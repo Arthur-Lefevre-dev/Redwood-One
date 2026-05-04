@@ -1,0 +1,34 @@
+# NVIDIA CUDA runtime for local GPU. Replace with python:3.11-slim if no NVIDIA GPU.
+FROM nvidia/cuda:12.3.1-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Mesa user-space for AMD (VAAPI) — the CUDA base image alone has no radeonsi VA driver.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3-pip \
+    python3.11-dev \
+    ffmpeg \
+    pciutils \
+    vainfo \
+    aria2 \
+    mesa-va-drivers \
+    libva2 \
+    libdrm2 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python3 && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python
+
+WORKDIR /app
+# Celery workers must resolve top-level packages `db`, `core`, `config`, etc.
+ENV PYTHONPATH=/app
+
+COPY requirements-base.txt requirements-worker.txt .
+RUN pip3 install --no-cache-dir -r requirements-worker.txt
+
+COPY . .
+
+RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents
+
+CMD ["celery", "-A", "worker.tasks", "worker", "--loglevel=info", "--concurrency=2"]

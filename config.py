@@ -1,0 +1,48 @@
+"""Application configuration loaded from environment."""
+
+from functools import lru_cache
+from typing import List
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    DATABASE_URL: str = "postgresql://redwood:redwood@localhost:5432/redwood"
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    SECRET_KEY: str = "dev-secret-change-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    TMDB_API_KEY: str = ""
+
+    S3_ENDPOINT_URL: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET_NAME: str = "redwood-films"
+    S3_REGION: str = "gra"
+
+    MAX_UPLOAD_SIZE: int = 53_687_091_200  # 50 GB
+    ALLOWED_ORIGINS: str = "http://localhost"
+
+    # GPU: auto | amd | nvidia | intel | cpu — "amd" forces VAAPI if /dev/dri + ffmpeg vaapi (see docker-compose /dev/dri)
+    REDWOOD_GPU_VENDOR: str = ""
+
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "admin"
+    ADMIN_EMAIL: str = "admin@redwoodplus.local"
+
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

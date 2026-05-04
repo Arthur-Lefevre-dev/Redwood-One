@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Film — Redwood Plus</title>
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+  <style>
+    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222}
+    .brand{font-weight:700;color:var(--accent)}
+    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
+    .backdrop{min-height:320px;background-size:cover;background-position:center;border-bottom:1px solid #222}
+    .wrap{max-width:980px;margin:-80px auto 0;padding:0 24px 40px;position:relative}
+    .poster{width:180px;border-radius:12px;border:2px solid #222;float:left;margin-right:22px}
+    h1{font-size:1.6rem;margin-bottom:8px}
+    .meta{color:var(--muted);font-size:13px;margin-bottom:12px}
+    .syno{color:#ddd;line-height:1.55;font-size:14px;margin-bottom:20px}
+    .tech{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;font-size:12px;color:var(--muted);margin-bottom:20px}
+    video{max-width:100%;border-radius:12px;background:#000}
+    .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+    .pill{padding:6px 10px;border-radius:999px;background:#1a1a1a;border:1px solid #333;font-size:12px}
+    .similar{margin-top:32px}
+    .similar h2{font-size:1rem;margin-bottom:12px}
+    .cards{display:flex;gap:10px;overflow-x:auto}
+    .c{flex:0 0 120px;background:#141414;border:1px solid #222;border-radius:8px;overflow:hidden;cursor:pointer}
+    .c img{width:100%;aspect-ratio:2/3;object-fit:cover}
+    .c .t{padding:6px 8px;font-size:11px}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand">Redwood Plus</div>
+    <div>
+      <a href="/watch/">Accueil</a>
+      <a href="/watch/categories.html">Catégories</a>
+      <a href="#" id="nav-logout">Déconnexion</a>
+    </div>
+  </nav>
+  <div class="backdrop" id="backdrop"></div>
+  <main class="wrap">
+    <img class="poster" id="poster" alt="" />
+    <h1 id="title">…</h1>
+    <div class="meta" id="meta"></div>
+    <div class="syno" id="syno"></div>
+    <div class="tech" id="tech"></div>
+    <!-- No crossorigin: presigned S3 URLs rarely send CORS headers; without it, cross-origin video still plays. -->
+    <video id="player" playsinline controls></video>
+    <div class="row" id="actors"></div>
+    <section class="similar">
+      <h2>Autres films</h2>
+      <div class="cards" id="sim"></div>
+    </section>
+  </main>
+  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+  <script src="./app.js"></script>
+  <script>
+    document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+    const params = new URLSearchParams(location.search);
+    const id = params.get('id');
+
+    async function boot() {
+      await api('/api/auth/me');
+      if (!id) { location.href = '/watch/'; return; }
+      const r = await api('/api/films/' + id);
+      const f = await r.json();
+      document.getElementById('title').textContent = f.titre;
+      document.getElementById('meta').textContent = [f.annee, f.duree_min ? f.duree_min + ' min' : '', f.realisateur].filter(Boolean).join(' · ');
+      document.getElementById('syno').textContent = f.synopsis || '';
+      const pu = f.poster_url || '';
+      document.getElementById('poster').src = pu;
+      document.getElementById('backdrop').style.backgroundImage = pu ? `linear-gradient(180deg,rgba(10,10,10,.2),#0a0a0a),url('${pu}')` : 'none';
+      document.getElementById('tech').innerHTML = `
+        <div><b>Résolution</b><br>${f.resolution || '—'}</div>
+        <div><b>Codec</b><br>${f.codec_video || '—'}</div>
+        <div><b>Note TMDB</b><br>${f.note_tmdb ?? '—'}</div>`;
+      const act = document.getElementById('actors');
+      act.innerHTML = '';
+      (f.acteurs || []).slice(0, 12).forEach(a => {
+        const p = document.createElement('span');
+        p.className = 'pill';
+        p.textContent = a;
+        act.appendChild(p);
+      });
+
+      const su = await api('/api/films/' + id + '/stream-url');
+      const stream = await su.json();
+      const video = document.getElementById('player');
+      video.src = stream.url;
+      new Plyr(video);
+
+      const all = await api('/api/films');
+      const films = await all.json();
+      const sim = document.getElementById('sim');
+      films.filter(x => String(x.id) !== String(id)).slice(0, 12).forEach(x => {
+        const c = document.createElement('div');
+        c.className = 'c';
+        c.onclick = () => location.href = '/watch/film.html?id=' + x.id;
+        const img = x.poster_path ? posterUrl(x.poster_path) : '';
+        c.innerHTML = `<img src="${img}" alt="" loading="lazy" /><div class="t"></div>`;
+        c.querySelector('.t').textContent = x.titre;
+        sim.appendChild(c);
+      });
+    }
+    boot().catch(() => { location.href = '/login.html'; });
+  </script>
+</body>
+</html>

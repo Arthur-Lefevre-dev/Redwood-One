@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Redwood Plus</title>
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+  <style>
+    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222}
+    .brand{font-weight:700;color:var(--accent);letter-spacing:0.02em}
+    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
+    nav a:hover{color:#fff}
+    .hero{margin:24px 28px;padding:48px;border-radius:16px;background:linear-gradient(120deg,#1a0a0a,#0a0a0a);border:1px solid #222;min-height:220px;display:flex;flex-direction:column;justify-content:flex-end}
+    .hero h1{font-size:2rem;margin-bottom:8px}
+    .hero p{color:var(--muted);max-width:560px;line-height:1.5}
+    .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px}
+    .row-head h2{font-size:1rem;color:#ddd}
+    .row-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 28px 28px;scroll-snap-type:x mandatory}
+    .card{flex:0 0 160px;scroll-snap-align:start;background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer}
+    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:#222}
+    .card .t{padding:8px 10px;font-size:12px;line-height:1.3}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand">Redwood Plus</div>
+    <div>
+      <a href="/watch/">Accueil</a>
+      <a href="/watch/categories.html">Catégories</a>
+      <a href="#" id="nav-logout">Déconnexion</a>
+    </div>
+  </nav>
+  <section class="hero" id="hero">
+    <h1 id="hero-title">Chargement…</h1>
+    <p id="hero-desc"></p>
+  </section>
+  <div class="row-head"><h2>Tendances</h2></div>
+  <div class="row-scroll" id="row-featured"></div>
+  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="./app.js"></script>
+  <script>
+    document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+
+    async function boot() {
+      await api('/api/auth/me');
+      const fr = await api('/api/films/featured');
+      const featured = await fr.json();
+      const row = document.getElementById('row-featured');
+      row.innerHTML = '';
+      if (featured.length) {
+        const h = featured[0];
+        document.getElementById('hero-title').textContent = h.titre;
+        document.getElementById('hero-desc').textContent = (h.synopsis || '').slice(0, 220) + (h.synopsis && h.synopsis.length > 220 ? '…' : '');
+        document.getElementById('hero').style.cursor = 'pointer';
+        document.getElementById('hero').onclick = () => location.href = '/watch/film.html?id=' + h.id;
+      } else {
+        document.getElementById('hero-title').textContent = 'Bienvenue';
+        document.getElementById('hero-desc').textContent = 'Ajoutez des films depuis l’administration.';
+      }
+      featured.forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.onclick = () => location.href = '/watch/film.html?id=' + f.id;
+        const img = f.poster_path ? posterUrl(f.poster_path) : '';
+        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
+        el.querySelector('.t').textContent = f.titre;
+        row.appendChild(el);
+      });
+    }
+    boot().catch(() => { location.href = '/login.html'; });
+  </script>
+</body>
+</html>

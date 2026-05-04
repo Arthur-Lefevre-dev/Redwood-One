@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Administration — Redwood Plus</title>
+  <style>
+:root{
+  --font-sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --color-background-primary:#fff;
+  --color-background-secondary:#f7f7f8;
+  --color-background-tertiary:#ececf0;
+  --color-border-secondary:#d4d4d8;
+  --color-border-tertiary:#e4e4e7;
+  --color-text-primary:#18181b;
+  --color-text-secondary:#3f3f46;
+  --color-text-tertiary:#71717a;
+  --color-text-danger:#b91c1c;
+  --color-text-warning:#b45309;
+  --border-radius-md:8px;
+  --border-radius-lg:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);background:var(--color-background-tertiary)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.layout{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.sidebar{background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);padding:16px 0;display:flex;flex-direction:column}
+.sidebar-logo{padding:0 16px 16px;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:8px}
+.logo-text{font-size:14px;font-weight:500;color:#8B2500}
+.logo-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+.nav-section{padding:8px 16px 4px;font-size:10px;color:var(--color-text-tertiary);letter-spacing:0.08em;text-transform:uppercase;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:13px;color:var(--color-text-secondary);cursor:pointer;border-left:2px solid transparent}
+.nav-item:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
+.nav-item.active{color:#8B2500;background:#FEF2EE;border-left-color:#8B2500}
+.nav-icon{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-badge{margin-left:auto;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--color-background-secondary);color:var(--color-text-tertiary)}
+.nav-badge.red{background:#FCEBEB;color:#A32D2D}
+.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:0.5px solid var(--color-border-tertiary)}
+.user-row{display:flex;align-items:center;gap:8px}
+.user-avatar{width:28px;height:28px;border-radius:50%;background:#8B2500;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0}
+.user-info{min-width:0}
+.user-name{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:10px;color:var(--color-text-tertiary)}
+.main{display:flex;flex-direction:column;overflow:hidden;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary)}
+.page-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
+.page-sub{font-size:12px;color:var(--color-text-tertiary);margin-top:1px}
+.topbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font-size:12px;padding:6px 14px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.btn-primary{background:#8B2500;color:#fff;border-color:#8B2500}
+.btn-primary:hover{background:#712B13}
+.gpu-pill{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border-radius:20px;background:#EAF3DE;color:#27500A;border:0.5px solid #C0DD97;max-width:280px}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-green{background:#639922}
+.dot-amber{background:#BA7517}
+.content{flex:1;overflow-y:auto;padding:20px}
+.page{display:none}
+.page.active{display:block}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
+.stat-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:500;color:var(--color-text-primary)}
+.stat-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.card-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.card-body{padding:16px}
+.upload-zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:28px 20px;text-align:center;background:var(--color-background-secondary);cursor:pointer;margin-bottom:12px}
+.upload-zone:hover{border-color:#8B2500;background:#FEF9F7}
+.upload-icon{width:36px;height:36px;border-radius:50%;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:16px}
+.upload-title{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.upload-sub{font-size:12px;color:var(--color-text-tertiary)}
+.magnet-row{display:flex;gap:8px;margin-bottom:16px}
+.magnet-input{flex:1;font-size:13px;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);font-family:var(--font-mono)}
+.queue-list{display:flex;flex-direction:column;gap:8px}
+.queue-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)}
+.qi-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#1a1a2a;color:#fff}
+.qi-info{flex:1;min-width:0}
+.qi-title{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qi-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:1px;white-space:pre-line;line-height:1.45}
+.qi-status{flex-shrink:0}
+.status-pill{font-size:10px;padding:3px 8px;border-radius:10px;white-space:nowrap}
+.s-transcoding{background:#FAEEDA;color:#633806}
+.s-done{background:#EAF3DE;color:#27500A}
+.s-waiting{background:var(--color-background-secondary);color:var(--color-text-tertiary);border:0.5px solid var(--color-border-tertiary)}
+.s-error{background:#FCEBEB;color:#A32D2D}
+.s-uploading{background:#E6F1FB;color:#0C447C}
+.s-direct{background:#EAF3DE;color:#27500A}
+.s-opt{background:#E1F5EE;color:#085041}
+.s-trans{background:#FAEEDA;color:#633806}
+.progress-bar{height:3px;background:var(--color-border-tertiary);border-radius:2px;margin-top:4px}
+.progress-fill{height:100%;border-radius:2px;background:#8B2500}
+.film-table{width:100%;border-collapse:collapse}
+.film-table th{font-size:11px;color:var(--color-text-tertiary);text-align:left;padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary);font-weight:400}
+.film-table td{font-size:12px;padding:9px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+.film-table tr:last-child td{border-bottom:none}
+.film-thumb{width:36px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;background:#27272a;color:#fff}
+.film-actions{display:flex;gap:4px;flex-wrap:wrap}
+.action-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer}
+.action-btn.danger{color:#A32D2D;border-color:#F09595}
+.users-table{width:100%;border-collapse:collapse}
+.users-table th{font-size:11px;color:var(--color-text-tertiary);text-align:left;padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary);font-weight:400}
+.users-table td{font-size:12px;padding:9px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
+.users-table tr:last-child td{border-bottom:none}
+.role-badge{font-size:10px;padding:2px 8px;border-radius:10px}
+.role-admin{background:#FAECE7;color:#712B13}
+.role-viewer{background:#E6F1FB;color:#0C447C}
+.active-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.gpu-info{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gpu-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
+.gpu-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px}
+.gpu-val{font-size:13px;font-weight:500;color:var(--color-text-primary)}
+.gpu-bar{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin-top:8px}
+.gpu-fill{height:100%;border-radius:3px}
+#upload-progress{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin:8px 0;display:none}
+#upload-progress .fill{height:100%;width:0;background:#8B2500;border-radius:3px}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-backdrop.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:18px;width:min(420px,92vw);border:1px solid var(--color-border-tertiary)}
+.modal h3{font-size:14px;margin-bottom:12px}
+.modal input{width:100%;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary)}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.hidden{display:none!important}
+  </style>
+</head>
+<body>
+<h2 class="sr-only">Administration Redwood Plus</h2>
+<div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;margin:12px">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">Redwood Plus</div>
+      <div class="logo-sub">Administration</div>
+    </div>
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" data-page="pipeline">
+      <span class="nav-icon">▦</span>
+      Pipeline
+      <span class="nav-badge red" id="badge-queue">0</span>
+    </div>
+    <div class="nav-item" data-page="films">
+      <span class="nav-icon">▣</span>
+      Bibliothèque
+      <span class="nav-badge" id="badge-lib">0</span>
+    </div>
+    <div class="nav-section">Système</div>
+    <div class="nav-item" data-page="users">
+      <span class="nav-icon">◎</span>
+      Utilisateurs
+    </div>
+    <div class="nav-item" data-page="gpu">
+      <span class="nav-icon">▤</span>
+      GPU & Système
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="user-avatar" id="sb-av">?</div>
+        <div class="user-info">
+          <div class="user-name" id="sb-name">…</div>
+          <div class="user-role" id="sb-role">…</div>
+        </div>
+      </div>
+      <button class="btn" id="btn-logout" style="width:100%;margin-top:10px">Déconnexion</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <section class="page active" id="page-pipeline">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Pipeline</div>
+          <div class="page-sub">Ajout et traitement des films</div>
+        </div>
+        <div class="topbar-right">
+          <div class="gpu-pill" id="gpu-pill-pipeline"><span class="dot dot-green"></span><span id="gpu-pill-text">GPU</span></div>
+        </div>
+      </header>
+      <div class="content">
+        <div class="stat-grid">
+          <div class="stat"><div class="stat-label">En cours</div><div class="stat-val" id="st-running">0</div><div class="stat-sub">transcodage / file</div></div>
+          <div class="stat"><div class="stat-label">En attente</div><div class="stat-val" id="st-wait">0</div><div class="stat-sub">dans la file</div></div>
+          <div class="stat"><div class="stat-label">Bibliothèque</div><div class="stat-val" id="st-done">0</div><div class="stat-sub">disponibles</div></div>
+          <div class="stat"><div class="stat-label">Erreurs</div><div class="stat-val" id="st-err" style="color:var(--color-text-danger)">0</div><div class="stat-sub">à traiter</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Ajouter un film</div></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;font-weight:500">Upload direct</div>
+                <div class="upload-zone" id="drop-zone">
+                  <div class="upload-icon">↑</div>
+                  <div class="upload-title">Glisser un fichier ici</div>
+                  <div class="upload-sub">MP4, MKV, AVI, MOV, WMV, M4V — max 50 GB</div>
+                </div>
+                <input type="file" id="file-input" class="hidden" accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v" />
+                <div id="upload-progress"><div class="fill" id="upload-fill"></div></div>
+                <button class="btn btn-primary" style="width:100%" id="btn-browse" type="button">Parcourir les fichiers</button>
+              </div>
+              <div>
+                <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;font-weight:500">Via torrent</div>
+                <div class="magnet-row">
+                  <input class="magnet-input" id="magnet-input" placeholder="magnet:?xt=urn:btih:…" />
+                </div>
+                <div class="upload-zone" id="torrent-drop" style="padding:14px;margin-bottom:8px">
+                  <div style="font-size:12px;color:var(--color-text-tertiary)">Déposer un fichier .torrent</div>
+                </div>
+                <input type="file" id="torrent-input" class="hidden" accept=".torrent" />
+                <button class="btn btn-primary" style="width:100%" id="btn-magnet" type="button">Ajouter à la file (magnet)</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">File de traitement</div>
+            <div style="font-size:12px;color:var(--color-text-tertiary)" id="queue-meta"></div>
+          </div>
+          <div class="card-body" style="padding:8px 12px">
+            <div class="queue-list" id="queue-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-films">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Bibliothèque</div>
+          <div class="page-sub" id="lib-sub">Films</div>
+        </div>
+        <div class="topbar-right">
+          <input id="lib-search" style="font-size:12px;padding:5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:180px" placeholder="Rechercher…" />
+        </div>
+      </header>
+      <div class="content">
+        <div class="card">
+          <div class="card-head"><div class="card-title">Films</div></div>
+          <div class="card-body" style="padding:0;overflow:auto">
+            <table class="film-table">
+              <thead>
+                <tr>
+                  <th style="padding-left:16px">Film</th>
+                  <th>Année</th>
+                  <th>Taille</th>
+                  <th>Codec</th>
+                  <th>Traitement</th>
+                  <th>Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="lib-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-users">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Utilisateurs</div>
+          <div class="page-sub">Gestion des accès</div>
+        </div>
+        <div class="topbar-right">
+          <button class="btn btn-primary" id="btn-new-user" type="button">+ Nouvel utilisateur</button>
+        </div>
+      </header>
+      <div class="content">
+        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat"><div class="stat-label">Total</div><div class="stat-val" id="u-total">0</div></div>
+          <div class="stat"><div class="stat-label">Admins</div><div class="stat-val" id="u-adm">0</div></div>
+          <div class="stat"><div class="stat-label">Viewers</div><div class="stat-val" id="u-view">0</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Comptes</div></div>
+          <div class="card-body" style="padding:0">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th style="padding-left:16px">Utilisateur</th>
+                  <th>Rôle</th>
+                  <th>Statut</th>
+                  <th>Dernière connexion</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page" id="page-gpu">
+      <header class="topbar">
+        <div>
+          <div class="page-title">GPU & Système</div>
+          <div class="page-sub">Ressources locales</div>
+        </div>
+        <div class="topbar-right">
+          <div class="gpu-pill" id="gpu-pill2"><span class="dot dot-green"></span><span id="gpu-active">GPU</span></div>
+        </div>
+      </header>
+      <div class="content">
+        <div class="stat-grid">
+          <div class="stat"><div class="stat-label">GPU</div><div class="stat-val" style="font-size:13px" id="g-name">—</div><div class="stat-sub" id="g-sub">—</div></div>
+          <div class="stat"><div class="stat-label">VRAM</div><div class="stat-val" id="g-vram">—</div><div class="stat-sub" id="g-vram-sub">—</div></div>
+          <div class="stat"><div class="stat-label">Charge GPU</div><div class="stat-val" id="g-load">—</div><div class="stat-sub">utilisation</div></div>
+          <div class="stat"><div class="stat-label">Température</div><div class="stat-val" id="g-temp">—</div><div class="stat-sub">°C</div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="card-title">Ressources en temps réel</div></div>
+          <div class="card-body">
+            <div class="gpu-info">
+              <div class="gpu-card"><div class="gpu-label">Charge GPU</div><div class="gpu-val" id="b-gpu">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-gpu" style="width:0;background:#8B2500"></div></div></div>
+              <div class="gpu-card"><div class="gpu-label">VRAM</div><div class="gpu-val" id="b-vram">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-vram" style="width:0;background:#185FA5"></div></div></div>
+              <div class="gpu-card"><div class="gpu-label">CPU</div><div class="gpu-val" id="b-cpu">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-cpu" style="width:0;background:#3B6D11"></div></div></div>
+              <div class="gpu-card"><div class="gpu-label">RAM</div><div class="gpu-val" id="b-ram">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-ram" style="width:0;background:#633806"></div></div></div>
+            </div>
+            <div style="margin-top:14px;padding:12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
+              <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Encodeur sélectionné</div>
+              <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6" id="enc-block"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+
+<div class="modal-backdrop" id="modal-user">
+  <div class="modal">
+    <h3>Nouvel utilisateur</h3>
+    <input id="nu-user" placeholder="username" autocomplete="off" />
+    <input id="nu-email" placeholder="email" type="email" />
+    <input id="nu-pass" placeholder="mot de passe" type="password" />
+    <select id="nu-role" style="width:100%;padding:8px;border-radius:8px;margin-bottom:10px">
+      <option value="viewer">viewer</option>
+      <option value="admin">admin</option>
+    </select>
+    <div class="row">
+      <button class="btn" type="button" id="nu-cancel">Annuler</button>
+      <button class="btn btn-primary" type="button" id="nu-save">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { credentials: 'include', ...opts });
+  if (r.status === 401) {
+    window.location.href = '/login.html';
+    throw new Error('401');
+  }
+  return r;
+}
+
+function initials(name) {
+  return (name || '?').split(/[.\s]+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('') || '?';
+}
+
+function fmtBytes(n) {
+  if (n == null) return '—';
+  const u = ['o', 'Ko', 'Mo', 'Go', 'To'];
+  let i = 0;
+  let x = Number(n);
+  while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
+  return `${x.toFixed(i ? 1 : 0)} ${u[i]}`;
+}
+
+function fmtRate(bps) {
+  const n = Number(bps) || 0;
+  if (n <= 0) return '0 o/s';
+  const u = ['o/s', 'Ko/s', 'Mo/s', 'Go/s'];
+  let i = 0;
+  let x = n;
+  while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
+  return `${x < 10 && i > 0 ? x.toFixed(1) : Math.round(x)} ${u[i]}`;
+}
+
+function transcodeProgressLabel(progress, traitement, statut) {
+  if (statut !== 'en_cours') return '';
+  if (!traitement || (traitement !== 'transcode' && traitement !== 'optimise')) return '';
+  const p = Number(progress);
+  if (Number.isNaN(p)) return '';
+  if (p >= 45 && p < 75) {
+    const inner = Math.round(((p - 45) / 30) * 100);
+    return `Transcodage: ${inner}%`;
+  }
+  if (p >= 75 && p < 100) return `Envoi S3… (${p}%)`;
+  return '';
+}
+
+function torrentCompletionPct(ts) {
+  const done = Number(ts.completed_bytes) || 0;
+  const total = Number(ts.total_bytes) || 0;
+  if (total <= 0) return null;
+  return Math.min(100, Math.max(0, Math.round((100 * done) / total)));
+}
+
+function torrentStatsLine(ts, source) {
+  if (source !== 'torrent' || !ts || typeof ts !== 'object') return '';
+  const pct = torrentCompletionPct(ts);
+  const done = Number(ts.completed_bytes) || 0;
+  const total = Number(ts.total_bytes) || 0;
+  let completion = '';
+  if (pct != null) {
+    completion = `Complétion: ${pct} % (${fmtBytes(done)} / ${fmtBytes(total)})`;
+  }
+  const s = ts.seeders != null ? ts.seeders : '—';
+  const l = ts.leechers != null ? ts.leechers : '—';
+  const p = ts.connections != null ? ts.connections : '—';
+  const d = fmtRate(ts.download_bps);
+  const u = fmtRate(ts.upload_bps);
+  const peers = `S: ${s} · L: ${l} · pairs: ${p} · ↓ ${d} · ↑ ${u}`;
+  return completion ? `${completion}\n${peers}` : peers;
+}
+
+function goPage(p) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + p).classList.add('active');
+  const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
+  if (nav) nav.classList.add('active');
+  if (p === 'films') loadLibrary();
+  if (p === 'users') loadUsers();
+  if (p === 'gpu') loadGpuOnce();
+}
+
+document.querySelectorAll('.nav-item[data-page]').forEach(el => {
+  el.addEventListener('click', () => goPage(el.dataset.page));
+});
+
+async function boot() {
+  const r = await api('/api/auth/me');
+  const me = await r.json();
+  $('#sb-name').textContent = me.username;
+  $('#sb-role').textContent = me.role === 'admin' ? 'Administrateur' : 'Viewer';
+  $('#sb-av').textContent = initials(me.username);
+  if (me.role !== 'admin') {
+    window.location.href = '/watch/';
+    return;
+  }
+  await refreshStats();
+  await refreshQueue();
+  await refreshGpuPill();
+  setInterval(refreshStats, 8000);
+  setInterval(() => { if ($('#page-pipeline').classList.contains('active')) refreshQueue(); }, 2000);
+  setInterval(() => { if ($('#page-gpu').classList.contains('active')) loadGpuOnce(); }, 3000);
+}
+
+$('#btn-logout').addEventListener('click', async () => {
+  await api('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login.html';
+});
+
+async function refreshStats() {
+  const r = await api('/api/films/stats');
+  const s = await r.json();
+  $('#st-running').textContent = s.en_cours;
+  $('#st-wait').textContent = Math.max(0, s.en_cours);
+  $('#st-done').textContent = s.disponible;
+  $('#st-err').textContent = s.erreur;
+  $('#badge-lib').textContent = s.disponible;
+}
+
+async function refreshQueue() {
+  const r = await api('/api/admin/queue');
+  const q = await r.json();
+  const items = q.items || [];
+  $('#badge-queue').textContent = items.filter(i => i.statut === 'en_cours').length;
+  $('#queue-meta').textContent = `${items.length} élément(s)`;
+  const list = $('#queue-list');
+  list.innerHTML = '';
+  items.forEach(i => {
+    const row = document.createElement('div');
+    row.className = 'queue-item';
+    const st = i.statut;
+    const pill = st === 'erreur' ? 's-error' : (st === 'en_cours' ? 's-transcoding' : 's-waiting');
+    const label = st === 'en_cours' ? 'En cours' : (st === 'erreur' ? 'Erreur' : st);
+    let progW = Math.min(100, i.progress || 0);
+    if (i.source === 'torrent' && i.torrent_stats && typeof i.torrent_stats === 'object') {
+      const tcp = torrentCompletionPct(i.torrent_stats);
+      if (tcp != null) progW = tcp;
+    }
+    row.innerHTML = `
+      <div class="qi-icon">▶</div>
+      <div class="qi-info">
+        <div class="qi-title"></div>
+        <div class="qi-sub"></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
+      </div>
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
+    row.querySelector('.qi-title').textContent = i.filename || ('#' + i.id);
+    const tline = torrentStatsLine(i.torrent_stats, i.source);
+    const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
+    const base = i.erreur_message || (i.traitement || 'Pipeline') + ' · ' + (i.source || '');
+    const subParts = [base];
+    if (tx) subParts.push(tx);
+    if (tline) subParts.push(tline);
+    row.querySelector('.qi-sub').textContent = subParts.join('\n');
+    list.appendChild(row);
+  });
+}
+
+async function refreshGpuPill() {
+  try {
+    const r = await api('/api/admin/system/stats');
+    const s = await r.json();
+    const enc = s.encoder || {};
+    const txt = (enc.vendor === 'cpu' ? '⚠ CPU — ' : '') + (s.gpu_label || enc.label || enc.vendor || 'GPU');
+    $('#gpu-pill-text').textContent = txt;
+    $('#gpu-active').textContent = txt;
+  } catch (_) {}
+}
+
+async function loadGpuOnce() {
+  const r = await api('/api/admin/system/stats');
+  const s = await r.json();
+  $('#g-name').textContent = s.gpu_label || '—';
+  $('#g-sub').textContent = (s.encoder && s.encoder.vendor) ? String(s.encoder.vendor).toUpperCase() : '';
+  $('#g-vram').textContent = s.vram_total_mb ? `${(s.vram_used_mb/1024).toFixed(1)} / ${(s.vram_total_mb/1024).toFixed(1)} GB` : '—';
+  $('#g-vram-sub').textContent = s.vram_total_mb ? 'VRAM' : 'nvidia-smi indisponible';
+  $('#g-load').textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
+  $('#g-temp').textContent = s.gpu_temp_c ? `${Math.round(s.gpu_temp_c)}°C` : '—';
+  $('#b-gpu').textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
+  $('#f-gpu').style.width = `${Math.min(100, s.gpu_util_percent || 0)}%`;
+  $('#b-vram').textContent = `${s.vram_percent || 0}%`;
+  $('#f-vram').style.width = `${Math.min(100, s.vram_percent || 0)}%`;
+  $('#b-cpu').textContent = `${s.cpu_percent || 0}%`;
+  $('#f-cpu').style.width = `${Math.min(100, s.cpu_percent || 0)}%`;
+  $('#b-ram').textContent = `${s.ram_percent || 0}%`;
+  $('#f-ram').style.width = `${Math.min(100, s.ram_percent || 0)}%`;
+  const enc = s.encoder || {};
+  const warn = enc.vendor === 'cpu' ? '⚠ Fallback CPU (lent). ' : '';
+  $('#enc-block').innerHTML = `${warn}Vendor <b>${enc.vendor || '—'}</b> — vidéo ` +
+    `<code>${enc.h264 || ''}</code> / <code>${enc.h265 || ''}</code>` +
+    (enc.hwaccel ? `<br>Hwaccel: <code>${enc.hwaccel}</code>` : '');
+  await refreshGpuPill();
+}
+
+function traitClass(t) {
+  if (t === 'direct') return 's-direct';
+  if (t === 'optimise') return 's-opt';
+  if (t === 'transcode') return 's-trans';
+  return 's-waiting';
+}
+
+async function loadLibrary() {
+  const q = $('#lib-search').value.trim();
+  const url = '/api/admin/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
+  const r = await api(url);
+  const rows = await r.json();
+  $('#lib-sub').textContent = `${rows.length} titre(s)`;
+  const tb = $('#lib-body');
+  tb.innerHTML = '';
+  rows.forEach(f => {
+    const tr = document.createElement('tr');
+    const thumb = (f.poster_path ? '🎬' : '🎞');
+    tr.innerHTML = `
+      <td style="padding-left:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="film-thumb">${thumb}</div>
+          <div>
+            <div style="font-weight:500"></div>
+            <div style="font-size:10px;color:var(--color-text-tertiary)"></div>
+          </div>
+        </div>
+      </td>
+      <td></td><td></td><td></td><td></td><td></td><td></td>`;
+    tr.querySelector('div[style*="font-weight:500"]').textContent = f.titre;
+    tr.querySelector('div[style*="font-size:10px"]').textContent = f.realisateur || '';
+    const tds = tr.querySelectorAll('td');
+    tds[1].textContent = f.annee ?? '—';
+    tds[2].textContent = fmtBytes(f.taille_octets);
+    tds[3].innerHTML = f.codec_video ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>` : '—';
+    const tp = f.traitement || '—';
+    tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
+    tds[5].innerHTML = `<span class="status-pill ${f.statut === 'disponible' ? 's-done' : (f.statut === 'erreur' ? 's-error' : 's-transcoding')}">${f.statut}</span>`;
+    const actions = document.createElement('div');
+    actions.className = 'film-actions';
+    const b1 = document.createElement('button');
+    b1.className = 'action-btn';
+    b1.textContent = 'TMDB';
+    b1.onclick = async () => { await api(`/api/films/${f.id}/refresh-tmdb`, { method: 'POST' }); loadLibrary(); };
+    const b2 = document.createElement('button');
+    b2.className = 'action-btn danger';
+    b2.textContent = 'Suppr.';
+    b2.onclick = async () => {
+      if (!confirm('Supprimer ce film ?')) return;
+      await api(`/api/films/${f.id}`, { method: 'DELETE' });
+      loadLibrary();
+    };
+    actions.appendChild(b1);
+    actions.appendChild(b2);
+    tds[6].appendChild(actions);
+    tb.appendChild(tr);
+  });
+}
+
+$('#lib-search').addEventListener('input', () => { clearTimeout(window._ls); window._ls = setTimeout(loadLibrary, 300); });
+
+async function loadUsers() {
+  const r = await api('/api/admin/users');
+  const rows = await r.json();
+  let na = 0, nv = 0;
+  rows.forEach(u => { if (u.role === 'admin') na++; else nv++; });
+  $('#u-total').textContent = rows.length;
+  $('#u-adm').textContent = na;
+  $('#u-view').textContent = nv;
+  const tb = $('#users-body');
+  tb.innerHTML = '';
+  rows.forEach(u => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="padding-left:16px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:26px;height:26px;border-radius:50%;background:#8B2500;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:#fff;flex-shrink:0"></div>
+          <div>
+            <div style="font-weight:500"></div>
+            <div style="font-size:10px;color:var(--color-text-tertiary)"></div>
+          </div>
+        </div>
+      </td>
+      <td></td><td></td><td></td><td></td>`;
+    tr.querySelector('div[style*="width:26px"]').textContent = initials(u.username);
+    tr.querySelector('div[style*="font-weight:500"]').textContent = u.username;
+    tr.querySelector('div[style*="font-size:10px"]').textContent = u.email;
+    const tds = tr.querySelectorAll('td');
+    tds[1].innerHTML = `<span class="role-badge ${u.role === 'admin' ? 'role-admin' : 'role-viewer'}">${u.role}</span>`;
+    const dot = u.is_active ? '#639922' : '#BA7517';
+    tds[2].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? 'Actif' : 'Inactif'}</span>`;
+    const dc = u.derniere_connexion ? new Date(u.derniere_connexion).toLocaleString() : '—';
+    tds[3].textContent = dc;
+    const act = document.createElement('div');
+    act.className = 'film-actions';
+    const b0 = document.createElement('button');
+    b0.className = 'action-btn danger';
+    b0.textContent = 'Désactiver';
+    b0.onclick = async () => {
+      await api(`/api/admin/users/${u.id}/deactivate`, { method: 'PATCH' });
+      loadUsers();
+    };
+    const b1 = document.createElement('button');
+    b1.className = 'action-btn danger';
+    b1.textContent = 'Suppr.';
+    b1.onclick = async () => {
+      if (!confirm('Supprimer utilisateur ?')) return;
+      await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+      loadUsers();
+    };
+    act.appendChild(b0);
+    act.appendChild(b1);
+    tds[4].appendChild(act);
+    tb.appendChild(tr);
+  });
+}
+
+$('#btn-new-user').addEventListener('click', () => { $('#modal-user').classList.add('show'); });
+$('#nu-cancel').addEventListener('click', () => { $('#modal-user').classList.remove('show'); });
+$('#nu-save').addEventListener('click', async () => {
+  const body = {
+    username: $('#nu-user').value.trim(),
+    email: $('#nu-email').value.trim(),
+    password: $('#nu-pass').value,
+    role: $('#nu-role').value,
+  };
+  const r = await api('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) { alert('Échec création'); return; }
+  $('#modal-user').classList.remove('show');
+  loadUsers();
+});
+
+function uploadWithProgress(file) {
+  const bar = $('#upload-progress');
+  const fill = $('#upload-fill');
+  bar.style.display = 'block';
+  fill.style.width = '0%';
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/admin/upload');
+  xhr.withCredentials = true;
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const p = Math.round(100 * e.loaded / e.total);
+    fill.style.width = p + '%';
+  };
+  xhr.onload = () => {
+    bar.style.display = 'none';
+    if (xhr.status >= 200 && xhr.status < 300) {
+      refreshQueue();
+      refreshStats();
+    } else {
+      alert('Upload échoué');
+    }
+  };
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  xhr.send(fd);
+}
+
+$('#btn-browse').addEventListener('click', () => $('#file-input').click());
+$('#file-input').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) uploadWithProgress(f);
+});
+
+const dz = $('#drop-zone');
+['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+dz.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f) uploadWithProgress(f);
+});
+
+$('#btn-magnet').addEventListener('click', async () => {
+  const m = $('#magnet-input').value.trim();
+  if (!m.startsWith('magnet:?')) { alert('Magnet invalide'); return; }
+  const r = await api('/api/admin/torrents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ magnet: m }) });
+  if (!r.ok) { alert('Échec'); return; }
+  refreshQueue();
+});
+
+const tdz = $('#torrent-drop');
+['dragenter','dragover'].forEach(ev => tdz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+tdz.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const fd = new FormData();
+  fd.append('torrent', f);
+  const r = await fetch('/api/admin/torrents/file', { method: 'POST', body: fd, credentials: 'include' });
+  if (r.status === 401) window.location.href = '/login.html';
+  if (!r.ok) { alert('Échec torrent'); return; }
+  refreshQueue();
+});
+
+boot().catch(() => { window.location.href = '/login.html'; });
+</script>
+</body>
+</html>

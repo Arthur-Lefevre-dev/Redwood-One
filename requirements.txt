@@ -1,0 +1,4 @@
+# Local dev: base + tests. In Docker, torrents use system `aria2` (see Dockerfile.worker).
+-r requirements-base.txt
+
+pytest==8.2.0

@@ -1,0 +1,249 @@
+"""Unified film processing: ffprobe → transcode decision → TMDB → S3."""
+
+import logging
+import os
+import re
+import subprocess
+import threading
+import time
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Tuple
+
+from sqlalchemy.orm import Session
+
+from core.ffprobe import FFprobeError, probe, summarize
+from core.gpu_detect import get_encoder
+from core.logging_json import log_event
+from core.s3 import build_object_key, presigned_stream_url, upload_file
+from core.tmdb import enrich_from_filename
+from db.models import Film, FilmStatut, FilmTraitement
+
+logger = logging.getLogger(__name__)
+
+THREE_GB = 3 * 1024 * 1024 * 1024
+
+
+def decide_processing(path: str, meta: Dict[str, Any]) -> Tuple[FilmTraitement, bool]:
+    """
+    Returns (traitement, needs_transcode).
+    needs_transcode False means upload source file as-is.
+    """
+    suf = Path(path).suffix.lower()
+    size = int(meta.get("size_bytes") or 0)
+    if suf != ".mp4":
+        return FilmTraitement.transcode, True
+    if size >= THREE_GB:
+        return FilmTraitement.optimise, True
+    return FilmTraitement.direct, False
+
+
+def _build_ffmpeg_cmd(
+    input_path: str,
+    output_path: str,
+    use_h265: bool,
+) -> list[str]:
+    enc = get_encoder()
+    cmd: list[str] = ["ffmpeg", "-y"]
+    if enc.get("hwaccel") == "-hwaccel" and enc.get("hwaccel_device") == "cuda":
+        cmd += ["-hwaccel", "cuda", "-hwaccel_output_format", "cuda"]
+    elif enc.get("hwaccel") == "-hwaccel" and enc.get("hwaccel_device") == "qsv":
+        cmd += ["-hwaccel", "qsv"]
+    elif enc.get("hwaccel") == "vaapi" and enc.get("hwaccel_device"):
+        cmd += ["-hwaccel", "vaapi", "-hwaccel_device", str(enc["hwaccel_device"])]
+    cmd += ["-i", input_path]
+    vcodec = enc["h265"] if use_h265 else enc["h264"]
+    cmd += ["-c:v", vcodec]
+    if enc["vendor"] == "cpu":
+        cmd += ["-crf", "23", "-maxrate", "4M", "-bufsize", "8M"]
+    elif "_vaapi" in vcodec:
+        cmd += ["-qp", "23", "-maxrate", "4M", "-bufsize", "8M"]
+    else:
+        cmd += ["-cq", "23", "-maxrate", "4M", "-bufsize", "8M"]
+    cmd += ["-c:a", "aac", "-b:a", "128k", str(output_path)]
+    return cmd
+
+
+_FFMPEG_TIME = re.compile(r"time=(\d+):(\d+):(\d+\.?\d*)")
+
+
+def _ffmpeg_time_to_sec(s: str) -> float:
+    m = _FFMPEG_TIME.search(s)
+    if not m:
+        return -1.0
+    h, mi, se = int(m.group(1)), int(m.group(2)), float(m.group(3))
+    return h * 3600 + mi * 60 + se
+
+
+def transcode_to_mp4(
+    input_path: str,
+    output_path: str,
+    use_h265: bool = True,
+    duration_sec: float = 0.0,
+    progress_frac: Optional[Callable[[float], None]] = None,
+) -> None:
+    """
+    Run ffmpeg; optional progress_frac(0..1) from stderr time= vs duration_sec.
+    progress_frac may be invoked from a side thread — caller must be thread-safe.
+    """
+    cmd = _build_ffmpeg_cmd(input_path, output_path, use_h265)
+    log_event(logger, "ffmpeg_start", cmd=" ".join(cmd))
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+    assert proc.stderr is not None
+    last_emit = [0.0, -1.0]  # monotonic time, last emitted fraction
+
+    def emit(frac: float) -> None:
+        if not progress_frac:
+            return
+        f = max(0.0, min(1.0, frac))
+        f = max(f, last_emit[1])
+        now = time.monotonic()
+        if f < 0.999 and abs(f - last_emit[1]) < 0.012 and (now - last_emit[0]) < 1.5:
+            return
+        last_emit[0] = now
+        last_emit[1] = f
+        progress_frac(f)
+
+    def read_stderr() -> None:
+        dur = float(duration_sec or 0.0)
+        best = 0.0
+        try:
+            for line in iter(proc.stderr.readline, ""):
+                if not line:
+                    break
+                t = _ffmpeg_time_to_sec(line)
+                if t < 0:
+                    continue
+                best = max(best, t)
+                if dur > 1.0:
+                    emit(best / dur)
+                elif progress_frac:
+                    emit(min(1.0, best / 300.0))
+        finally:
+            try:
+                proc.stderr.close()
+            except OSError:
+                pass
+
+    th = threading.Thread(target=read_stderr, name="ffmpeg-stderr", daemon=True)
+    th.start()
+    try:
+        rc = proc.wait(timeout=86400)
+    finally:
+        th.join(timeout=5)
+    if rc != 0:
+        raise RuntimeError(f"ffmpeg exited with code {rc}")
+    if progress_frac:
+        progress_frac(1.0)
+    log_event(logger, "ffmpeg_done", output=output_path)
+
+
+ProgressCb = Optional[Callable[[int], None]]
+
+
+def process_film_file(
+    db: Session,
+    film: Film,
+    local_path: str,
+    progress: ProgressCb = None,
+) -> None:
+    """Run full pipeline for an existing Film row."""
+    try:
+        if progress:
+            progress(5)
+        data = probe(local_path)
+        meta = summarize(data)
+        film.codec_video = meta.get("codec_video")
+        film.codec_audio = meta.get("codec_audio")
+        film.resolution = meta.get("resolution")
+        film.bitrate_kbps = meta.get("bitrate_kbps")
+        film.taille_octets = meta.get("size_bytes")
+        film.duree_min = meta.get("duration_min")
+        db.commit()
+
+        traitement, needs_tx = decide_processing(local_path, meta)
+        film.traitement = traitement
+        db.commit()
+        log_event(
+            logger,
+            "pipeline_decision",
+            film_id=film.id,
+            traitement=traitement.value,
+            needs_transcode=needs_tx,
+        )
+        if progress:
+            progress(25)
+
+        enrich = enrich_from_filename(Path(local_path).name)
+        for k, v in enrich.items():
+            if hasattr(film, k) and v is not None:
+                setattr(film, k, v)
+        db.commit()
+        if progress:
+            progress(45)
+
+        work_path = local_path
+        tmp_out: Optional[str] = None
+        if needs_tx:
+            tmp_out = str(
+                Path("/tmp/redwood/uploads") / f"{film.id}_out_{Path(local_path).stem}.mp4"
+            )
+            use_h265 = True
+            dur = float(meta.get("duration_sec") or 0.0)
+
+            def tx_progress(frac: float) -> None:
+                if progress:
+                    progress(45 + int(max(0.0, min(1.0, frac)) * 30))
+
+            transcode_to_mp4(
+                local_path,
+                tmp_out,
+                use_h265=use_h265,
+                duration_sec=dur,
+                progress_frac=tx_progress,
+            )
+            work_path = tmp_out
+            if progress:
+                progress(75)
+
+        key = build_object_key(film.id, Path(work_path).name)
+        upload_file(work_path, key)
+        film.s3_key = key
+        from config import get_settings
+
+        film.s3_bucket = get_settings().S3_BUCKET_NAME
+        film.url_streaming = presigned_stream_url(key, expires=86400)
+        film.statut = FilmStatut.disponible
+        film.erreur_message = None
+        film.pipeline_progress = 100
+        db.commit()
+        log_event(logger, "pipeline_complete", film_id=film.id, s3_key=key)
+
+        try:
+            os.remove(local_path)
+        except OSError:
+            pass
+        if tmp_out and tmp_out != local_path:
+            try:
+                os.remove(tmp_out)
+            except OSError:
+                pass
+    except FFprobeError as e:
+        _fail(db, film, str(e))
+    except Exception as e:
+        logger.exception("pipeline error film_id=%s", film.id)
+        _fail(db, film, str(e))
+
+
+def _fail(db: Session, film: Film, message: str) -> None:
+    film.statut = FilmStatut.erreur
+    film.erreur_message = message[:8000]
+    film.pipeline_progress = None
+    db.commit()
+    log_event(logger, "pipeline_error", film_id=film.id, error=message)

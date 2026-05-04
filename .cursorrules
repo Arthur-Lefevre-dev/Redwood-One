@@ -1,0 +1,315 @@
+# Contexte du projet
+
+Tu vas construire un pipeline de traitement automatique de fichiers vidéo.
+L'admin soumet un film via upload direct ou torrent. Les fichiers sont analysés,
+transcodés localement (GPU détecté automatiquement), enrichis via TMDB, stockés
+sur OVH S3, et accessibles via l'interface Netflix "Redwood Plus".
+
+
+# Stack technique
+
+- Backend         : Python 3.11+, FastAPI
+- Authentification : JWT (access 15min + refresh 7j), bcrypt (passlib)
+- Base de données  : PostgreSQL + SQLAlchemy ORM
+- File d'attente   : Celery + Redis
+- Torrent         : libtorrent (python-libtorrent)
+- Upload direct   : FastAPI UploadFile (multipart/form-data, chunked) nouveau
+- Analyse vidéo   : ffprobe (via subprocess)
+- Transcodage     : ffmpeg — GPU local détecté auto, fallback CPU modifié
+- Enrichissement  : API TMDB gratuite (httpx async)
+- Stockage        : OVH Object Storage S3 (boto3)
+- Frontend        : HTML/CSS/JS vanilla
+                    1. login.html — page de connexion commune
+                    2. frontend/admin/ — interface admin (sidebar + 4 sections)
+                    3. frontend/watch/ — interface visionnage Netflix
+- Infra           : VPS OVH avec GPU local (pas d'instance GPU externe)
+
+
+# Détection GPU locale — core/gpu_detect.py modifié
+
+Créer un module core/gpu_detect.py qui détecte le GPU disponible au démarrage
+et retourne l'encodeur ffmpeg optimal. Ordre de priorité :
+
+1. NVIDIA (CUDA)
+   Détection : subprocess nvidia-smi
+   Encodeurs  : h264_nvenc (H.264) / hevc_nvenc (H.265)
+   Décodeur   : -hwaccel cuda
+
+2. AMD (AMF)
+   Détection : vérifier /dev/dri/ + vainfo ou lspci | grep -i amd
+   Encodeurs  : h264_amf / hevc_amf
+
+3. Intel Quick Sync
+   Détection : vérifier /dev/dri/renderD* + vainfo | grep H264
+   Encodeurs  : h264_qsv / hevc_qsv
+
+4. CPU (fallback)
+   Aucun GPU détecté
+   Encodeurs  : libx264 (H.264) / libx265 (H.265)
+   Note       : beaucoup plus lent, logguer un avertissement
+
+La fonction get_encoder() retourne un dict :
+  { "vendor": "nvidia"|"amd"|"intel"|"cpu",
+    "h264": "h264_nvenc"|..., "h265": "hevc_nvenc"|...,
+    "hwaccel": "-hwaccel cuda"|... | None }
+
+Ce dict est mis en cache au démarrage (singleton) et utilisé par
+toutes les tâches Celery de transcodage. Afficher le GPU détecté
+dans l'interface admin (section GPU & Système).
+
+Supprimer entièrement gpu/lifecycle.py et toute logique OVH GPU. supprimé
+
+
+# Upload direct de films — core/upload.py nouveau
+
+L'admin peut uploader un fichier vidéo directement depuis l'interface admin
+sans passer par un torrent. Implémenter :
+
+Endpoint :
+  POST /api/admin/upload
+  Content-Type: multipart/form-data
+  Champ : file (UploadFile)
+  Formats acceptés : .mp4, .mkv, .avi, .mov, .wmv, .m4v
+  Taille max : 50 GB (configurable via MAX_UPLOAD_SIZE dans config.py)
+
+Comportement :
+  - Écriture du fichier en streaming par chunks de 1 MB dans /tmp/redwood/uploads/
+    (ne pas charger tout en RAM)
+  - Retourne immédiatement un { job_id, filename, size_bytes } sans attendre
+    la fin du traitement
+  - Lance une tâche Celery process_film(filepath, source="upload")
+    identique au pipeline torrent à partir de l'étape analyse ffprobe
+
+Dans le Dockerfile.api :
+  Ajouter la limite de taille d'upload Nginx (client_max_body_size 55G)
+  et dans uvicorn : --limit-request-body 55000000000
+
+Barre de progression frontend :
+  Utiliser fetch() avec ReadableStream pour afficher la progression
+  de l'upload en temps réel dans l'interface admin.
+
+
+# Logique métier — pipeline (unifié upload + torrent)
+
+Source "torrent" :
+  1. Admin soumet magnet link ou .torrent
+  2. Celery : téléchargement via libtorrent → /tmp/redwood/torrents/
+
+Source "upload" :
+  1. Admin uploade un fichier → /tmp/redwood/uploads/
+
+Étapes communes (à partir du fichier local) :
+  3. Analyse ffprobe : format .mp4 ? taille < 3 GB ?
+  4. Arbre de décision :
+     - Pas .mp4            → Transcodage complet (GPU local détecté)
+     - .mp4 ET size ≥ 3 GB → Optimisation bitrate (GPU local détecté)
+     - .mp4 ET size < 3 GB → Upload direct S3, pas de transcodage
+  5. Enrichissement TMDB
+  6. Sauvegarde métadonnées PostgreSQL
+  7. Upload S3 + pre-signed URL
+  8. Film disponible dans Redwood Plus
+  9. Suppression du fichier temporaire
+
+
+# Interface admin — frontend/admin/ redesign
+
+Layout sidebar fixe (200px) + zone principale scrollable.
+Design : fond var(--color-background-tertiary), sidebar blanche avec
+bordure, accent couleur rouge brique #8B2500.
+
+Sidebar :
+  Logo "Redwood Plus / Administration" en haut
+  Sections de navigation avec icônes SVG :
+    Principal : Pipeline (badge rouge = nb tâches actives), Bibliothèque
+    Système   : Utilisateurs, GPU & Système
+  Footer sidebar : avatar initiales + nom + rôle de l'utilisateur connecté
+
+Topbar (par page) :
+  Titre de page + sous-titre à gauche
+  Actions contextuelles à droite (boutons, badge GPU détecté)
+
+Section Pipeline :
+  Rangée de 4 stat cards : En cours / En attente / Terminés / Erreurs
+  Bloc "Ajouter un film" en 2 colonnes :
+    Colonne gauche — Upload direct :
+      Zone drag & drop (dashed border, hover coloré)
+      Bouton "Parcourir les fichiers" (input file caché)
+      Barre de progression upload (visible pendant l'envoi)
+      Formats acceptés et taille max affichés
+    Colonne droite — Via torrent :
+      Input magnet link (font-mono)
+      Zone drag & drop pour .torrent
+      Bouton "Ajouter à la file"
+  File de traitement (liste) :
+    Chaque item : icône colorée + nom fichier + statut + barre de progression
+    Statuts : Transcodage / En attente / Upload S3 / Disponible / Erreur
+    Les items "Erreur" affichent le message d'erreur ffprobe/libtorrent
+
+Section Bibliothèque :
+  Barre de recherche en topbar
+  Tableau : miniature + titre + réalisateur / année / taille / codec /
+            traitement appliqué / statut / actions (TMDB refresh + supprimer)
+  Colonne "traitement" : badge coloré Direct (vert) / Optimisé (bleu) / Transcodé (ambre)
+
+Section Utilisateurs :
+  3 stat cards : Total / Admins / Viewers
+  Tableau : avatar initiales coloré + username + email / rôle / statut actif /
+            dernière connexion / actions (modifier + désactiver)
+  Bouton "+ Nouvel utilisateur" en topbar → modale inline avec formulaire
+
+Section GPU & Système :
+  4 stat cards : GPU détecté / VRAM utilisée / Charge GPU / Température
+  Grille 2×2 de barres de progression temps réel :
+    Charge GPU, VRAM, CPU, RAM
+    Données depuis GET /api/admin/system/stats (polling toutes les 3s)
+  Bloc "Encodeur sélectionné" :
+    Affiche vendor détecté + encodeurs h264/h265 actifs
+    Fallback CPU signalé avec icône d'avertissement si aucun GPU
+
+
+# Système d'authentification auth
+
+  Rôles : admin (accès total) / viewer (watch/ uniquement)
+  JWT httpOnly cookies : redwood_access (15min) + redwood_refresh (7j)
+  Rate limiting login : 5 req / 15min / IP (slowapi)
+  Tables : users, refresh_tokens
+  get_current_user() → 401 si absent
+  require_admin()    → 403 si rôle insuffisant
+
+  Routes protégées :
+  - GET  /api/films/*             → get_current_user() (admin + viewer)
+  - POST/DELETE /api/films/*      → require_admin()
+  - POST /api/admin/upload        → require_admin()
+  - GET/POST/PATCH/DELETE /api/admin/* → require_admin()
+  - /api/auth/*                   → public
+
+
+# Modèle de données
+
+Table films :
+  id, tmdb_id, titre, titre_original, annee, synopsis,
+  genres (JSON), realisateur, acteurs (JSON), note_tmdb,
+  poster_path, langue_originale, duree_min, resolution,
+  codec_video, codec_audio, bitrate_kbps, taille_octets,
+  s3_key, s3_bucket,
+  source          (enum: upload | torrent) nouveau
+  traitement      (enum: direct | optimise | transcode)
+  statut          (enum: en_cours | disponible | erreur)
+  erreur_message  (str | None) nouveau
+  date_ajout, url_streaming
+
+Table users :
+  id, username, email, hashed_password, role,
+  is_active, date_creation, derniere_connexion
+
+Table refresh_tokens :
+  id, user_id (FK), token_hash, expires_at, revoked, created_at
+
+
+# API REST
+
+  POST   /api/auth/login | /api/auth/refresh | /api/auth/logout
+  GET    /api/auth/me
+
+  GET    /api/films | /api/films/featured | /api/films/by-genre
+  GET    /api/films/{id} | /api/films/{id}/stream-url
+  DELETE /api/films/{id}              → require_admin
+  POST   /api/films/{id}/refresh-tmdb → require_admin
+  GET    /api/films/stats             → require_admin
+
+  POST   /api/admin/upload            → require_admin (upload direct) nouveau
+  POST   /api/admin/torrents          → require_admin (soumission torrent)
+  GET    /api/admin/queue             → require_admin (file de traitement)
+  GET    /api/admin/system/stats      → require_admin (GPU, CPU, RAM temps réel) nouveau
+  GET    /api/admin/users             → require_admin
+  POST   /api/admin/users             → require_admin
+  PATCH  /api/admin/users/{id}/role   → require_admin
+  PATCH  /api/admin/users/{id}/deactivate → require_admin
+  DELETE /api/admin/users/{id}        → require_admin
+
+
+# Interface visionnage Netflix — Redwood Plus (frontend/watch/) Netflix
+
+  index.html : hero (featured) + rangées scrollables par genre
+  categories.html : grille genres + liste complète filtrable
+  film.html : backdrop, synopsis, infos techniques, acteurs, Plyr.js, similaires
+  Navbar : logo, Accueil, Catégories, avatar + déconnexion
+  Footer : "© Redwood Plus — This product uses the TMDB API..."
+  Design : fond #0a0a0a, accent #8B2500
+
+
+# Paramètres ffmpeg
+
+  Encodeur : sélectionné automatiquement par core/gpu_detect.py
+  Bitrate  : -maxrate 4M -bufsize 8M
+  Qualité  : -crf 23
+  Audio    : -c:a aac -b:a 128k
+  Sortie   : .mp4
+  Exemple NVIDIA : ffmpeg -hwaccel cuda -i input -c:v hevc_nvenc -crf 23 ...
+  Exemple CPU    : ffmpeg -i input -c:v libx265 -crf 23 ...
+
+
+# Structure de projet
+
+project/
+├── api/
+│   ├── routes/
+│   │   ├── auth.py
+│   │   ├── films.py
+│   │   ├── admin.py          # upload, queue, system/stats, users
+│   │   └── torrents.py
+│   ├── deps.py
+│   └── main.py
+├── worker/
+│   └── tasks.py              # process_film(filepath, source) unifié
+├── core/
+│   ├── pipeline.py
+│   ├── ffprobe.py
+│   ├── tmdb.py
+│   ├── s3.py
+│   ├── security.py
+│   ├── upload.py             # chunked upload, validation format/taillenouveau
+│   └── gpu_detect.py         # détection NVIDIA/AMD/Intel/CPUmodifié
+├── db/
+│   ├── models.py
+│   └── session.py
+├── scripts/
+│   └── seed_admin.py
+├── frontend/
+│   ├── login.html
+│   ├── admin/
+│   │   └── index.html        # sidebar + Pipeline/Biblio/Users/GPU
+│   └── watch/
+│       ├── index.html
+│       ├── categories.html
+│       ├── film.html
+│       └── app.js
+├── config.py
+├── nginx/nginx.conf          # client_max_body_size 55G
+└── docker-compose.yml
+
+
+# Contraintes
+
+- Aucune logique OVH GPU, aucun gpu/lifecycle.py. Supprimé. supprimé
+- gpu_detect.py s'exécute une fois au démarrage FastAPI (lifespan event).
+- L'upload chunked ne charge jamais le fichier entier en RAM.
+- Les erreurs de pipeline (ffprobe, ffmpeg, S3) sont sauvegardées dans
+  erreur_message sur le film et affichées dans l'interface admin.
+- Tokens httpOnly uniquement. CORS restreint au VPS.
+- Logs JSON structurés à chaque étape.
+- Tests : pipeline.py, ffprobe.py, tmdb.py, gpu_detect.py.
+
+
+# Ordre d'implémentation
+
+1.  config.py + db/models.py + db/session.py
+2.  core/security.py + core/gpu_detect.py
+3.  api/deps.py + api/routes/auth.py + scripts/seed_admin.py
+4.  core/ffprobe.py + core/tmdb.py + core/pipeline.py
+5.  core/upload.py + core/s3.py
+6.  worker/tasks.py (process_film unifié upload + torrent)
+7.  api/routes/films.py + api/routes/admin.py
+8.  frontend/login.html
+9.  frontend/admin/index.html (sidebar + 4 sections)
+10. frontend/watch/ (index, categories, film, app.js)

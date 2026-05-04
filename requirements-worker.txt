@@ -1,0 +1,2 @@
+# Worker image: same deps as API (torrent downloads use system `aria2`, not PyPI libtorrent).
+-r requirements-base.txt
