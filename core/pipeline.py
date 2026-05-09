@@ -16,7 +16,7 @@ from core.gpu_detect import get_encoder
 from core.logging_json import log_event
 from core.s3 import build_object_key, presigned_stream_url, upload_file
 from core.tmdb import enrich_from_filename
-from db.models import Film, FilmStatut, FilmTraitement
+from db.models import ContentKind, Film, FilmStatut, FilmTraitement
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ def process_film_file(
         if progress:
             progress(25)
 
-        enrich = enrich_from_filename(Path(local_path).name)
+        enrich = enrich_from_filename(Path(local_path).name, film.content_kind)
         for k, v in enrich.items():
             if hasattr(film, k) and v is not None:
                 setattr(film, k, v)

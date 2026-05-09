@@ -26,6 +26,19 @@ from worker.tasks import download_torrent_task, process_film_task
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _parse_upload_content_kind(raw: Optional[str]) -> ContentKind:
+    """Multipart / form value: 'film' or 'series_episode'."""
+    s = (raw or "film").strip()
+    if s == ContentKind.film.value:
+        return ContentKind.film
+    if s == ContentKind.series_episode.value:
+        return ContentKind.series_episode
+    raise HTTPException(
+        status_code=400,
+        detail="content_kind doit être 'film' ou 'series_episode'",
+    )
+
+
 @router.get("/films")
 def admin_list_films(
     db: Session = Depends(get_db),
@@ -73,6 +86,7 @@ def _film_to_admin_detail(f: Film) -> dict[str, Any]:
         "resolution": f.resolution,
         "langue_originale": f.langue_originale,
         "tmdb_id": f.tmdb_id,
+        "imdb_title_id": f.imdb_title_id,
         "statut": f.statut.value,
         "codec_video": f.codec_video,
         "taille_octets": f.taille_octets,
@@ -111,6 +125,7 @@ class AdminFilmUpdateBody(BaseModel):
     resolution: Optional[str] = None
     langue_originale: Optional[str] = None
     tmdb_id: Optional[int] = None
+    imdb_title_id: Optional[str] = None
     content_kind: ContentKind = ContentKind.film
     series_key: Optional[str] = None
     series_title: Optional[str] = None
@@ -147,6 +162,8 @@ def admin_patch_film(
     f.langue_originale = lo or None
     prev_tmdb_id = f.tmdb_id
     f.tmdb_id = body.tmdb_id
+    im = (body.imdb_title_id or "").strip()
+    f.imdb_title_id = im or None
     if prev_tmdb_id != body.tmdb_id:
         f.trailers_tmdb_cache = None
         f.trailers_tmdb_cached_at = None
@@ -172,6 +189,7 @@ def admin_patch_film(
 @router.post("/upload")
 async def admin_upload(
     file: UploadFile = File(...),
+    content_kind: str = Form("film"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -180,11 +198,13 @@ async def admin_upload(
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    ck = _parse_upload_content_kind(content_kind)
     film = Film(
         titre=Path(file.filename or "upload").stem,
         source=FilmSource.upload,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
+        content_kind=ck,
     )
     db.add(film)
     db.commit()
@@ -195,6 +215,7 @@ async def admin_upload(
 
 class TorrentMagnetBody(BaseModel):
     magnet: str
+    content_kind: ContentKind = ContentKind.film
 
 
 @router.post("/torrents")
@@ -210,6 +231,7 @@ def admin_torrent_magnet(
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
+        content_kind=body.content_kind,
     )
     db.add(film)
     db.commit()
@@ -221,17 +243,20 @@ def admin_torrent_magnet(
 @router.post("/torrents/file")
 async def admin_torrent_file(
     torrent: UploadFile = File(...),
+    content_kind: str = Form("film"),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     if not torrent.filename or not torrent.filename.lower().endswith(".torrent"):
         raise HTTPException(400, "Expected .torrent file")
     data = await torrent.read()
+    ck = _parse_upload_content_kind(content_kind)
     film = Film(
         titre=Path(torrent.filename).stem,
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
+        content_kind=ck,
     )
     db.add(film)
     db.commit()

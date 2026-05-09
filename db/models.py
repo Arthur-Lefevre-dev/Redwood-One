@@ -94,6 +94,8 @@ class Film(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tmdb_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # IMDb title id (e.g. tt1375666) when using METADATA_PROVIDER=imdbapi; episode or movie id.
+    imdb_title_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, index=True)
     titre: Mapped[str] = mapped_column(String(512))
     titre_original: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     annee: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

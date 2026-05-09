@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Store /movie/{id}/videos in DB; refresh after N days (0 = fetch every film page view when API key set).
     TMDB_TRAILERS_CACHE_DAYS: int = 7
 
+    # Metadata enrichment: "tmdb" (default) or "imdbapi" (https://imdbapi.dev — no API key).
+    METADATA_PROVIDER: str = "tmdb"
+    IMDBAPI_BASE_URL: str = "https://api.imdbapi.dev"
+
     S3_ENDPOINT_URL: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: str = ""

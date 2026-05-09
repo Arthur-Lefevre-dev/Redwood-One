@@ -67,6 +67,24 @@ def _ensure_user_invite_column() -> None:
     logger.info("database schema: ensured users.last_invite_at (sqlite)")
 
 
+def _ensure_films_imdb_title_id_column() -> None:
+    """Optional IMDb id for imdbapi.dev enrichment."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE films ADD COLUMN IF NOT EXISTS imdb_title_id VARCHAR(16)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_films_imdb_title_id ON films(imdb_title_id)"))
+        logger.info("database schema: ensured films.imdb_title_id (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    if "imdb_title_id" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE films ADD COLUMN imdb_title_id VARCHAR(16)"))
+        logger.info("database schema: added films.imdb_title_id (sqlite)")
+
+
 def _ensure_invitation_created_by_column() -> None:
     """Link member-generated invite codes to users for history UI."""
     if engine.dialect.name == "postgresql":
@@ -106,6 +124,7 @@ def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
     _ensure_films_trailer_columns()
+    _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
     _ensure_invitation_created_by_column()
 

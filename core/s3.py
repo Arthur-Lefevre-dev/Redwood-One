@@ -88,27 +88,47 @@ def list_film_objects_by_id() -> Dict[int, str]:
     return {fid: pair[1] for fid, pair in best.items()}
 
 
-def delete_film_prefix(film_id: int) -> int:
+def _s3_can_mutate_objects() -> bool:
+    """True when bucket + credentials are set (endpoint optional: default AWS endpoint works)."""
+    s = get_settings()
+    return bool(s.S3_BUCKET_NAME and s.S3_ACCESS_KEY and s.S3_SECRET_KEY)
+
+
+def delete_film_prefix(film_id: int, known_s3_key: Optional[str] = None) -> int:
     """
-    Delete every object under films/{film_id}/ in the configured bucket.
-    Returns the number of keys removed. No-op (returns 0) when S3 is not configured.
-    Raises on API errors when S3 is configured.
+    Delete objects for this film: everything under films/{film_id}/, plus known_s3_key if set
+    (covers DB-only key when ListBucket is restricted or listing returns nothing).
+    Returns the number of keys removed. No-op when S3 credentials are not configured.
+    Raises on API errors when deletion is attempted.
     """
     s = get_settings()
-    if not s.S3_BUCKET_NAME or not s.S3_ENDPOINT_URL:
-        logger.debug("s3: skip delete for film_id=%s (S3 not configured)", film_id)
+    if not _s3_can_mutate_objects():
+        logger.warning(
+            "s3: skip delete for film_id=%s (set S3_BUCKET_NAME, S3_ACCESS_KEY, S3_SECRET_KEY; "
+            "use S3_ENDPOINT_URL for OVH/MinIO)",
+            film_id,
+        )
         return 0
     client = get_s3_client()
     prefix = f"films/{int(film_id)}/"
+    seen: set[str] = set()
     keys: List[str] = []
     paginator = client.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=s.S3_BUCKET_NAME, Prefix=prefix):
-        for obj in page.get("Contents") or []:
-            k = obj.get("Key")
-            if k:
-                keys.append(k)
+    try:
+        for page in paginator.paginate(Bucket=s.S3_BUCKET_NAME, Prefix=prefix):
+            for obj in page.get("Contents") or []:
+                k = obj.get("Key")
+                if k and k not in seen:
+                    seen.add(k)
+                    keys.append(k)
+    except Exception as e:
+        logger.warning("s3: list_objects prefix=%s failed (%s); will still try known_s3_key", prefix, e)
+    extra = (known_s3_key or "").strip()
+    if extra and extra not in seen:
+        keys.append(extra)
+        seen.add(extra)
     if not keys:
-        logger.info("s3: no objects to delete under %s", prefix)
+        logger.info("s3: no keys to delete for film_id=%s (prefix %s, known_s3_key=%s)", film_id, prefix, extra or "—")
         return 0
     deleted = 0
     for i in range(0, len(keys), 1000):
@@ -121,7 +141,8 @@ def delete_film_prefix(film_id: int) -> int:
         if errs:
             first = errs[0]
             msg = first.get("Message") or str(first)
-            raise RuntimeError(f"S3 delete_objects error: {msg}")
+            code = first.get("Code") or ""
+            raise RuntimeError(f"S3 delete_objects error ({code}): {msg}")
         deleted += len(batch)
-    logger.info("s3: deleted %s object(s) under %s", deleted, prefix)
+    logger.info("s3: deleted %s object(s) for film_id=%s (prefix %s)", deleted, film_id, prefix)
     return deleted

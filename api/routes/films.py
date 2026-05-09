@@ -14,7 +14,14 @@ from api.deps import get_current_user, require_admin
 from config import get_settings
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import delete_film_prefix, presigned_stream_url
-from core.tmdb import enrich_from_filename, movie_details, movie_trailers_youtube
+from core.imdbapi import apply_imdb_title_metadata
+from core.tmdb import (
+    enrich_from_filename,
+    movie_details,
+    movie_trailers_youtube,
+    tv_season_episode,
+    tv_series_details,
+)
 from core.trailers_util import merge_trailer_lists, trailers_from_json_column
 from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
@@ -281,7 +288,7 @@ def delete_film(film_id: int, db: Session = Depends(get_db), _: User = Depends(r
     if not f:
         raise HTTPException(404, "Not found")
     try:
-        delete_film_prefix(film_id)
+        delete_film_prefix(film_id, known_s3_key=f.s3_key)
     except Exception as e:
         logger.exception("s3 delete failed for film_id=%s", film_id)
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -294,24 +301,72 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
     f = db.get(Film, film_id)
     if not f:
         raise HTTPException(404, "Not found")
-    if f.tmdb_id:
-        d = movie_details(f.tmdb_id)
-        if d:
-            f.synopsis = d.get("overview")
-            f.genres = [g.get("name") for g in d.get("genres", []) if g.get("name")]
-            f.note_tmdb = d.get("vote_average")
-            f.poster_path = d.get("poster_path")
-    else:
-        data = enrich_from_filename(f.titre + ".mp4")
-        for k, v in data.items():
-            if hasattr(f, k) and v is not None:
-                setattr(f, k, v)
-    tid = f.tmdb_id
-    if tid and (get_settings().TMDB_API_KEY or "").strip():
-        f.trailers_tmdb_cache = movie_trailers_youtube(int(tid), limit=1)
-        f.trailers_tmdb_cached_at = datetime.utcnow()
-    else:
+    has_key = bool((get_settings().TMDB_API_KEY or "").strip())
+    prov = (get_settings().METADATA_PROVIDER or "tmdb").strip().lower()
+
+    if prov == "imdbapi":
+        if f.imdb_title_id:
+            apply_imdb_title_metadata(f)
+        else:
+            data = enrich_from_filename((f.titre or "video") + ".mp4", f.content_kind)
+            for k, v in data.items():
+                if hasattr(f, k) and v is not None:
+                    setattr(f, k, v)
         f.trailers_tmdb_cache = None
         f.trailers_tmdb_cached_at = None
+        db.commit()
+        return {"ok": True}
+
+    if f.content_kind == ContentKind.series_episode:
+        applied = False
+        if (
+            f.tmdb_id
+            and f.season_number is not None
+            and f.episode_number is not None
+        ):
+            ep = tv_season_episode(int(f.tmdb_id), int(f.season_number), int(f.episode_number))
+            show = tv_series_details(int(f.tmdb_id))
+            if ep and show:
+                f.synopsis = ep.get("overview")
+                f.note_tmdb = ep.get("vote_average")
+                still = ep.get("still_path")
+                if still:
+                    f.poster_path = still
+                elif show.get("poster_path"):
+                    f.poster_path = show.get("poster_path")
+                ename = ep.get("name")
+                if ename:
+                    f.titre = ename
+                f.genres = [g.get("name") for g in show.get("genres", []) if g.get("name")]
+                if not f.series_title:
+                    f.series_title = show.get("name")
+                applied = True
+        if not applied:
+            data = enrich_from_filename((f.titre or "video") + ".mp4", ContentKind.series_episode)
+            for k, v in data.items():
+                if hasattr(f, k) and v is not None:
+                    setattr(f, k, v)
+        f.trailers_tmdb_cache = None
+        f.trailers_tmdb_cached_at = None
+    else:
+        if f.tmdb_id:
+            d = movie_details(f.tmdb_id)
+            if d:
+                f.synopsis = d.get("overview")
+                f.genres = [g.get("name") for g in d.get("genres", []) if g.get("name")]
+                f.note_tmdb = d.get("vote_average")
+                f.poster_path = d.get("poster_path")
+        else:
+            data = enrich_from_filename(f.titre + ".mp4", ContentKind.film)
+            for k, v in data.items():
+                if hasattr(f, k) and v is not None:
+                    setattr(f, k, v)
+        tid = f.tmdb_id
+        if tid and has_key:
+            f.trailers_tmdb_cache = movie_trailers_youtube(int(tid), limit=1)
+            f.trailers_tmdb_cached_at = datetime.utcnow()
+        else:
+            f.trailers_tmdb_cache = None
+            f.trailers_tmdb_cached_at = None
     db.commit()
     return {"ok": True}
