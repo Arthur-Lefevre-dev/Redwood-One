@@ -545,6 +545,50 @@
         background: #27272a;
         color: #fff;
       }
+      .lib-series-root {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .lib-series-show {
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
+      .lib-series-show:last-child {
+        border-bottom: none;
+      }
+      .lib-series-show-title {
+        margin: 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        background: var(--color-background-secondary);
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
+      .lib-series-season {
+        background: var(--color-background-tertiary);
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
+      .lib-series-season:last-child {
+        border-bottom: none;
+      }
+      .lib-series-season-label {
+        padding: 10px 16px 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--color-text-tertiary);
+      }
+      .lib-series-season .film-table tr:last-child td {
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
+      .lib-series-season:last-of-type .film-table tr:last-child td {
+        border-bottom: none;
+      }
+      .lib-series-empty {
+        padding: 20px 16px;
+        font-size: 12px;
+        color: var(--color-text-tertiary);
+      }
       .film-actions {
         display: flex;
         gap: 4px;
@@ -1236,7 +1280,7 @@
             <header class="topbar">
               <div>
                 <div class="page-title">Bibliothèque</div>
-                <div class="page-sub" id="lib-sub">Films</div>
+                <div class="page-sub" id="lib-sub">Chargement…</div>
               </div>
               <div class="topbar-right">
                 <button
@@ -1293,8 +1337,16 @@
                         <th>Actions</th>
                       </tr>
                     </thead>
-                    <tbody id="lib-body"></tbody>
+                    <tbody id="lib-body-films"></tbody>
                   </table>
+                </div>
+              </div>
+              <div class="card" style="margin-top: 16px">
+                <div class="card-head">
+                  <div class="card-title">Séries</div>
+                </div>
+                <div class="card-body" style="padding: 0; overflow: auto">
+                  <div id="lib-series-root" class="lib-series-root"></div>
                 </div>
               </div>
             </div>
@@ -2571,19 +2623,18 @@
         return "s-waiting";
       }
 
-      async function loadLibrary() {
-        const q = $("#lib-search").value.trim();
-        const url =
-          "/api/admin/films" + (q ? "?q=" + encodeURIComponent(q) : "");
-        const r = await api(url);
-        const rows = await r.json();
-        $("#lib-sub").textContent = `${rows.length} titre(s)`;
-        const tb = $("#lib-body");
-        tb.innerHTML = "";
-        rows.forEach((f) => {
-          const tr = document.createElement("tr");
-          const thumb = f.poster_path ? "🎬" : "🎞";
-          tr.innerHTML = `
+      function adminSeriesShowLabel(ep) {
+        const t = (ep.series_title || "").trim();
+        if (t) return t;
+        const k = (ep.series_key || "").trim();
+        if (k) return k;
+        return "Sans titre de série";
+      }
+
+      function appendLibraryRow(tb, f, primaryLine, subLine) {
+        const tr = document.createElement("tr");
+        const thumb = f.poster_path ? "🎬" : "🎞";
+        tr.innerHTML = `
       <td style="padding-left:16px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="film-thumb">${thumb}</div>
@@ -2594,81 +2645,197 @@
         </div>
       </td>
       <td></td><td></td><td></td><td></td><td></td><td></td>`;
-          tr.querySelector('div[style*="font-weight:500"]').textContent =
-            f.titre;
-          tr.querySelector('div[style*="font-size:10px"]').textContent =
-            f.realisateur || "";
-          const tds = tr.querySelectorAll("td");
-          tds[1].textContent = f.annee ?? "—";
-          tds[2].textContent = fmtBytes(f.taille_octets);
-          tds[3].innerHTML = f.codec_video
-            ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>`
-            : "—";
-          const tp = f.traitement || "—";
-          tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
-          tds[5].innerHTML = `<span class="status-pill ${f.statut === "disponible" ? "s-done" : f.statut === "erreur" ? "s-error" : "s-transcoding"}">${f.statut}</span>`;
-          const actions = document.createElement("div");
-          actions.className = "film-actions";
-          const b0 = document.createElement("button");
-          b0.className = "action-btn";
-          b0.textContent = "Modifier";
-          b0.onclick = () => openFilmModal(f.id);
-          const b1 = document.createElement("button");
-          b1.className = "action-btn";
-          b1.textContent = "TMDB";
-          b1.title = "Rafraîchir les métadonnées (TheMovieDB)";
-          b1.onclick = async () => {
-            await api(`/api/admin/films/${f.id}/refresh-tmdb`, {
-              method: "POST",
-            });
-            loadLibrary();
-          };
-          const b1b = document.createElement("button");
-          b1b.className = "action-btn";
-          b1b.textContent = "IMDb API";
-          b1b.title = "Rafraîchir les métadonnées (imdbapi.dev)";
-          b1b.onclick = async () => {
-            const choice = await showImdbApiRefreshModal(f.titre || "");
-            if (choice == null) return;
-            const payload = {};
-            if (choice.imdbTitleId) payload.imdb_title_id = choice.imdbTitleId;
-            const r = await api(`/api/admin/films/${f.id}/refresh-imdbapi`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-            if (!r.ok) {
-              let msg = "Échec du rafraîchissement IMDb API";
-              try {
-                const j = await r.json();
-                if (j.detail)
-                  msg = typeof j.detail === "string" ? j.detail : msg;
-              } catch (_) {}
-              await showAlertModal("IMDb API", msg);
-              return;
-            }
-            loadLibrary();
-          };
-          const b2 = document.createElement("button");
-          b2.className = "action-btn danger";
-          b2.textContent = "Suppr.";
-          b2.onclick = async () => {
-            const ok = await showConfirmModal(
-              "Supprimer ce film ?",
-              "Le film sera retiré du catalogue. Cette action est définitive.",
-              { confirmText: "Supprimer", cancelText: "Annuler" },
+        tr.querySelector('div[style*="font-weight:500"]').textContent =
+          primaryLine;
+        tr.querySelector('div[style*="font-size:10px"]').textContent =
+          subLine || "";
+        const tds = tr.querySelectorAll("td");
+        tds[1].textContent = f.annee ?? "—";
+        tds[2].textContent = fmtBytes(f.taille_octets);
+        tds[3].innerHTML = f.codec_video
+          ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>`
+          : "—";
+        const tp = f.traitement || "—";
+        tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
+        tds[5].innerHTML = `<span class="status-pill ${f.statut === "disponible" ? "s-done" : f.statut === "erreur" ? "s-error" : "s-transcoding"}">${f.statut}</span>`;
+        const actions = document.createElement("div");
+        actions.className = "film-actions";
+        const b0 = document.createElement("button");
+        b0.className = "action-btn";
+        b0.textContent = "Modifier";
+        b0.onclick = () => openFilmModal(f.id);
+        const b1 = document.createElement("button");
+        b1.className = "action-btn";
+        b1.textContent = "TMDB";
+        b1.title = "Rafraîchir les métadonnées (TheMovieDB)";
+        b1.onclick = async () => {
+          await api(`/api/admin/films/${f.id}/refresh-tmdb`, {
+            method: "POST",
+          });
+          loadLibrary();
+        };
+        const b1b = document.createElement("button");
+        b1b.className = "action-btn";
+        b1b.textContent = "IMDb API";
+        b1b.title = "Rafraîchir les métadonnées (imdbapi.dev)";
+        b1b.onclick = async () => {
+          const choice = await showImdbApiRefreshModal(f.titre || "");
+          if (choice == null) return;
+          const payload = {};
+          if (choice.imdbTitleId) payload.imdb_title_id = choice.imdbTitleId;
+          const r = await api(`/api/admin/films/${f.id}/refresh-imdbapi`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!r.ok) {
+            let msg = "Échec du rafraîchissement IMDb API";
+            try {
+              const j = await r.json();
+              if (j.detail)
+                msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            await showAlertModal("IMDb API", msg);
+            return;
+          }
+          loadLibrary();
+        };
+        const b2 = document.createElement("button");
+        b2.className = "action-btn danger";
+        b2.textContent = "Suppr.";
+        b2.onclick = async () => {
+          const isEp = f.content_kind === "series_episode";
+          const ok = await showConfirmModal(
+            isEp ? "Supprimer cet épisode ?" : "Supprimer ce film ?",
+            isEp
+              ? "L’épisode sera retiré du catalogue. Cette action est définitive."
+              : "Le film sera retiré du catalogue. Cette action est définitive.",
+            { confirmText: "Supprimer", cancelText: "Annuler" },
+          );
+          if (!ok) return;
+          await api(`/api/films/${f.id}`, { method: "DELETE" });
+          loadLibrary();
+        };
+        actions.appendChild(b0);
+        actions.appendChild(b1);
+        actions.appendChild(b1b);
+        actions.appendChild(b2);
+        tds[6].appendChild(actions);
+        tb.appendChild(tr);
+      }
+
+      async function loadLibrary() {
+        const q = $("#lib-search").value.trim();
+        const url =
+          "/api/admin/films" + (q ? "?q=" + encodeURIComponent(q) : "");
+        const r = await api(url);
+        const rows = await r.json();
+        const films = rows.filter((x) => x.content_kind !== "series_episode");
+        const episodes = rows.filter((x) => x.content_kind === "series_episode");
+        const showLabels = episodes.map(adminSeriesShowLabel);
+        const nShows = new Set(showLabels).size;
+        $("#lib-sub").textContent =
+          `${films.length} film(s) · ${episodes.length} épisode(s)` +
+          (nShows ? ` · ${nShows} série(s)` : "");
+
+        const tbFilms = $("#lib-body-films");
+        tbFilms.innerHTML = "";
+        if (films.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="7" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Aucun film.</td>`;
+          tbFilms.appendChild(tr);
+        } else {
+          films.forEach((f) => {
+            appendLibraryRow(tbFilms, f, f.titre, f.realisateur || "");
+          });
+        }
+
+        const root = $("#lib-series-root");
+        root.innerHTML = "";
+        if (episodes.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "lib-series-empty";
+          empty.textContent =
+            "Aucun épisode de série. Utilisez « Épisode de série » dans Modifier.";
+          root.appendChild(empty);
+        } else {
+          const byShow = new Map();
+          for (const ep of episodes) {
+            const label = adminSeriesShowLabel(ep);
+            if (!byShow.has(label)) byShow.set(label, new Map());
+            const seasonMap = byShow.get(label);
+            const sn =
+              ep.season_number != null && Number.isFinite(ep.season_number)
+                ? ep.season_number
+                : 0;
+            if (!seasonMap.has(sn)) seasonMap.set(sn, []);
+            seasonMap.get(sn).push(ep);
+          }
+          const sortedShows = Array.from(byShow.keys()).sort((a, b) =>
+            a.localeCompare(b, "fr", { sensitivity: "base" }),
+          );
+          for (const showName of sortedShows) {
+            const seasonMap = byShow.get(showName);
+            const block = document.createElement("div");
+            block.className = "lib-series-show";
+            const h = document.createElement("h3");
+            h.className = "lib-series-show-title";
+            h.textContent = showName;
+            block.appendChild(h);
+            const seasonsSorted = Array.from(seasonMap.keys()).sort(
+              (a, b) => a - b,
             );
-            if (!ok) return;
-            await api(`/api/films/${f.id}`, { method: "DELETE" });
-            loadLibrary();
-          };
-          actions.appendChild(b0);
-          actions.appendChild(b1);
-          actions.appendChild(b1b);
-          actions.appendChild(b2);
-          tds[6].appendChild(actions);
-          tb.appendChild(tr);
-        });
+            for (const sn of seasonsSorted) {
+              const eps = seasonMap.get(sn);
+              eps.sort((a, b) => {
+                const ea =
+                  a.episode_number != null && Number.isFinite(a.episode_number)
+                    ? a.episode_number
+                    : 99999;
+                const eb =
+                  b.episode_number != null && Number.isFinite(b.episode_number)
+                    ? b.episode_number
+                    : 99999;
+                return ea - eb;
+              });
+              const seasonEl = document.createElement("div");
+              seasonEl.className = "lib-series-season";
+              const lab = document.createElement("div");
+              lab.className = "lib-series-season-label";
+              lab.textContent = `Saison ${sn}`;
+              seasonEl.appendChild(lab);
+              const table = document.createElement("table");
+              table.className = "film-table";
+              table.innerHTML = `<thead><tr>
+        <th style="padding-left:16px">Épisode</th>
+        <th>Année</th>
+        <th>Taille</th>
+        <th>Codec</th>
+        <th>Traitement</th>
+        <th>Statut</th>
+        <th>Actions</th>
+      </tr></thead>`;
+              const tbody = document.createElement("tbody");
+              for (const ep of eps) {
+                const snRaw = ep.season_number;
+                const epRaw = ep.episode_number;
+                const sPart =
+                  snRaw != null && Number.isFinite(snRaw) ? String(snRaw) : "?";
+                const ePart =
+                  epRaw != null && Number.isFinite(epRaw)
+                    ? String(epRaw).padStart(2, "0")
+                    : "?";
+                const primary = `S${sPart}E${ePart} · ${ep.titre || "—"}`;
+                const sub = ep.series_key ? `Clé : ${ep.series_key}` : "";
+                appendLibraryRow(tbody, ep, primary, sub);
+              }
+              table.appendChild(tbody);
+              seasonEl.appendChild(table);
+              block.appendChild(seasonEl);
+            }
+            root.appendChild(block);
+          }
+        }
       }
 
       function syncLibSearchClearBtn() {

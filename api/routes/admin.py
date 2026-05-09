@@ -51,7 +51,14 @@ def admin_list_films(
     query = db.query(Film).order_by(Film.date_ajout.desc())
     if q:
         like = f"%{q}%"
-        query = query.filter(or_(Film.titre.ilike(like), Film.realisateur.ilike(like)))
+        query = query.filter(
+            or_(
+                Film.titre.ilike(like),
+                Film.realisateur.ilike(like),
+                Film.series_title.ilike(like),
+                Film.series_key.ilike(like),
+            )
+        )
     rows = query.limit(500).all()
     return [
         {
@@ -66,6 +73,11 @@ def admin_list_films(
             "poster_path": f.poster_path,
             "source": f.source.value,
             "erreur_message": f.erreur_message,
+            "content_kind": f.content_kind.value,
+            "series_title": f.series_title,
+            "series_key": f.series_key,
+            "season_number": f.season_number,
+            "episode_number": f.episode_number,
         }
         for f in rows
     ]
