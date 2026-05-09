@@ -1,6 +1,8 @@
 """Admin-only routes: upload, queue, system, users, torrents."""
 
 import base64
+import logging
+import os
 import re
 import secrets
 from datetime import datetime, timedelta
@@ -36,6 +38,8 @@ from db.models import (
 from db.session import get_db
 from worker.tasks import download_torrent_task, process_film_task
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
@@ -50,6 +54,67 @@ def _parse_upload_content_kind(raw: Optional[str]) -> ContentKind:
         status_code=400,
         detail="content_kind doit être 'film' ou 'series_episode'",
     )
+
+
+def _enqueue_process_film_or_raise(film_id: int, local_path: str, db: Session) -> None:
+    """Queue Celery pipeline; on broker failure, remove temp file and mark film failed."""
+    try:
+        process_film_task.delay(film_id, local_path)
+    except Exception:
+        logger.exception(
+            "enqueue process_film_task failed (Redis/Celery?). film_id=%s",
+            film_id,
+        )
+        try:
+            os.unlink(local_path)
+        except OSError:
+            pass
+        row = db.get(Film, film_id)
+        if row:
+            row.statut = FilmStatut.erreur
+            row.erreur_message = (
+                "File d'attente indisponible : impossible de joindre Redis/Celery. "
+                "Vérifiez REDIS_URL et que les conteneurs redis et worker sont actifs."
+            )[:8000]
+            db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Le traitement vidéo n'a pas pu être mis en file d'attente (Redis). "
+                "Vérifiez docker compose (services redis, worker), et que REDIS_URL / "
+                "REDIS_PASSWORD dans docker/.env sont cohérents."
+            ),
+        )
+
+
+def _enqueue_download_torrent_or_raise(
+    film_id: int,
+    db: Session,
+    *,
+    magnet: Optional[str] = None,
+    torrent_b64: Optional[str] = None,
+) -> None:
+    try:
+        download_torrent_task.delay(film_id, magnet, torrent_b64)
+    except Exception:
+        logger.exception(
+            "enqueue download_torrent_task failed (Redis/Celery?). film_id=%s",
+            film_id,
+        )
+        row = db.get(Film, film_id)
+        if row:
+            row.statut = FilmStatut.erreur
+            row.erreur_message = (
+                "File d'attente indisponible : impossible de joindre Redis/Celery."
+            )[:8000]
+            db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "La file d'attente (Redis) est injoignable. "
+                "Vérifiez les conteneurs redis et worker et la variable REDIS_URL."
+            ),
+        )
 
 
 @router.get("/films")
@@ -280,7 +345,7 @@ async def admin_upload(
     db.add(film)
     db.commit()
     db.refresh(film)
-    process_film_task.delay(film.id, path)
+    _enqueue_process_film_or_raise(film.id, path, db)
     return {"job_id": film.id, "filename": file.filename, "size_bytes": size}
 
 
@@ -307,7 +372,7 @@ def admin_torrent_magnet(
     db.add(film)
     db.commit()
     db.refresh(film)
-    download_torrent_task.delay(film.id, body.magnet)
+    _enqueue_download_torrent_or_raise(film.id, db, magnet=body.magnet)
     return {"job_id": film.id}
 
 
@@ -333,7 +398,11 @@ async def admin_torrent_file(
     db.commit()
     db.refresh(film)
     # Celery JSON serializer cannot carry raw bytes; use base64 for the worker.
-    download_torrent_task.delay(film.id, None, base64.b64encode(data).decode("ascii"))
+    _enqueue_download_torrent_or_raise(
+        film.id,
+        db,
+        torrent_b64=base64.b64encode(data).decode("ascii"),
+    )
     return {"job_id": film.id}
 
 
