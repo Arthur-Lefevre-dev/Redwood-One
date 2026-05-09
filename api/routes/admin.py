@@ -12,6 +12,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
+from api.routes.announcement import _get_or_create_row, _is_active
 from api.routes.films import RefreshImdbApiBody, refresh_imdbapi as films_refresh_imdbapi
 from config import get_settings
 from core.catalog_sync import sync_s3_films_to_db
@@ -514,3 +515,48 @@ def delete_user(
         raise HTTPException(404, "Not found")
     db.delete(u)
     db.commit()
+
+
+class ViewerAnnouncementUpdateBody(BaseModel):
+    message: str = ""
+    duration_hours: int = Field(default=24, ge=1, le=720)
+
+
+@router.get("/viewer-announcement")
+def admin_get_viewer_announcement(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = _get_or_create_row(db)
+    ends = row.ends_at
+    return {
+        "message": row.message or "",
+        "ends_at": ends.strftime("%Y-%m-%dT%H:%M:%SZ") if ends else None,
+        "active": _is_active(row),
+    }
+
+
+@router.put("/viewer-announcement")
+@router.post("/viewer-announcement")
+def admin_put_viewer_announcement(
+    body: ViewerAnnouncementUpdateBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = _get_or_create_row(db)
+    msg = (body.message or "").strip()
+    if not msg:
+        row.message = None
+        row.ends_at = None
+    else:
+        row.message = msg
+        row.ends_at = datetime.utcnow() + timedelta(hours=body.duration_hours)
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    ends = row.ends_at
+    return {
+        "ok": True,
+        "message": row.message or "",
+        "ends_at": ends.strftime("%Y-%m-%dT%H:%M:%SZ") if ends else None,
+        "active": _is_active(row),
+    }

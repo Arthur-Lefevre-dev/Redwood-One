@@ -186,9 +186,104 @@ async function hydrateWatchNavUser() {
   }
 }
 
+function watchEscapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+const WATCH_ANNOUNCE_DISMISS_KEY = 'redwood_announce_dismiss';
+
+function injectWatchAnnouncementStyles() {
+  if (document.getElementById('watch-announcement-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'watch-announcement-styles';
+  style.textContent = `
+    .watch-announcement-host{margin:0;padding:0}
+    .watch-announcement{
+      margin:12px 28px 4px;
+      padding:12px 16px;
+      border-radius:10px;
+      border:1px solid rgba(139,37,0,.45);
+      background:linear-gradient(135deg,rgba(139,37,0,.22),rgba(20,10,8,.95));
+      color:#fef2f2;
+      font-size:14px;
+      line-height:1.5;
+      display:flex;
+      align-items:flex-start;
+      gap:12px;
+      box-shadow:0 4px 24px rgba(0,0,0,.35);
+    }
+    .watch-announcement .wa-icon{flex-shrink:0;font-size:18px;line-height:1.2}
+    .watch-announcement .wa-body{flex:1;min-width:0;word-break:break-word}
+    .watch-announcement .wa-meta{font-size:11px;color:#fca5a5;margin-top:8px;opacity:.95}
+    .watch-announcement .wa-dismiss{
+      flex-shrink:0;background:transparent;border:none;color:#fecaca;cursor:pointer;
+      padding:4px 8px;font-size:18px;line-height:1;border-radius:6px;opacity:.85;
+    }
+    .watch-announcement .wa-dismiss:hover{opacity:1;background:rgba(0,0,0,.2)}
+    @media (max-width:560px){
+      .watch-announcement{margin-left:16px;margin-right:16px}
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function initViewerAnnouncement() {
+  const host = document.getElementById('watch-announcement');
+  if (!host) return;
+  injectWatchAnnouncementStyles();
+  try {
+    const data = await apiJson('/api/announcement');
+    if (!data || !data.active || !data.message) {
+      host.hidden = true;
+      host.innerHTML = '';
+      return;
+    }
+    const token = (data.ends_at || '') + '|' + data.message;
+    if (sessionStorage.getItem(WATCH_ANNOUNCE_DISMISS_KEY) === token) {
+      host.hidden = true;
+      host.innerHTML = '';
+      return;
+    }
+    host.hidden = false;
+    let meta = '';
+    if (data.ends_at) {
+      const raw = data.ends_at.endsWith('Z') ? data.ends_at : data.ends_at + 'Z';
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) {
+        meta =
+          "Jusqu'au " +
+          d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+      }
+    }
+    host.innerHTML =
+      '<div class="watch-announcement" role="region" aria-label="Annonce">' +
+      '<span class="wa-icon" aria-hidden="true">&#128226;</span>' +
+      '<div class="wa-body">' +
+      watchEscapeHtml(data.message).replace(/\n/g, '<br>') +
+      (meta ? '<div class="wa-meta">' + watchEscapeHtml(meta) + '</div>' : '') +
+      '</div>' +
+      '<button type="button" class="wa-dismiss" aria-label="Masquer pour cette session">&times;</button>' +
+      '</div>';
+    const btn = host.querySelector('.wa-dismiss');
+    if (btn) {
+      btn.addEventListener('click', () => {
+        sessionStorage.setItem(WATCH_ANNOUNCE_DISMISS_KEY, token);
+        host.hidden = true;
+        host.innerHTML = '';
+      });
+    }
+  } catch (_) {
+    host.hidden = true;
+    host.innerHTML = '';
+  }
+}
+
 if (typeof document !== 'undefined') {
   initWatchNavUserMenu();
   hydrateWatchNavUser();
+  initViewerAnnouncement();
 }
 
 // Expose on window (inline scripts rely on globals; absolute /watch/app.js avoids failed load when URL is /watch without trailing slash)
@@ -199,3 +294,5 @@ window.posterUrl = posterUrl;
 window.logout = logout;
 window.initWatchNavUserMenu = initWatchNavUserMenu;
 window.hydrateWatchNavUser = hydrateWatchNavUser;
+window.initViewerAnnouncement = initViewerAnnouncement;
+window.watchEscapeHtml = watchEscapeHtml;

@@ -209,6 +209,10 @@ Table refresh_tokens :
   POST   /api/auth/login | /api/auth/refresh | /api/auth/logout
   GET    /api/auth/me
 
+  GET    /api/announcement              → spectateurs connectés (annonce globale)
+  GET    /api/admin/viewer-announcement → require_admin
+  PUT    /api/admin/viewer-announcement → require_admin
+
   GET    /api/films | /api/films/featured | /api/films/by-genre
   GET    /api/films/{id} | /api/films/{id}/stream-url
   DELETE /api/films/{id}              → require_admin

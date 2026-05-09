@@ -158,3 +158,14 @@ class InvitationCode(Base):
     note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ViewerAnnouncement(Base):
+    """Singleton row id=1: global message for logged-in viewers until ends_at."""
+
+    __tablename__ = "viewer_announcement"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

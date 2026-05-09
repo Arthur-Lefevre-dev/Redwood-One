@@ -247,6 +247,19 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
           <div class="stat"><div class="stat-label">Erreurs</div><div class="stat-val" id="st-err" style="color:var(--color-text-danger)">0</div><div class="stat-sub">à traiter</div></div>
         </div>
         <div class="card">
+          <div class="card-head"><div class="card-title">Annonce spectateurs</div></div>
+          <div class="card-body" style="font-size:12px;color:var(--color-text-secondary);line-height:1.55">
+            <p style="margin-bottom:12px">Message général affiché sous la barre de navigation de l’espace spectateur (utilisateurs connectés). Durée comptée à partir de l’enregistrement. Laissez le message vide pour désactiver.</p>
+            <label for="va-message">Message</label>
+            <textarea id="va-message" style="display:block;width:100%;min-height:88px;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);background:#0f0f0f;color:var(--color-text-primary);font-family:var(--font-sans);font-size:13px;resize:vertical"></textarea>
+            <label for="va-hours">Durée (heures)</label>
+            <input type="number" id="va-hours" min="1" max="720" value="24" style="width:120px;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);background:#0f0f0f;color:var(--color-text-primary)" />
+            <p id="va-status" style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px"></p>
+            <button type="button" class="btn btn-primary" id="va-save">Enregistrer</button>
+            <button type="button" class="btn" id="va-clear" style="margin-left:8px">Effacer l’annonce</button>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head">
             <div class="card-title">Synchroniser le stockage S3</div>
             <button class="btn btn-primary" type="button" id="btn-sync-s3">Importer les objets films/*</button>
@@ -802,6 +815,7 @@ function goPage(p) {
   document.getElementById('page-' + p).classList.add('active');
   const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
   if (nav) nav.classList.add('active');
+  if (p === 'pipeline') loadViewerAnnouncementAdmin();
   if (p === 'films') loadLibrary();
   if (p === 'users') { loadUsers(); loadInvites(); }
   if (p === 'gpu') loadGpuOnce();
@@ -828,6 +842,7 @@ async function boot() {
   await refreshStats();
   await refreshQueue();
   await refreshGpuPill();
+  await loadViewerAnnouncementAdmin();
   setInterval(refreshStats, 8000);
   setInterval(() => { if ($('#page-pipeline').classList.contains('active')) refreshQueue(); }, 2000);
   setInterval(() => { if ($('#page-gpu').classList.contains('active')) loadGpuOnce(); }, 3000);
@@ -836,6 +851,85 @@ async function boot() {
 $('#btn-logout').addEventListener('click', async () => {
   await api('/api/auth/logout', { method: 'POST' });
   window.location.href = '/login-admin.html';
+});
+
+async function loadViewerAnnouncementAdmin() {
+  const st = $('#va-status');
+  if (!st || !$('#va-message')) return;
+  try {
+    const r = await api('/api/admin/viewer-announcement');
+    if (!r.ok) {
+      st.textContent = 'Impossible de charger l’annonce.';
+      return;
+    }
+    const j = await r.json();
+    $('#va-message').value = j.message || '';
+    if (j.active && j.ends_at) {
+      const d = new Date(j.ends_at.endsWith('Z') ? j.ends_at : j.ends_at + 'Z');
+      st.textContent = Number.isNaN(d.getTime())
+        ? 'Annonce active.'
+        : 'Actif jusqu’au : ' + d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+    } else if ((j.message || '').trim()) {
+      st.textContent = 'Message enregistré mais expiré. Ré-enregistrez pour republier.';
+    } else {
+      st.textContent = 'Aucune annonce publiée.';
+    }
+  } catch (e) {
+    if (e && e.message === '403-admin') return;
+    st.textContent = 'Erreur réseau.';
+  }
+}
+
+$('#va-save').addEventListener('click', async () => {
+  const st = $('#va-status');
+  const msg = ($('#va-message').value || '').trim();
+  const hours = parseInt($('#va-hours').value, 10);
+  if (msg && (!Number.isFinite(hours) || hours < 1 || hours > 720)) {
+    st.textContent = 'Durée : entre 1 et 720 heures.';
+    return;
+  }
+  st.textContent = 'Enregistrement…';
+  try {
+    const r = await api('/api/admin/viewer-announcement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, duration_hours: Number.isFinite(hours) ? hours : 24 }),
+    });
+    if (!r.ok) {
+      let t = 'Échec';
+      try {
+        const j = await r.json();
+        if (j.detail) t = typeof j.detail === 'string' ? j.detail : t;
+      } catch (_) {}
+      st.textContent = t;
+      return;
+    }
+    await loadViewerAnnouncementAdmin();
+  } catch (e) {
+    if (e && e.message === '403-admin') return;
+    st.textContent = 'Erreur réseau.';
+  }
+});
+
+$('#va-clear').addEventListener('click', async () => {
+  $('#va-message').value = '';
+  const st = $('#va-status');
+  st.textContent = 'Effacement…';
+  try {
+    const r = await api('/api/admin/viewer-announcement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: '', duration_hours: 24 }),
+    });
+    if (!r.ok) {
+      st.textContent = 'Échec';
+      return;
+    }
+    await loadViewerAnnouncementAdmin();
+  } catch (e) {
+    if (e && e.message === '403-admin') return;
+    st.textContent = 'Erreur réseau.';
+  }
 });
 
 $('#btn-sync-s3').addEventListener('click', async () => {

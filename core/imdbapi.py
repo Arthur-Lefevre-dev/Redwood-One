@@ -52,12 +52,39 @@ def search_titles(query: str) -> List[Dict[str, Any]]:
     return list(data.get("titles") or [])
 
 
+def normalize_imdb_tt_id(raw: Any) -> Optional[str]:
+    """Canonical ``tt1234567`` for API URLs and stable ``series_key`` grouping."""
+    if raw is None:
+        return None
+    if isinstance(raw, int):
+        return f"tt{raw}"
+    s = str(raw).strip()
+    if not s:
+        return None
+    m = re.fullmatch(r"tt(\d+)", s, re.I)
+    if m:
+        return f"tt{m.group(1)}"
+    if re.fullmatch(r"\d+", s):
+        return f"tt{s}"
+    return None
+
+
 def get_title(title_id: str) -> Optional[Dict[str, Any]]:
-    tid = (title_id or "").strip()
-    if not tid.startswith("tt"):
+    tid = normalize_imdb_tt_id(title_id)
+    if not tid:
         return None
     data = _get_json(f"/titles/{tid}")
     return data if isinstance(data, dict) else None
+
+
+def _series_key_imdb_from_show(*, show_detail: Any, search_hit: Any) -> Optional[str]:
+    """One stable key per series: prefer full title document id, else search hit id."""
+    tt = None
+    if isinstance(show_detail, dict):
+        tt = normalize_imdb_tt_id(show_detail.get("id"))
+    if not tt and isinstance(search_hit, dict):
+        tt = normalize_imdb_tt_id(search_hit.get("id"))
+    return f"imdb-{tt}" if tt else None
 
 
 def _pick_by_type_and_year(
@@ -103,7 +130,10 @@ def _directors_line(detail: Dict[str, Any]) -> Optional[str]:
 
 
 def fetch_credits_cast(title_id: str, limit: int = 12) -> List[str]:
-    data = _get_json(f"/titles/{title_id.strip()}/credits")
+    tid = normalize_imdb_tt_id(title_id)
+    if not tid:
+        return []
+    data = _get_json(f"/titles/{tid}/credits")
     if not data or not isinstance(data, dict):
         return []
     out: List[str] = []
@@ -122,13 +152,16 @@ def fetch_credits_cast(title_id: str, limit: int = 12) -> List[str]:
 
 
 def find_episode_on_show(show_id: str, season: int, episode: int) -> Optional[Dict[str, Any]]:
+    sid = normalize_imdb_tt_id(show_id)
+    if not sid:
+        return None
     token: Optional[str] = None
     want_s, want_e = str(int(season)), int(episode)
     while True:
         params: Dict[str, Any] = {}
         if token:
             params["pageToken"] = token
-        data = _get_json(f"/titles/{show_id.strip()}/episodes", params)
+        data = _get_json(f"/titles/{sid}/episodes", params)
         if not data or not isinstance(data, dict):
             return None
         for ep in data.get("episodes") or []:
@@ -180,6 +213,17 @@ def _spoken_lang(detail: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _best_title(d: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Pick the best human-readable title from an imdbapi title/search object."""
+    if not isinstance(d, dict):
+        return None
+    for key in ("primaryTitle", "originalTitle", "title", "name", "displayName"):
+        v = d.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
 def _imdb_episode_titre_and_original(
     series_name: str,
     season: int,
@@ -199,19 +243,13 @@ def _imdb_episode_titre_and_original(
 
 
 def parse_imdb_tt(raw: Optional[str]) -> Optional[str]:
-    """Return normalized ``tt123...`` or None if invalid."""
-    if raw is None or not str(raw).strip():
-        return None
-    s = str(raw).strip()
-    m = re.fullmatch(r"(tt)(\d+)", s, re.I)
-    if not m:
-        return None
-    return f"tt{m.group(2)}"
+    """Return normalized ``tt123...`` or None if invalid (user / admin input)."""
+    return normalize_imdb_tt_id(raw)
 
 
 def metadata_from_imdb_title_id(imdb_title_id: str) -> Optional[Dict[str, Any]]:
     """Build Film field dict from ``GET /titles/{id}`` (+ credits), no search step."""
-    tid = parse_imdb_tt(imdb_title_id)
+    tid = normalize_imdb_tt_id(imdb_title_id)
     if not tid:
         return None
     detail = get_title(tid)
@@ -266,16 +304,30 @@ def metadata_from_imdb_title_id(imdb_title_id: str) -> Optional[Dict[str, Any]]:
         series_id: Optional[str] = None
         parent = detail.get("series")
         if isinstance(parent, dict):
-            pid = parent.get("id")
+            pid = normalize_imdb_tt_id(parent.get("id"))
             if pid:
-                series_id = str(pid)
-            pst = parent.get("primaryTitle") or parent.get("title")
-            if isinstance(pst, str) and pst.strip():
-                out["series_title"] = pst.strip()
-        if not series_id and detail.get("seriesId"):
-            series_id = str(detail["seriesId"])
-        if series_id and str(series_id).startswith("tt"):
-            out["series_key"] = f"imdb-{series_id}"
+                series_id = pid
+            pst = _best_title(parent)
+            if pst:
+                out["series_title"] = pst
+        if not series_id:
+            series_id = normalize_imdb_tt_id(detail.get("seriesId"))
+        if not (out.get("series_title") or "").strip():
+            for key in ("seriesName", "showTitle", "parentTitle"):
+                raw = detail.get(key)
+                if isinstance(raw, str) and raw.strip():
+                    out["series_title"] = raw.strip()
+                    break
+        sdet: Optional[Dict[str, Any]] = None
+        if series_id:
+            sdet = get_title(series_id)
+        if not (out.get("series_title") or "").strip() and sdet:
+            st_fetch = _best_title(sdet)
+            if st_fetch:
+                out["series_title"] = st_fetch
+        if series_id:
+            canon = normalize_imdb_tt_id(sdet.get("id")) if isinstance(sdet, dict) else None
+            out["series_key"] = f"imdb-{canon or series_id}"
 
         st = (out.get("series_title") or "").strip()
         ep_name = (detail.get("primaryTitle") or "").strip()
@@ -326,7 +378,7 @@ def enrich_movie_from_filename(filename: str) -> Dict[str, Any]:
 
     return {
         "tmdb_id": None,
-        "imdb_title_id": str(tid) if tid else None,
+        "imdb_title_id": normalize_imdb_tt_id(tid),
         "titre": (base.get("primaryTitle") if isinstance(base, dict) else None)
         or hit.get("primaryTitle")
         or guess,
@@ -357,18 +409,19 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
         detail = get_title(str(tid)) if tid else None
         base = detail or hit
         genres = list(base.get("genres") or []) if isinstance(base, dict) else []
-        stitle = (
-            base.get("primaryTitle") if isinstance(base, dict) else None
-        ) or hit.get("primaryTitle") or guess
+        stitle = _best_title(base if isinstance(base, dict) else None) or _best_title(
+            hit if isinstance(hit, dict) else None
+        ) or guess
         img = _primary_image_url(base) if isinstance(base, dict) else _primary_image_url(hit)
         rel = base.get("startYear") if isinstance(base, dict) else hit.get("startYear")
         try:
             ay = int(rel) if rel is not None else None
         except (TypeError, ValueError):
             ay = None
+        imdb_tid = normalize_imdb_tt_id(tid)
         return {
             "tmdb_id": None,
-            "imdb_title_id": str(tid) if tid else None,
+            "imdb_title_id": imdb_tid,
             "titre": guess,
             "titre_original": None,
             "synopsis": base.get("plot") if isinstance(base, dict) else None,
@@ -380,7 +433,7 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
             "langue_originale": _spoken_lang(base) if isinstance(base, dict) else None,
             "annee": ay,
             "series_title": stitle,
-            "series_key": f"imdb-{tid}" if tid else None,
+            "series_key": _series_key_imdb_from_show(base if isinstance(base, dict) else {}, hit),
         }
 
     season, episode = parsed
@@ -394,16 +447,35 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
         out["annee"] = year_hint
         return out
 
-    show_id = str(hit["id"])
+    show_id = normalize_imdb_tt_id(hit.get("id"))
+    if not show_id:
+        out = _empty_film_fields(guess)
+        out["season_number"] = season
+        out["episode_number"] = episode
+        out["annee"] = year_hint
+        return out
     ep_row = find_episode_on_show(show_id, season, episode)
     show_detail = get_title(show_id) or hit
-    stitle = (
-        show_detail.get("primaryTitle")
-        if isinstance(show_detail, dict)
-        else hit.get("primaryTitle")
-    ) or show_q
+    series_key_val = _series_key_imdb_from_show(
+        show_detail if isinstance(show_detail, dict) else {},
+        hit,
+    )
+
+    def _stitle_from_ep_context(ep_use_local: Optional[Dict[str, Any]]) -> str:
+        t = _best_title(show_detail if isinstance(show_detail, dict) else None)
+        if t:
+            return t
+        if isinstance(ep_use_local, dict) and isinstance(ep_use_local.get("series"), dict):
+            t = _best_title(ep_use_local["series"])
+            if t:
+                return t
+        t = _best_title(hit if isinstance(hit, dict) else None)
+        if t:
+            return t
+        return show_q
 
     if not ep_row:
+        stitle = _stitle_from_ep_context(None)
         t_ep, t_orig = _imdb_episode_titre_and_original(stitle, season, episode, None)
         return {
             "tmdb_id": None,
@@ -421,19 +493,20 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
             "langue_originale": _spoken_lang(show_detail) if isinstance(show_detail, dict) else None,
             "annee": year_hint,
             "series_title": stitle,
-            "series_key": f"imdb-{show_id}",
+            "series_key": series_key_val,
             "season_number": season,
             "episode_number": episode,
         }
 
     ep_id = ep_row.get("id")
-    ep_detail = get_title(str(ep_id)) if ep_id else None
+    ep_detail = get_title(str(ep_id)) if ep_id is not None else None
     ep_use = ep_detail or ep_row
+    stitle = _stitle_from_ep_context(ep_use if isinstance(ep_use, dict) else None)
 
     director = _directors_line(ep_use) if isinstance(ep_use, dict) else None
     cast: List[str] = []
     if ep_id:
-        cast = fetch_credits_cast(str(ep_id))
+        cast = fetch_credits_cast(ep_id)
 
     rd = ep_row.get("releaseDate") if isinstance(ep_row, dict) else None
     ay = None
@@ -445,7 +518,9 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
     else:
         ay = year_hint
 
-    ep_title = ep_use.get("primaryTitle") if isinstance(ep_use, dict) else ep_row.get("title")
+    ep_title = _best_title(ep_use if isinstance(ep_use, dict) else None) or (
+        ep_row.get("title") if isinstance(ep_row, dict) else None
+    )
     overview = ep_use.get("plot") if isinstance(ep_use, dict) else ep_row.get("plot")
     img = _primary_image_url(ep_use) if isinstance(ep_use, dict) else None
     if not img:
@@ -460,7 +535,7 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
 
     return {
         "tmdb_id": None,
-        "imdb_title_id": str(ep_id) if ep_id else None,
+        "imdb_title_id": normalize_imdb_tt_id(ep_id),
         "titre": disp_titre,
         "titre_original": disp_orig,
         "synopsis": overview,
@@ -472,7 +547,7 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
         "langue_originale": _spoken_lang(show_detail) if isinstance(show_detail, dict) else None,
         "annee": ay,
         "series_title": stitle,
-        "series_key": f"imdb-{show_id}",
+        "series_key": series_key_val,
         "season_number": season,
         "episode_number": episode,
     }

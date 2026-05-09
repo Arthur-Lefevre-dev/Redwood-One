@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_current_user, require_admin
 from config import get_settings
 from core.imdbapi import metadata_from_imdb_title_id, parse_imdb_tt
+from core.series_grouping import normalize_series_group_key
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import delete_film_prefix, presigned_stream_url
 from core.tmdb import (
@@ -261,7 +262,7 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
     playback = None
     if f.content_kind == ContentKind.series_episode and f.series_key:
         playback = {
-            "series_key": f.series_key,
+            "series_key": normalize_series_group_key(f.series_key),
             "series_title": f.series_title,
             "season_number": f.season_number,
             "episode_number": f.episode_number,
