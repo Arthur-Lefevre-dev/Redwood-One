@@ -9,15 +9,27 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
     nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
-    .brand{font-weight:700;color:var(--accent)}
+    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem)}
+    a.brand:hover{color:#fca5a5}
+    .nav-search{flex:1;max-width:360px;padding:9px 14px;border-radius:999px;border:1px solid #333;background:#111;color:#fff;font-size:14px}
+    .nav-search::placeholder{color:#666}
     nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
     nav a:hover{color:#fff}
     main{padding:24px 28px 48px;max-width:960px;margin:0 auto}
     h1{font-size:1.35rem;margin-bottom:8px}
     .lead{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.5}
     .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
-    .card{background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer}
-    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#222;display:block}
+    .card{
+      background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer;
+      transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+    }
+    .card:hover{
+      transform:translateY(-6px) scale(1.02);
+      box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(139,37,0,.35);
+      border-color:rgba(139,37,0,.55);
+    }
+    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#222;display:block;transition:transform .35s ease}
+    .card:hover img{transform:scale(1.04)}
     .card .t{padding:10px;font-size:12px;line-height:1.35}
     .back{display:inline-block;margin-bottom:20px;color:#fca5a5;font-size:14px;text-decoration:none}
     .back:hover{text-decoration:underline}
@@ -36,7 +48,8 @@
 </head>
 <body>
   <nav>
-    <div class="brand">Redwood Plus</div>
+    <a class="brand" href="/watch/">Redwood Plus</a>
+    <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher une série…" autocomplete="off" />
     <div>
       <a href="/watch/">Accueil</a>
       <a href="/watch/serie.html">Séries</a>
@@ -65,6 +78,10 @@
     const params = new URLSearchParams(location.search);
     const key = params.get('key');
 
+    function seriesListUrl(qTrim) {
+      return '/watch/serie.html' + (qTrim ? '?q=' + encodeURIComponent(qTrim) : '');
+    }
+
     function showList() {
       document.getElementById('main-list').style.display = 'block';
       document.getElementById('main-detail').style.display = 'none';
@@ -74,16 +91,24 @@
       document.getElementById('main-detail').style.display = 'block';
     }
 
-    async function bootList() {
-      const rows = await apiJson('/api/series');
+    async function bootList(q) {
+      const needle = (q || '').trim();
+      const url = '/api/series' + (needle ? '?q=' + encodeURIComponent(needle) : '');
+      const rows = await apiJson(url);
       const g = document.getElementById('series-grid');
       const empty = document.getElementById('empty-list');
+      const h1 = document.querySelector('#main-list h1');
       g.innerHTML = '';
       if (!rows.length) {
         empty.style.display = 'block';
+        empty.textContent = needle
+          ? 'Aucune série ne correspond à votre recherche.'
+          : 'Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.';
+        if (h1) h1.textContent = needle ? ('Résultats : « ' + needle + ' »') : 'Séries';
         return;
       }
       empty.style.display = 'none';
+      if (h1) h1.textContent = needle ? ('Résultats : « ' + needle + ' »') : 'Séries';
       rows.forEach((s) => {
         const el = document.createElement('div');
         el.className = 'card';
@@ -126,14 +151,33 @@
       });
     }
 
+    let searchTimer;
+    document.getElementById('nav-q').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        const q = document.getElementById('nav-q').value.trim();
+        if (key) {
+          location.href = seriesListUrl(q);
+          return;
+        }
+        history.replaceState(null, '', seriesListUrl(q));
+        bootList(q).catch((e) => {
+          if (e && e.message === '401') { location.href = '/login.html'; return; }
+          console.error(e);
+        });
+      }, 280);
+    });
+
     async function boot() {
       await apiJson('/api/auth/me');
+      const listQ = (params.get('q') || '').trim();
+      document.getElementById('nav-q').value = listQ;
       if (key) {
         showDetail();
         await bootDetail(key);
       } else {
         showList();
-        await bootList();
+        await bootList(listQ);
       }
     }
     boot().catch((e) => {

@@ -1,6 +1,7 @@
 """Public / authenticated film catalog routes."""
 
 import random
+from datetime import datetime
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -30,6 +31,7 @@ class FilmOut(BaseModel):
     duree_min: Optional[int]
     resolution: Optional[str]
     statut: str
+    date_ajout: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -41,6 +43,30 @@ def _poster_url(path: Optional[str]) -> Optional[str]:
     if path.startswith("http"):
         return path
     return f"https://image.tmdb.org/t/p/w500{path}"
+
+
+def _genre_labels(genres_raw: Any) -> List[str]:
+    """Normalize JSON genres to display names (strings, dicts with name, or comma-separated string)."""
+    if not genres_raw:
+        return []
+    if isinstance(genres_raw, str):
+        parts = [p.strip() for p in genres_raw.replace(";", ",").split(",")]
+        return [p for p in parts if p]
+    if isinstance(genres_raw, list):
+        out: List[str] = []
+        for item in genres_raw:
+            if isinstance(item, str) and item.strip():
+                out.append(item.strip())
+            elif isinstance(item, dict):
+                n = item.get("name") or item.get("Name")
+                if isinstance(n, str) and n.strip():
+                    out.append(n.strip())
+        return out
+    return []
+
+
+def _film_genre_set(genres_raw: Any) -> set[str]:
+    return {g.lower() for g in _genre_labels(genres_raw)}
 
 
 @router.get("", response_model=List[FilmOut])
@@ -97,11 +123,20 @@ def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_curre
     )
     counts: dict[str, int] = {}
     for f in films:
-        for g in f.genres or []:
-            if isinstance(g, str) and g.strip():
-                k = g.strip()
-                counts[k] = counts.get(k, 0) + 1
-    rows = [{"name": k, "count": v} for k, v in counts.items()]
+        for g in _genre_labels(f.genres):
+            counts[g] = counts.get(g, 0) + 1
+    sample_poster: dict[str, str] = {}
+    # Prefer films that have a poster so category tiles always get a backdrop when any title does.
+    with_poster = [f for f in films if f.poster_path]
+    for f in with_poster:
+        pp = f.poster_path or ""
+        for g in _genre_labels(f.genres):
+            if g not in sample_poster and pp:
+                sample_poster[g] = pp
+    rows = [
+        {"name": k, "count": v, "poster_path": sample_poster.get(k), "poster_url": _poster_url(sample_poster.get(k))}
+        for k, v in counts.items()
+    ]
     rows.sort(key=lambda x: (-x["count"], x["name"].lower()))
     return rows
 
@@ -123,7 +158,7 @@ def surprise_me(db: Session = Depends(get_db), user: User = Depends(get_current_
         scored: List[tuple[float, Film]] = []
         pl = [str(p).lower() for p in prefs]
         for f in films:
-            gset = {str(x).lower() for x in (f.genres or []) if isinstance(x, str)}
+            gset = _film_genre_set(f.genres)
             overlap = sum(1 for p in pl if p in gset)
             scored.append((overlap + random.random() * 0.01, f))
         scored.sort(key=lambda x: -x[0])
@@ -141,11 +176,10 @@ def by_genre(genre: str, db: Session = Depends(get_db), user: User = Depends(get
         .order_by(Film.date_ajout.desc())
         .all()
     )
-    g = genre.lower()
+    g = genre.strip().lower()
     out = []
     for f in films:
-        genres = f.genres or []
-        if any(isinstance(x, str) and x.lower() == g for x in genres):
+        if g in _film_genre_set(f.genres):
             out.append(f)
     return out
 

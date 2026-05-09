@@ -10,15 +10,24 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
     nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;gap:16px;flex-wrap:wrap}
-    .brand{font-weight:700;color:var(--accent);letter-spacing:0.02em}
+    a.brand,.brand{font-weight:800;color:var(--accent);letter-spacing:0.02em;text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem)}
+    a.brand:hover{color:#fca5a5}
     .nav-mid{flex:1;display:flex;justify-content:center;min-width:200px;max-width:420px}
     .nav-search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid #333;background:#111;color:#fff;font-size:14px}
     .nav-search::placeholder{color:#666}
     nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
     nav a:hover{color:#fff}
-    .hero{margin:24px 28px;padding:48px;border-radius:16px;background:linear-gradient(120deg,#1a0a0a,#0a0a0a);border:1px solid #222;min-height:220px;display:flex;flex-direction:column;justify-content:flex-end}
-    .hero h1{font-size:2rem;margin-bottom:8px}
-    .hero p{color:var(--muted);max-width:560px;line-height:1.5}
+    .hero{
+      margin:24px 28px;padding:48px;border-radius:16px;border:1px solid #222;
+      min-height:300px;display:flex;flex-direction:column;justify-content:flex-end;
+      position:relative;overflow:hidden;
+      background:linear-gradient(120deg,#1a0a0a,#0a0a0a);
+      background-size:cover;background-position:center 20%;
+    }
+    .hero.has-backdrop{background-color:#0a0a0a}
+    .hero-inner{position:relative;z-index:1}
+    .hero h1{font-size:2rem;margin-bottom:8px;text-shadow:0 2px 24px rgba(0,0,0,.9),0 1px 3px #000}
+    .hero p{color:#d4d4d4;max-width:560px;line-height:1.55;text-shadow:0 1px 12px rgba(0,0,0,.85)}
     .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px;flex-wrap:wrap;gap:10px}
     .row-head h2{font-size:1rem;color:#ddd}
     .row-actions{display:flex;gap:10px;flex-wrap:wrap}
@@ -31,15 +40,35 @@
     .taste-grid label{font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #333;background:#161616}
     .taste-grid input{accent-color:var(--accent)}
     .row-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 28px 28px;scroll-snap-type:x mandatory}
-    .card{flex:0 0 160px;scroll-snap-align:start;background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer}
-    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:#222}
+    .card{
+      flex:0 0 160px;scroll-snap-align:start;background:#141414;border:1px solid #222;border-radius:10px;
+      overflow:hidden;cursor:pointer;
+      transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+    }
+    .card:hover{
+      transform:translateY(-6px) scale(1.02);
+      box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(139,37,0,.35);
+      border-color:rgba(139,37,0,.55);
+    }
+    .card-media{position:relative}
+    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:#222;transition:transform .35s ease}
+    .card:hover img{transform:scale(1.04)}
+    .badge-new{
+      position:absolute;top:8px;left:8px;z-index:2;
+      display:inline-flex;align-items:center;gap:4px;
+      background:linear-gradient(135deg,#8B2500,#c94a1a);color:#fff;
+      font-size:9px;font-weight:800;letter-spacing:.12em;
+      padding:5px 9px;border-radius:6px;
+      box-shadow:0 2px 10px rgba(0,0,0,.5);
+    }
+    .badge-new::before{content:'✦';font-size:10px;opacity:.95}
     .card .t{padding:8px 10px;font-size:12px;line-height:1.3}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
   </style>
 </head>
 <body>
   <nav>
-    <div class="brand">Redwood Plus</div>
+    <a class="brand" href="/watch/">Redwood Plus</a>
     <div class="nav-mid">
       <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher un film…" autocomplete="off" />
     </div>
@@ -51,8 +80,10 @@
     </div>
   </nav>
   <section class="hero" id="hero">
-    <h1 id="hero-title">Chargement…</h1>
-    <p id="hero-desc"></p>
+    <div class="hero-inner">
+      <h1 id="hero-title">Chargement…</h1>
+      <p id="hero-desc"></p>
+    </div>
   </section>
   <div class="row-head">
     <h2 id="latest-head">Derniers ajouts</h2>
@@ -75,14 +106,27 @@
   <script>
     document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
 
-    function renderCards(container, list) {
+    function isNewTitle(f) {
+      const raw = f.date_ajout || f.dateAjout;
+      if (!raw) return false;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return false;
+      return (Date.now() - d.getTime()) / 864e5 <= 45;
+    }
+
+    function renderCards(container, list, opts) {
+      const markNew = opts && opts.markNew;
+      const latestTopN = opts && typeof opts.latestTopN === 'number' ? opts.latestTopN : null;
       container.innerHTML = '';
-      list.forEach(f => {
+      list.forEach((f, i) => {
         const el = document.createElement('div');
         el.className = 'card';
         el.onclick = () => location.href = '/watch/film.html?id=' + f.id;
         const img = f.poster_path ? posterUrl(f.poster_path) : '';
-        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
+        const showNew = markNew && (isNewTitle(f) || (latestTopN != null && i < latestTopN));
+        const newBadge = showNew ? '<span class="badge-new">NEW</span>' : '';
+        // Badge after <img> so it stacks above the poster (image would cover an earlier sibling).
+        el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" />${newBadge}</div><div class="t"></div>`;
         el.querySelector('.t').textContent = f.titre;
         container.appendChild(el);
       });
@@ -98,7 +142,10 @@
         const row = document.getElementById('row-latest');
         document.getElementById('latest-head').textContent =
           q ? ('Résultats : « ' + q + ' »') : 'Derniers ajouts';
-        renderCards(row, rows.slice(0, 24));
+        renderCards(row, rows.slice(0, 24), {
+          markNew: true,
+          latestTopN: q ? 0 : 12,
+        });
       }, 280);
     });
 
@@ -148,18 +195,34 @@
         gEl.appendChild(lab);
       });
 
+      const heroEl = document.getElementById('hero');
       if (featured.length) {
         const h = featured[0];
         document.getElementById('hero-title').textContent = h.titre;
         document.getElementById('hero-desc').textContent = (h.synopsis || '').slice(0, 220) + (h.synopsis && h.synopsis.length > 220 ? '…' : '');
-        document.getElementById('hero').style.cursor = 'pointer';
-        document.getElementById('hero').onclick = () => location.href = '/watch/film.html?id=' + h.id;
+        heroEl.style.cursor = 'pointer';
+        heroEl.onclick = () => location.href = '/watch/film.html?id=' + h.id;
+        const pu = h.poster_path ? posterUrl(h.poster_path) : '';
+        if (pu) {
+          heroEl.classList.add('has-backdrop');
+          heroEl.style.backgroundImage =
+            'linear-gradient(105deg,rgba(10,10,10,.93) 0%,rgba(10,10,10,.55) 42%,rgba(10,10,10,.25) 72%),' +
+            'linear-gradient(180deg,rgba(10,10,10,.15) 0%,rgba(10,10,10,.88) 100%),' +
+            "url('" + pu.replace(/'/g, "\\'") + "')";
+        } else {
+          heroEl.classList.remove('has-backdrop');
+          heroEl.style.backgroundImage = '';
+        }
       } else {
         document.getElementById('hero-title').textContent = 'Bienvenue';
         document.getElementById('hero-desc').textContent = 'Découvrez le catalogue ou demandez un titre au hasard selon vos goûts.';
+        heroEl.classList.remove('has-backdrop');
+        heroEl.style.backgroundImage = '';
+        heroEl.style.cursor = '';
+        heroEl.onclick = null;
       }
 
-      renderCards(document.getElementById('row-latest'), latest);
+      renderCards(document.getElementById('row-latest'), latest, { markNew: true, latestTopN: 12 });
       renderCards(document.getElementById('row-featured'), featured);
 
       try {
@@ -171,7 +234,7 @@
           el.className = 'card';
           el.onclick = () => { location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key); };
           const img = s.poster_path ? posterUrl(s.poster_path) : '';
-          el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
+          el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /></div><div class="t"></div>`;
           el.querySelector('.t').textContent = s.title + ' · ' + s.episode_count + ' ép.';
           rs.appendChild(el);
         });

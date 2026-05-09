@@ -46,8 +46,11 @@ def list_series(
         if not rep:
             continue
         title = rep.series_title or rep.titre
-        if needle and needle not in (title or "").lower():
-            continue
+        if needle:
+            t = (title or "").lower()
+            skl = (sk or "").lower()
+            if needle not in t and needle not in skl:
+                continue
         ep_count = (
             db.query(func.count(Film.id))
             .filter(Film.series_key == sk, Film.statut == FilmStatut.disponible)
