@@ -355,9 +355,17 @@ def movie_trailers_youtube(tmdb_id: int, limit: int = 6) -> List[Dict[str, Any]]
 def enrich_from_filename(
     filename: str,
     content_kind: ContentKind = ContentKind.film,
+    *,
+    metadata_provider: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Return fields to merge into Film model (movie or TV episode)."""
-    prov = (get_settings().METADATA_PROVIDER or "tmdb").strip().lower()
+    """Return fields to merge into Film model (movie or TV episode).
+
+    If ``metadata_provider`` is ``\"tmdb\"`` or ``\"imdbapi\"``, it overrides
+    :envvar:`METADATA_PROVIDER` (for per-request refresh from admin).
+    """
+    prov = (
+        (metadata_provider or get_settings().METADATA_PROVIDER or "tmdb").strip().lower()
+    )
     if prov == "imdbapi":
         from core.imdbapi import enrich_from_filename_imdb
 

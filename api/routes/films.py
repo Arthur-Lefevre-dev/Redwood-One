@@ -3,6 +3,7 @@
 import logging
 import random
 from datetime import datetime
+from pathlib import PurePosixPath
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,7 +15,6 @@ from api.deps import get_current_user, require_admin
 from config import get_settings
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import delete_film_prefix, presigned_stream_url
-from core.imdbapi import apply_imdb_title_metadata
 from core.tmdb import (
     enrich_from_filename,
     movie_details,
@@ -27,6 +27,20 @@ from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
 router = APIRouter(prefix="/api/films", tags=["films"])
+
+
+def _filename_for_enrich(f: Film) -> str:
+    """Prefer uploaded object basename so SxxEyy / year in the filename are preserved for metadata search."""
+    key = (f.s3_key or "").strip()
+    if key:
+        name = PurePosixPath(key).name
+        if name:
+            return name
+    t = (f.titre or "video").strip() or "video"
+    lower = t.lower()
+    if lower.endswith((".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v")):
+        return t
+    return f"{t}.mp4"
 
 logger = logging.getLogger(__name__)
 
@@ -302,20 +316,6 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
     if not f:
         raise HTTPException(404, "Not found")
     has_key = bool((get_settings().TMDB_API_KEY or "").strip())
-    prov = (get_settings().METADATA_PROVIDER or "tmdb").strip().lower()
-
-    if prov == "imdbapi":
-        if f.imdb_title_id:
-            apply_imdb_title_metadata(f)
-        else:
-            data = enrich_from_filename((f.titre or "video") + ".mp4", f.content_kind)
-            for k, v in data.items():
-                if hasattr(f, k) and v is not None:
-                    setattr(f, k, v)
-        f.trailers_tmdb_cache = None
-        f.trailers_tmdb_cached_at = None
-        db.commit()
-        return {"ok": True}
 
     if f.content_kind == ContentKind.series_episode:
         applied = False
@@ -342,7 +342,11 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
                     f.series_title = show.get("name")
                 applied = True
         if not applied:
-            data = enrich_from_filename((f.titre or "video") + ".mp4", ContentKind.series_episode)
+            data = enrich_from_filename(
+                _filename_for_enrich(f),
+                ContentKind.series_episode,
+                metadata_provider="tmdb",
+            )
             for k, v in data.items():
                 if hasattr(f, k) and v is not None:
                     setattr(f, k, v)
@@ -357,7 +361,11 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
                 f.note_tmdb = d.get("vote_average")
                 f.poster_path = d.get("poster_path")
         else:
-            data = enrich_from_filename(f.titre + ".mp4", ContentKind.film)
+            data = enrich_from_filename(
+                _filename_for_enrich(f),
+                ContentKind.film,
+                metadata_provider="tmdb",
+            )
             for k, v in data.items():
                 if hasattr(f, k) and v is not None:
                     setattr(f, k, v)
@@ -368,5 +376,25 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
         else:
             f.trailers_tmdb_cache = None
             f.trailers_tmdb_cached_at = None
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{film_id}/refresh-imdbapi")
+def refresh_imdbapi(film_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Re-fetch metadata from imdbapi.dev (search + title detail); ignores METADATA_PROVIDER."""
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Not found")
+    data = enrich_from_filename(
+        _filename_for_enrich(f),
+        f.content_kind,
+        metadata_provider="imdbapi",
+    )
+    for k, v in data.items():
+        if hasattr(f, k) and v is not None:
+            setattr(f, k, v)
+    f.trailers_tmdb_cache = None
+    f.trailers_tmdb_cached_at = None
     db.commit()
     return {"ok": True}

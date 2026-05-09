@@ -1,4 +1,9 @@
-"""IMDb metadata via free API https://imdbapi.dev/ (Base: api.imdbapi.dev)."""
+"""IMDb metadata via https://imdbapi.dev/ (base api.imdbapi.dev).
+
+Uses two HTTP steps: ``GET /search/titles`` then ``GET /titles/{id}`` (plus
+``/credits``, ``/episodes`` for series). Enrichment is always search-driven from
+the filename, not from a manually entered id.
+"""
 
 from __future__ import annotations
 
@@ -363,44 +368,3 @@ def enrich_from_filename_imdb(filename: str, content_kind: ContentKind) -> Dict[
     if content_kind == ContentKind.series_episode:
         return enrich_series_episode_from_filename(filename)
     return enrich_movie_from_filename(filename)
-
-
-def apply_imdb_title_metadata(film_row: Any) -> None:
-    """Update a Film ORM instance from GET /titles/{imdb_title_id} (+ credits for cast)."""
-    iid = getattr(film_row, "imdb_title_id", None)
-    if not iid or not str(iid).startswith("tt"):
-        return
-    detail = get_title(str(iid))
-    if not detail:
-        return
-
-    film_row.titre = detail.get("primaryTitle") or film_row.titre
-    film_row.titre_original = detail.get("originalTitle") or film_row.titre_original
-    film_row.synopsis = detail.get("plot") or film_row.synopsis
-    g = detail.get("genres")
-    if isinstance(g, list) and g:
-        film_row.genres = g
-    dline = _directors_line(detail)
-    if dline:
-        film_row.realisateur = dline
-    rv = _rating_value(detail)
-    if rv is not None:
-        film_row.note_tmdb = rv
-    img = _primary_image_url(detail)
-    if img:
-        film_row.poster_path = img
-    if detail.get("startYear") is not None:
-        try:
-            film_row.annee = int(detail["startYear"])
-        except (TypeError, ValueError):
-            pass
-    sl = _spoken_lang(detail)
-    if sl:
-        film_row.langue_originale = sl
-    cast = fetch_credits_cast(str(iid))
-    if cast:
-        film_row.acteurs = cast
-    else:
-        sc = _stars_to_cast(detail)
-        if sc:
-            film_row.acteurs = sc

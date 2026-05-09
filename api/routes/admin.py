@@ -125,7 +125,6 @@ class AdminFilmUpdateBody(BaseModel):
     resolution: Optional[str] = None
     langue_originale: Optional[str] = None
     tmdb_id: Optional[int] = None
-    imdb_title_id: Optional[str] = None
     content_kind: ContentKind = ContentKind.film
     series_key: Optional[str] = None
     series_title: Optional[str] = None
@@ -162,8 +161,6 @@ def admin_patch_film(
     f.langue_originale = lo or None
     prev_tmdb_id = f.tmdb_id
     f.tmdb_id = body.tmdb_id
-    im = (body.imdb_title_id or "").strip()
-    f.imdb_title_id = im or None
     if prev_tmdb_id != body.tmdb_id:
         f.trailers_tmdb_cache = None
         f.trailers_tmdb_cached_at = None
@@ -184,6 +181,30 @@ def admin_patch_film(
     db.commit()
     db.refresh(f)
     return _film_to_admin_detail(f)
+
+
+@router.post("/films/{film_id}/refresh-tmdb")
+def admin_refresh_tmdb(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Same as POST /api/films/{id}/refresh-tmdb; exposed under /api/admin for the admin UI."""
+    from api.routes.films import refresh_tmdb as films_refresh_tmdb
+
+    return films_refresh_tmdb(film_id, db, _)
+
+
+@router.post("/films/{film_id}/refresh-imdbapi")
+def admin_refresh_imdbapi(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Same as POST /api/films/{id}/refresh-imdbapi; exposed under /api/admin for the admin UI."""
+    from api.routes.films import refresh_imdbapi as films_refresh_imdbapi
+
+    return films_refresh_imdbapi(film_id, db, _)
 
 
 @router.post("/upload")

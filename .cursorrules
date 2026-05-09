@@ -212,7 +212,10 @@ Table refresh_tokens :
   GET    /api/films | /api/films/featured | /api/films/by-genre
   GET    /api/films/{id} | /api/films/{id}/stream-url
   DELETE /api/films/{id}              → require_admin
-  POST   /api/films/{id}/refresh-tmdb → require_admin
+  POST   /api/films/{id}/refresh-tmdb       → require_admin (TheMovieDB)
+  POST   /api/films/{id}/refresh-imdbapi    → require_admin (imdbapi.dev)
+  POST   /api/admin/films/{id}/refresh-tmdb    → require_admin (alias admin UI)
+  POST   /api/admin/films/{id}/refresh-imdbapi → require_admin (alias admin UI)
   GET    /api/films/stats             → require_admin
 
   POST   /api/admin/upload            → require_admin (upload direct) nouveau

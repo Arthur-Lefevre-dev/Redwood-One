@@ -539,8 +539,6 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
     <input id="fm-langue" type="text" placeholder="ex. fr" autocomplete="off" />
     <label for="fm-tmdb-id">ID TMDB</label>
     <input id="fm-tmdb-id" type="number" min="0" placeholder="ex. 1054867" />
-    <label for="fm-imdb-id">ID IMDb (tt…)</label>
-    <input id="fm-imdb-id" type="text" placeholder="ex. tt1375666 ou tt0562997" autocomplete="off" />
     <label for="fm-trailers">Bande-annonce YouTube (manuel)</label>
     <textarea id="fm-trailers" rows="3" placeholder="Une seule URL (https://www.youtube.com/watch?v=… ou youtu.be/…). Optionnel : Titre affiché|URL"></textarea>
     <p class="hint">S’affichent <strong>avant</strong> les vidéos récupérées via TMDB. Laissez vide pour n’utiliser que TMDB. Pour <a href="https://www.themoviedb.org/movie/1054867-one-battle-after-another" target="_blank" rel="noopener">One Battle After Another</a>, renseignez aussi l’ID TMDB ci-dessus.</p>
@@ -1087,7 +1085,19 @@ async function loadLibrary() {
     const b1 = document.createElement('button');
     b1.className = 'action-btn';
     b1.textContent = 'TMDB';
-    b1.onclick = async () => { await api(`/api/films/${f.id}/refresh-tmdb`, { method: 'POST' }); loadLibrary(); };
+    b1.title = 'Rafraîchir les métadonnées (TheMovieDB)';
+    b1.onclick = async () => {
+      await api(`/api/admin/films/${f.id}/refresh-tmdb`, { method: 'POST' });
+      loadLibrary();
+    };
+    const b1b = document.createElement('button');
+    b1b.className = 'action-btn';
+    b1b.textContent = 'IMDb API';
+    b1b.title = 'Rafraîchir les métadonnées (imdbapi.dev)';
+    b1b.onclick = async () => {
+      await api(`/api/admin/films/${f.id}/refresh-imdbapi`, { method: 'POST' });
+      loadLibrary();
+    };
     const b2 = document.createElement('button');
     b2.className = 'action-btn danger';
     b2.textContent = 'Suppr.';
@@ -1103,6 +1113,7 @@ async function loadLibrary() {
     };
     actions.appendChild(b0);
     actions.appendChild(b1);
+    actions.appendChild(b1b);
     actions.appendChild(b2);
     tds[6].appendChild(actions);
     tb.appendChild(tr);
@@ -1185,7 +1196,6 @@ async function openFilmModal(filmId) {
     $('#fm-resolution').value = d.resolution || '';
     $('#fm-langue').value = d.langue_originale || '';
     $('#fm-tmdb-id').value = d.tmdb_id != null ? String(d.tmdb_id) : '';
-    $('#fm-imdb-id').value = d.imdb_title_id ? String(d.imdb_title_id) : '';
     $('#fm-trailers').value = Array.isArray(d.trailers_manual_lines) ? d.trailers_manual_lines.join('\n') : '';
     $('#fm-note').value = d.note_tmdb != null ? String(d.note_tmdb) : '';
     $('#fm-poster').value = d.poster_path || '';
@@ -1270,7 +1280,6 @@ $('#fm-save').addEventListener('click', async () => {
     resolution: $('#fm-resolution').value.trim() || null,
     langue_originale: $('#fm-langue').value.trim() || null,
     tmdb_id: parseOptInt($('#fm-tmdb-id')),
-    imdb_title_id: $('#fm-imdb-id').value.trim() || null,
     trailers_manual: trailerLines,
     content_kind: kind,
     series_key: kind === 'series_episode' ? $('#fm-series-key').value.trim() : null,
