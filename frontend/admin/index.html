@@ -338,10 +338,14 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
       <header class="topbar">
         <div>
           <div class="page-title">Utilisateurs</div>
-          <div class="page-sub">Gestion des accès</div>
+          <div class="page-sub" id="users-sub">Gestion des accès</div>
         </div>
         <div class="topbar-right">
           <button class="btn btn-refresh" type="button" id="btn-refresh-users" title="Actualiser utilisateurs et invitations"><span class="btn-refresh-glyph" aria-hidden="true">↻</span>Actualiser</button>
+          <div class="lib-search-wrap">
+            <input id="users-search" type="text" autocomplete="off" style="font-size:12px;padding:5px 28px 5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:200px" placeholder="Rechercher un utilisateur…" />
+            <button type="button" class="lib-search-clear" id="users-search-clear" hidden aria-label="Effacer la recherche" title="Effacer">×</button>
+          </div>
           <button class="btn btn-primary" id="btn-new-user" type="button">+ Nouvel utilisateur</button>
         </div>
       </header>
@@ -1217,17 +1221,46 @@ $('#fm-save').addEventListener('click', async () => {
   }
 });
 
-async function loadUsers() {
-  const r = await api('/api/admin/users');
-  const rows = await r.json();
-  let na = 0, nv = 0;
-  rows.forEach(u => { if (u.role === 'admin') na++; else nv++; });
+/** Full user list from last GET /api/admin/users; table shows a filtered subset. */
+let adminUsersCache = null;
+
+function syncUsersSearchClearBtn() {
+  const inp = $('#users-search');
+  const btn = $('#users-search-clear');
+  if (!inp || !btn) return;
+  btn.hidden = !inp.value.trim();
+}
+
+function applyUsersFilterAndRender() {
+  const rows = adminUsersCache;
+  if (!rows) return;
+  let na = 0;
+  let nv = 0;
+  rows.forEach((u) => {
+    if (u.role === 'admin') na++;
+    else nv++;
+  });
   $('#u-total').textContent = rows.length;
   $('#u-adm').textContent = na;
   $('#u-view').textContent = nv;
+  const qRaw = ($('#users-search') && $('#users-search').value) || '';
+  const q = qRaw.trim().toLowerCase();
+  const filtered = !q
+    ? rows
+    : rows.filter(
+        (u) =>
+          (u.username && String(u.username).toLowerCase().includes(q)) ||
+          (u.email && String(u.email).toLowerCase().includes(q)),
+      );
+  const sub = $('#users-sub');
+  if (sub) {
+    sub.textContent = q
+      ? `Gestion des accès — ${filtered.length} résultat(s) sur ${rows.length}`
+      : `Gestion des accès — ${rows.length} compte(s)`;
+  }
   const tb = $('#users-body');
   tb.innerHTML = '';
-  rows.forEach(u => {
+  filtered.forEach((u) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="padding-left:16px">
@@ -1309,6 +1342,27 @@ async function loadUsers() {
     tb.appendChild(tr);
   });
 }
+
+async function loadUsers() {
+  const r = await api('/api/admin/users');
+  adminUsersCache = await r.json();
+  syncUsersSearchClearBtn();
+  applyUsersFilterAndRender();
+}
+
+$('#users-search').addEventListener('input', () => {
+  syncUsersSearchClearBtn();
+  clearTimeout(window._us);
+  window._us = setTimeout(applyUsersFilterAndRender, 250);
+});
+$('#users-search-clear').addEventListener('click', () => {
+  const inp = $('#users-search');
+  inp.value = '';
+  syncUsersSearchClearBtn();
+  inp.focus();
+  clearTimeout(window._us);
+  applyUsersFilterAndRender();
+});
 
 $('#btn-new-user').addEventListener('click', () => { $('#modal-user').classList.add('show'); });
 $('#nu-cancel').addEventListener('click', () => { $('#modal-user').classList.remove('show'); });
