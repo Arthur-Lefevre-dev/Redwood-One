@@ -77,6 +77,7 @@
     .season-head-text{flex:1;min-width:0}
     .season-head-text h2{font-size:14px;padding:0;margin:0 0 6px;background:none;border:none;color:#ddd}
     .season-note{font-size:12px;color:var(--muted);margin:0;line-height:1.45}
+    .season-synopsis{font-size:13px;color:#c8c8c8;margin:10px 0 0;line-height:1.55;white-space:pre-wrap}
     .ep-list{display:flex;flex-direction:column}
     .ep{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #222;cursor:pointer;font-size:13px}
     .ep:last-child{border-bottom:none}
@@ -237,8 +238,8 @@
         const sec = document.createElement('section');
         sec.className = 'season';
         const art = (d.season_art && d.season_art[k]) || {};
-        const hasArt = !!(art.poster_path || art.note);
-        if (hasArt) {
+        const hasSeasonHead = !!(art.poster_path || art.note || art.synopsis);
+        if (hasSeasonHead) {
           const head = document.createElement('div');
           head.className = 'season-head';
           if (art.poster_path) {
@@ -260,6 +261,12 @@
             pn.className = 'season-note';
             pn.textContent = art.note;
             ht.appendChild(pn);
+          }
+          if (art.synopsis) {
+            const ps = document.createElement('p');
+            ps.className = 'season-synopsis';
+            ps.textContent = art.synopsis;
+            ht.appendChild(ps);
           }
           head.appendChild(ht);
           sec.appendChild(head);

@@ -146,7 +146,7 @@ class Film(Base):
 
 
 class SeriesSeasonMeta(Base):
-    """Admin-defined season poster / note per series_key (matches Film.series_key)."""
+    """Admin-defined season poster, note, and synopsis per series_key (matches Film.series_key)."""
 
     __tablename__ = "series_season_meta"
 
@@ -155,6 +155,7 @@ class SeriesSeasonMeta(Base):
     season_number: Mapped[int] = mapped_column(Integer, nullable=False)
     poster_path: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    synopsis: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("series_key", "season_number", name="uq_series_season_meta_key_sn"),

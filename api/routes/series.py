@@ -192,10 +192,12 @@ def series_detail(
         key = str(int(m.season_number))
         p = m.poster_path
         n = m.note
+        s = m.synopsis
         if key not in season_art:
             season_art[key] = {
                 "poster_path": p,
                 "note": n,
+                "synopsis": s,
             }
         else:
             cur = season_art[key]
@@ -203,6 +205,8 @@ def series_detail(
                 cur["poster_path"] = p
             if not (cur.get("note") or "").strip() and (n or "").strip():
                 cur["note"] = n
+            if not (cur.get("synopsis") or "").strip() and (s or "").strip():
+                cur["synopsis"] = s
     show_rows = (
         db.query(SeriesShowMeta)
         .filter(SeriesShowMeta.series_key.in_(sk_list))

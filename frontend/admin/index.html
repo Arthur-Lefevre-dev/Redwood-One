@@ -828,6 +828,12 @@
         max-height: 90vh;
         overflow-y: auto;
       }
+      .modal.modal-season-meta {
+        width: min(520px, 94vw);
+        max-height: 90vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
       .modal textarea {
         width: 100%;
         min-height: 88px;
@@ -1860,7 +1866,7 @@
     </div>
 
     <div class="modal-backdrop" id="modal-season-meta">
-      <div class="modal" role="document" style="max-width: 520px">
+      <div class="modal modal-season-meta" role="document">
         <h3 id="sm-heading">Fiche série et saisons</h3>
         <p class="err-msg" id="sm-err" style="display: none"></p>
         <p class="hint" id="sm-intro">
@@ -1965,6 +1971,12 @@
           placeholder="ex. 8.2"
           autocomplete="off"
         />
+        <label for="sm-synopsis">Résumé de la saison (optionnel)</label>
+        <textarea
+          id="sm-synopsis"
+          rows="5"
+          placeholder="Texte affiché sur la fiche série, sous le titre de saison…"
+        ></textarea>
         <div class="row" style="margin-top: 12px">
           <button class="btn" type="button" id="sm-close">Fermer</button>
           <button class="btn btn-primary" type="button" id="sm-save">
@@ -3198,6 +3210,15 @@
             nt.textContent = row.note;
             info.appendChild(nt);
           }
+          if (row.synopsis) {
+            const sy = document.createElement("div");
+            sy.style.cssText =
+              "color:var(--color-text-tertiary);font-size:11px;margin-top:4px;line-height:1.4;max-height:3.2em;overflow:hidden";
+            const t = String(row.synopsis);
+            sy.textContent = t.length > 160 ? t.slice(0, 160) + "…" : t;
+            sy.title = t;
+            info.appendChild(sy);
+          }
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "action-btn danger";
@@ -3280,9 +3301,11 @@
         const sn = $("#sm-season-num");
         const pp = $("#sm-poster");
         const nt = $("#sm-note");
+        const sy = $("#sm-synopsis");
         if (sn) sn.value = "";
         if (pp) pp.value = "";
         if (nt) nt.value = "";
+        if (sy) sy.value = "";
         const backdrop = $("#modal-season-meta");
         if (backdrop) backdrop.classList.add("show");
         if (opts.length) {
@@ -3470,6 +3493,7 @@
           season_number: sn,
           poster_path: ($("#sm-poster").value || "").trim() || null,
           note: ($("#sm-note").value || "").trim() || null,
+          synopsis: ($("#sm-synopsis").value || "").trim() || null,
         };
         const r = await api("/api/admin/series-seasons", {
           method: "POST",

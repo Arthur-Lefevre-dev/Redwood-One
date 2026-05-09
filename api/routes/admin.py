@@ -571,6 +571,7 @@ class SeriesSeasonMetaBody(BaseModel):
     season_number: int = Field(..., ge=0)
     poster_path: Optional[str] = Field(None, max_length=2048)
     note: Optional[str] = Field(None, max_length=512)
+    synopsis: Optional[str] = Field(None, max_length=32000)
 
 
 @router.get("/series-seasons")
@@ -595,6 +596,7 @@ def admin_list_series_seasons(
             "season_number": r.season_number,
             "poster_path": r.poster_path,
             "note": r.note,
+            "synopsis": r.synopsis,
         }
         for r in rows
     ]
@@ -610,6 +612,7 @@ def admin_upsert_series_season(
     sn = int(body.season_number)
     pp = (body.poster_path or "").strip() or None
     nt = (body.note or "").strip() or None
+    sy = (body.synopsis or "").strip() or None
     row = (
         db.query(SeriesSeasonMeta)
         .filter(SeriesSeasonMeta.series_key == sk, SeriesSeasonMeta.season_number == sn)
@@ -618,12 +621,14 @@ def admin_upsert_series_season(
     if row:
         row.poster_path = pp
         row.note = nt
+        row.synopsis = sy
     else:
         row = SeriesSeasonMeta(
             series_key=sk,
             season_number=sn,
             poster_path=pp,
             note=nt,
+            synopsis=sy,
         )
         db.add(row)
     db.commit()
@@ -634,6 +639,7 @@ def admin_upsert_series_season(
         "season_number": row.season_number,
         "poster_path": row.poster_path,
         "note": row.note,
+        "synopsis": row.synopsis,
     }
 
 

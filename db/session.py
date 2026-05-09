@@ -136,6 +136,7 @@ def _ensure_series_season_meta_table() -> None:
                         season_number INTEGER NOT NULL,
                         poster_path VARCHAR(2048),
                         note VARCHAR(512),
+                        synopsis TEXT,
                         CONSTRAINT uq_series_season_meta_key_sn UNIQUE (series_key, season_number)
                     )
                     """
@@ -159,6 +160,7 @@ def _ensure_series_season_meta_table() -> None:
                     season_number INTEGER NOT NULL,
                     poster_path VARCHAR(2048),
                     note VARCHAR(512),
+                    synopsis TEXT,
                     UNIQUE (series_key, season_number)
                 )
                 """
@@ -171,6 +173,26 @@ def _ensure_series_season_meta_table() -> None:
             )
         )
     logger.info("database schema: created series_season_meta (sqlite)")
+
+
+def _ensure_series_season_synopsis_column() -> None:
+    """Add season synopsis for existing series_season_meta tables."""
+    insp = inspect(engine)
+    if "series_season_meta" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("series_season_meta")}
+    if "synopsis" in cols:
+        return
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE series_season_meta ADD COLUMN synopsis TEXT")
+            )
+        logger.info("database schema: added series_season_meta.synopsis (postgresql)")
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE series_season_meta ADD COLUMN synopsis TEXT"))
+    logger.info("database schema: added series_season_meta.synopsis (sqlite)")
 
 
 def _ensure_series_show_meta_table() -> None:
@@ -242,6 +264,7 @@ def init_db() -> None:
     _ensure_user_invite_column()
     _ensure_invitation_created_by_column()
     _ensure_series_season_meta_table()
+    _ensure_series_season_synopsis_column()
     _ensure_series_show_meta_table()
     _widen_series_meta_poster_columns()
 
