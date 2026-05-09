@@ -2,7 +2,7 @@
 
 import logging
 import os
-import uuid
+import re
 from pathlib import Path
 from typing import Tuple
 
@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
 CHUNK_SIZE = 1024 * 1024  # 1 MB
 UPLOAD_DIR = Path("/tmp/redwood/uploads")
+# Strip characters unsafe or awkward on common filesystems / shells.
+_UNSAFE_NAME = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def ensure_upload_dir() -> None:
@@ -27,10 +29,41 @@ def validate_extension(filename: str) -> None:
         raise ValueError(f"unsupported format: {ext}")
 
 
+def sanitize_upload_basename(filename: str) -> str:
+    """Keep original filename (basename only); remove path tricks and unsafe chars."""
+    base = Path(filename).name.strip()
+    if not base or base in (".", ".."):
+        raise ValueError("invalid filename")
+    base = _UNSAFE_NAME.sub("_", base)
+    base = "".join(c for c in base if ord(c) >= 32)
+    if len(base) > 240:
+        stem, suf = Path(base).stem[:200], Path(base).suffix
+        base = stem + suf
+    if not Path(base).suffix:
+        raise ValueError("missing extension")
+    validate_extension(base)
+    return base
+
+
+def _unique_dest_path(basename: str) -> Path:
+    """If basename exists, use 'name (1).ext', 'name (2).ext', …"""
+    dest = UPLOAD_DIR / basename
+    if not dest.exists():
+        return dest
+    stem, suf = Path(basename).stem, Path(basename).suffix
+    n = 1
+    while True:
+        cand = UPLOAD_DIR / f"{stem} ({n}){suf}"
+        if not cand.exists():
+            return cand
+        n += 1
+
+
 async def save_upload_stream(file: UploadFile) -> Tuple[str, int]:
     """
     Stream UploadFile to disk in 1MB chunks.
     Returns (absolute_path, total_bytes_written).
+    Preserves the original filename (sanitized); picks a numeric suffix on collision.
     """
     settings = get_settings()
     ensure_upload_dir()
@@ -38,8 +71,8 @@ async def save_upload_stream(file: UploadFile) -> Tuple[str, int]:
         raise ValueError("missing filename")
     validate_extension(file.filename)
 
-    safe_name = f"{uuid.uuid4().hex}_{Path(file.filename).name}"
-    dest = UPLOAD_DIR / safe_name
+    safe_name = sanitize_upload_basename(file.filename)
+    dest = _unique_dest_path(safe_name)
     total = 0
     logger.info("upload: start %s -> %s", file.filename, dest)
 

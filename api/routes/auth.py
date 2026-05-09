@@ -50,12 +50,6 @@ class PatchMeBody(BaseModel):
     new_password: Optional[str] = Field(None, min_length=6, max_length=128)
 
 
-def _utc_aware(dt: datetime) -> datetime:
-    if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
 def _serialize_member_invite(row: InvitationCode) -> Dict[str, Any]:
     now = datetime.utcnow()
     expired = bool(row.expires_at and row.expires_at < now)
@@ -70,20 +64,29 @@ def _serialize_member_invite(row: InvitationCode) -> Dict[str, Any]:
     }
 
 
+def _legacy_invite_note_clause(user: User):
+    """
+    Legacy rows without created_by_user_id: note starts with 'Invité par <username>'.
+    LIKE-escape % and _ in username. Prefix match also catches notes truncated at 255 chars.
+    """
+    u = (user.username or "").replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"Invité par {u}%"
+    return and_(
+        InvitationCode.created_by_user_id.is_(None),
+        InvitationCode.note.isnot(None),
+        InvitationCode.note.like(pattern, escape="\\"),
+    )
+
+
+def _member_invite_clause(user: User):
+    return or_(InvitationCode.created_by_user_id == user.id, _legacy_invite_note_clause(user))
+
+
 def _list_member_invites(db: Session, user: User) -> List[Dict[str, Any]]:
-    """Codes created by this member (FK or legacy note match before FK existed)."""
-    note_legacy = f"Invité par {user.username}"
+    """Codes created by this member (FK or legacy note prefix)."""
     rows = (
         db.query(InvitationCode)
-        .filter(
-            or_(
-                InvitationCode.created_by_user_id == user.id,
-                and_(
-                    InvitationCode.created_by_user_id.is_(None),
-                    InvitationCode.note == note_legacy,
-                ),
-            )
-        )
+        .filter(_member_invite_clause(user))
         .order_by(InvitationCode.created_at.desc())
         .limit(100)
         .all()
@@ -91,21 +94,42 @@ def _list_member_invites(db: Session, user: User) -> List[Dict[str, Any]]:
     return [_serialize_member_invite(r) for r in rows]
 
 
-def _invite_month_status(user: User) -> Dict[str, Any]:
-    """One user-generated invite per calendar month (UTC)."""
-    now = datetime.now(timezone.utc)
-    last = user.last_invite_at
-    if not last:
+def _month_bounds_utc_naive() -> tuple[datetime, datetime]:
+    """Calendar month [start, end) in naive UTC (matches invitation_codes.created_at)."""
+    now = datetime.utcnow()
+    start = datetime(now.year, now.month, 1)
+    if now.month == 12:
+        end = datetime(now.year + 1, 1, 1)
+    else:
+        end = datetime(now.year, now.month + 1, 1)
+    return start, end
+
+
+def _member_invites_this_month_count(db: Session, user: User) -> int:
+    start, end = _month_bounds_utc_naive()
+    return (
+        db.query(InvitationCode)
+        .filter(
+            _member_invite_clause(user),
+            InvitationCode.created_at >= start,
+            InvitationCode.created_at < end,
+        )
+        .count()
+    )
+
+
+def _invite_month_status(db: Session, user: User) -> Dict[str, Any]:
+    """One invite per calendar month (UTC), based on actual invitation_codes rows (not last_invite_at)."""
+    n = _member_invites_this_month_count(db, user)
+    if n < 1:
         return {"can_invite_this_month": True, "next_invite_at": None}
-    last_u = _utc_aware(last)
-    if last_u.year == now.year and last_u.month == now.month:
-        if now.month == 12:
-            y, m = now.year + 1, 1
-        else:
-            y, m = now.year, now.month + 1
-        next_start = datetime(y, m, 1, tzinfo=timezone.utc)
-        return {"can_invite_this_month": False, "next_invite_at": next_start.isoformat()}
-    return {"can_invite_this_month": True, "next_invite_at": None}
+    now = datetime.now(timezone.utc)
+    if now.month == 12:
+        y, m = now.year + 1, 1
+    else:
+        y, m = now.year, now.month + 1
+    next_start = datetime(y, m, 1, tzinfo=timezone.utc)
+    return {"can_invite_this_month": False, "next_invite_at": next_start.isoformat()}
 
 
 def _cookie_kwargs():
@@ -291,7 +315,7 @@ def create_user_invite(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if not _invite_month_status(user)["can_invite_this_month"]:
+    if not _invite_month_status(db, user)["can_invite_this_month"]:
         raise HTTPException(
             status_code=403,
             detail="Vous avez déjà généré une invitation ce mois-ci (limite : une par mois, UTC).",
@@ -322,7 +346,7 @@ def create_user_invite(
         "code": inv.code,
         "max_uses": inv.max_uses,
         "uses": inv.uses,
-        "invite": _invite_month_status(user),
+        "invite": _invite_month_status(db, user),
         "my_invites": _list_member_invites(db, user),
     }
 
@@ -335,7 +359,7 @@ def me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
         "email": user.email,
         "role": user.role.value,
         "preferences": user.preferences if isinstance(user.preferences, dict) else {},
-        "invite": _invite_month_status(user),
+        "invite": _invite_month_status(db, user),
         "my_invites": _list_member_invites(db, user),
     }
 
@@ -371,6 +395,6 @@ def patch_me(
         "email": user.email,
         "role": user.role.value,
         "preferences": user.preferences if isinstance(user.preferences, dict) else {},
-        "invite": _invite_month_status(user),
+        "invite": _invite_month_status(db, user),
         "my_invites": _list_member_invites(db, user),
     }

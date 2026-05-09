@@ -15,6 +15,8 @@ TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
 def _clean_title_guess(filename: str) -> str:
     base = re.sub(r"\.[^.]+$", "", filename)
+    # Legacy uploads used a 32-char hex prefix on disk; strip so TMDB/title guess stays clean.
+    base = re.sub(r"^[a-f0-9]{32}[_\s.-]+", "", base, flags=re.I)
     base = re.sub(r"[\._]", " ", base)
     base = re.sub(
         r"\b(19|20)\d{2}\b.*$",
