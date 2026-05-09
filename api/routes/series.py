@@ -105,6 +105,7 @@ def list_series(
                 "title": title,
                 "poster_path": list_poster or None,
                 "episode_count": int(ep_count or 0),
+                "_keys": list(sk_list),
             }
         )
     merged: dict[str, dict[str, Any]] = {}
@@ -116,15 +117,30 @@ def list_series(
                 "title": it["title"],
                 "poster_path": it["poster_path"],
                 "episode_count": it["episode_count"],
+                "_keys": set(it["_keys"]),
             }
         else:
             cur = merged[mk]
             cur["episode_count"] = int(cur["episode_count"]) + int(it["episode_count"])
+            cur["_keys"].update(it["_keys"])
             if str(it["series_key"]) < str(cur["series_key"]):
                 cur["series_key"] = it["series_key"]
                 cur["title"] = it["title"]
             if it.get("poster_path") and not cur.get("poster_path"):
                 cur["poster_path"] = it["poster_path"]
+    for cur in merged.values():
+        sk_u = list(cur["_keys"])
+        del cur["_keys"]
+        sc = (
+            db.query(func.count(func.distinct(func.coalesce(Film.season_number, 0))))
+            .filter(
+                Film.series_key.in_(sk_u),
+                Film.statut == FilmStatut.disponible,
+                Film.content_kind == ContentKind.series_episode,
+            )
+            .scalar()
+        )
+        cur["season_count"] = int(sc or 0)
     out = list(merged.values())
     out.sort(key=lambda x: (x.get("title") or "").lower())
     return out

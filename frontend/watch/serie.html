@@ -110,10 +110,6 @@
   <div id="watch-announcement" class="watch-announcement-host" hidden></div>
   <main id="main-list">
     <h1>Séries</h1>
-    <p class="lead">
-      Les épisodes qui partagent le même <strong>titre affiché de la série</strong> (réglé dans l’admin)
-      apparaissent sur une seule fiche ; les épisodes y sont regroupés par <strong>saison</strong>.
-    </p>
     <div class="grid" id="series-grid"></div>
     <p class="empty" id="empty-list" style="display:none">Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.</p>
   </main>
@@ -189,7 +185,11 @@
         };
         const img = s.poster_path ? posterUrl(s.poster_path) : '';
         el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
-        el.querySelector('.t').textContent = s.title + ' · ' + s.episode_count + ' ép.';
+        const nEp = Number(s.episode_count) || 0;
+        const nSe = Number(s.season_count) || 0;
+        const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
+        const seLabel = nSe === 1 ? '1 saison' : nSe + ' saisons';
+        el.querySelector('.t').textContent = s.title + ' · ' + epLabel + ' · ' + seLabel;
         g.appendChild(el);
       });
     }
