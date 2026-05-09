@@ -107,5 +107,6 @@ def series_detail(
         "title": rep.series_title or rep.titre,
         "poster_path": rep.poster_path,
         "synopsis": rep.synopsis,
+        "note_tmdb": rep.note_tmdb,
         "seasons": seasons,
     }

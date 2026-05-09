@@ -1170,6 +1170,7 @@ $('#file-input').addEventListener('change', (e) => {
 });
 
 const dz = $('#drop-zone');
+dz.addEventListener('click', () => $('#file-input').click());
 ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
 dz.addEventListener('drop', (e) => {
   e.preventDefault();
@@ -1185,18 +1186,28 @@ $('#btn-magnet').addEventListener('click', async () => {
   refreshQueue();
 });
 
-const tdz = $('#torrent-drop');
-['dragenter','dragover'].forEach(ev => tdz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-tdz.addEventListener('drop', async (e) => {
-  e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (!f) return;
+async function uploadTorrentFile(f) {
   const fd = new FormData();
   fd.append('torrent', f);
   const r = await fetch('/api/admin/torrents/file', { method: 'POST', body: fd, credentials: 'include' });
   if (r.status === 401) window.location.href = '/login.html';
   if (!r.ok) { alert('Échec torrent'); return; }
   refreshQueue();
+}
+
+const tdz = $('#torrent-drop');
+tdz.addEventListener('click', () => $('#torrent-input').click());
+$('#torrent-input').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (f) uploadTorrentFile(f);
+  e.target.value = '';
+});
+['dragenter','dragover'].forEach(ev => tdz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+tdz.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  uploadTorrentFile(f);
 });
 
 boot().catch(() => { window.location.href = '/login.html'; });

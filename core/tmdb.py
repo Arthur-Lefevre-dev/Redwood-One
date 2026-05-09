@@ -66,6 +66,47 @@ def movie_details(tmdb_id: int) -> Optional[Dict[str, Any]]:
         return None
 
 
+def movie_trailers_youtube(tmdb_id: int, limit: int = 6) -> List[Dict[str, Any]]:
+    """YouTube embed keys for trailers/teasers (TMDB /movie/{id}/videos)."""
+    settings = get_settings()
+    if not settings.TMDB_API_KEY:
+        return []
+    url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/videos"
+    params = {"api_key": settings.TMDB_API_KEY}
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            r = client.get(url, params=params)
+            r.raise_for_status()
+            raw = r.json().get("results") or []
+    except Exception as e:
+        logger.exception("tmdb videos failed: %s", e)
+        return []
+    candidates = [
+        v
+        for v in raw
+        if v.get("site") == "YouTube" and v.get("key") and v.get("type") in ("Trailer", "Teaser", "Clip", "Featurette")
+    ]
+
+    def sort_key(v: Dict[str, Any]) -> tuple:
+        t = v.get("type") or ""
+        order = {"Trailer": 0, "Teaser": 1, "Clip": 2, "Featurette": 3}.get(t, 9)
+        official = 0 if v.get("official") else 1
+        return (order, official, v.get("name") or "")
+
+    candidates.sort(key=sort_key)
+    out: List[Dict[str, Any]] = []
+    lim = max(0, min(limit, 12))
+    for v in candidates[:lim]:
+        out.append(
+            {
+                "key": v["key"],
+                "name": (v.get("name") or "Bande-annonce").strip(),
+                "type": v.get("type") or "Trailer",
+            }
+        )
+    return out
+
+
 def enrich_from_filename(filename: str) -> Dict[str, Any]:
     """Return fields to merge into Film model."""
     guess = _clean_title_guess(filename)

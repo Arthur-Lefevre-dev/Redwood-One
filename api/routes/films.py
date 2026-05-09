@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from api.deps import get_current_user, require_admin
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import presigned_stream_url
-from core.tmdb import enrich_from_filename, movie_details
+from core.tmdb import enrich_from_filename, movie_details, movie_trailers_youtube
 from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
@@ -208,6 +208,9 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
             "next_episode_id": next_episode_id(db, f),
             "prev_episode_id": prev_episode_id(db, f),
         }
+    trailers: List[dict] = []
+    if f.content_kind == ContentKind.film and f.tmdb_id:
+        trailers = movie_trailers_youtube(int(f.tmdb_id), limit=6)
     return {
         "id": f.id,
         "titre": f.titre,
@@ -221,11 +224,10 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
         "poster_url": _poster_url(f.poster_path),
         "backdrop": None,
         "duree_min": f.duree_min,
-        "resolution": f.resolution,
-        "codec_video": f.codec_video,
         "statut": f.statut.value,
         "content_kind": f.content_kind.value,
         "playback": playback,
+        "trailers": trailers,
     }
 
 
