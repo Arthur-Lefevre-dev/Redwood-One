@@ -1,5 +1,6 @@
 """Public / authenticated film catalog routes."""
 
+import logging
 import random
 from datetime import datetime
 from typing import Any, List, Optional
@@ -12,13 +13,15 @@ from sqlalchemy.orm import Session
 from api.deps import get_current_user, require_admin
 from config import get_settings
 from core.series_playback import next_episode_id, prev_episode_id
-from core.s3 import presigned_stream_url
+from core.s3 import delete_film_prefix, presigned_stream_url
 from core.tmdb import enrich_from_filename, movie_details, movie_trailers_youtube
 from core.trailers_util import merge_trailer_lists, trailers_from_json_column
 from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
 router = APIRouter(prefix="/api/films", tags=["films"])
+
+logger = logging.getLogger(__name__)
 
 
 class FilmOut(BaseModel):
@@ -277,6 +280,11 @@ def delete_film(film_id: int, db: Session = Depends(get_db), _: User = Depends(r
     f = db.get(Film, film_id)
     if not f:
         raise HTTPException(404, "Not found")
+    try:
+        delete_film_prefix(film_id)
+    except Exception as e:
+        logger.exception("s3 delete failed for film_id=%s", film_id)
+        raise HTTPException(status_code=503, detail=str(e)) from e
     db.delete(f)
     db.commit()
 

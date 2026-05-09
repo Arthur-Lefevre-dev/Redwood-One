@@ -17,6 +17,7 @@ from core.catalog_sync import sync_s3_films_to_db
 from core.trailers_util import trailers_from_admin_lines, trailers_from_json_column, trailers_to_watch_urls
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
+from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
 from db.models import ContentKind, Film, FilmSource, FilmStatut, InvitationCode, User, UserRole
 from db.session import get_db
@@ -435,6 +436,23 @@ def deactivate(
     u.is_active = False
     db.commit()
     return {"ok": True}
+
+
+@router.post("/users/{user_id}/reset-invite-monthly-quota")
+def reset_user_invite_monthly_quota(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Delete member-generated invitation codes for the current UTC month for this user
+    and clear last_invite_at so they can generate a new code (spectator monthly quota).
+    """
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "Not found")
+    deleted = reset_member_invite_quota_current_month(db, u)
+    return {"ok": True, "deleted_invites": deleted}
 
 
 @router.delete("/users/{user_id}", status_code=204)

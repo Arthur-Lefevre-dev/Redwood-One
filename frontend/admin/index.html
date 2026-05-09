@@ -160,6 +160,7 @@ body{font-family:var(--font-sans);background:var(--color-background-tertiary);co
 .upload-job-msg{font-size:11px;color:#fca5a5;margin-top:6px;line-height:1.35}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:50}
 .modal-backdrop.show{display:flex}
+.modal-backdrop.dlg-overlay{z-index:100}
 .modal{background:var(--color-background-primary);border-radius:12px;padding:18px;width:min(420px,92vw);border:1px solid var(--color-border-tertiary);color:var(--color-text-primary)}
 .modal h3{font-size:14px;margin-bottom:12px;color:var(--color-text-primary)}
 .modal input,.modal select{width:100%;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);font-family:var(--font-sans);font-size:13px;background:#0f0f0f;color:var(--color-text-primary)}
@@ -510,8 +511,102 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
   </div>
 </div>
 
+<div class="modal-backdrop dlg-overlay" id="modal-dlg-alert" aria-modal="true" role="alertdialog" aria-labelledby="dlg-alert-title">
+  <div class="modal" role="document">
+    <h3 id="dlg-alert-title">Message</h3>
+    <p id="dlg-alert-body" style="font-size:13px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 16px"></p>
+    <div class="row">
+      <button class="btn btn-primary" type="button" id="dlg-alert-ok">OK</button>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop dlg-overlay" id="modal-dlg-confirm" aria-modal="true" role="dialog" aria-labelledby="dlg-confirm-title">
+  <div class="modal" role="document">
+    <h3 id="dlg-confirm-title">Confirmer</h3>
+    <p id="dlg-confirm-body" style="font-size:13px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 16px"></p>
+    <div class="row">
+      <button class="btn" type="button" id="dlg-confirm-no">Annuler</button>
+      <button class="btn btn-primary" type="button" id="dlg-confirm-yes">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = (s) => document.querySelector(s);
+
+/** In-app modal (no window.alert). */
+function showAlertModal(title, message, opts = {}) {
+  const okText = opts.okText || 'OK';
+  return new Promise((resolve) => {
+    const backdrop = $('#modal-dlg-alert');
+    const titleEl = $('#dlg-alert-title');
+    const bodyEl = $('#dlg-alert-body');
+    const btnOk = $('#dlg-alert-ok');
+    titleEl.textContent = title;
+    bodyEl.textContent = message;
+    bodyEl.style.whiteSpace = 'pre-line';
+    btnOk.textContent = okText;
+    const finish = () => {
+      backdrop.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      btnOk.removeEventListener('click', onOk);
+      backdrop.removeEventListener('click', onBackdrop);
+      resolve();
+    };
+    const onOk = () => finish();
+    const onBackdrop = (e) => {
+      if (e.target === backdrop) finish();
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') finish();
+    };
+    btnOk.addEventListener('click', onOk);
+    backdrop.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+    backdrop.classList.add('show');
+    btnOk.focus();
+  });
+}
+
+/** In-app confirm (no window.confirm). Resolves true if confirmed. */
+function showConfirmModal(title, message, opts = {}) {
+  const confirmText = opts.confirmText || 'Confirmer';
+  const cancelText = opts.cancelText || 'Annuler';
+  return new Promise((resolve) => {
+    const backdrop = $('#modal-dlg-confirm');
+    const titleEl = $('#dlg-confirm-title');
+    const bodyEl = $('#dlg-confirm-body');
+    const btnNo = $('#dlg-confirm-no');
+    const btnYes = $('#dlg-confirm-yes');
+    titleEl.textContent = title;
+    bodyEl.textContent = message;
+    bodyEl.style.whiteSpace = 'pre-line';
+    btnYes.textContent = confirmText;
+    btnNo.textContent = cancelText;
+    const cleanup = (value) => {
+      backdrop.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      btnYes.removeEventListener('click', onYes);
+      btnNo.removeEventListener('click', onNo);
+      backdrop.removeEventListener('click', onBackdrop);
+      resolve(value);
+    };
+    const onYes = () => cleanup(true);
+    const onNo = () => cleanup(false);
+    const onBackdrop = (e) => {
+      if (e.target === backdrop) cleanup(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') cleanup(false);
+    };
+    btnYes.addEventListener('click', onYes);
+    btnNo.addEventListener('click', onNo);
+    backdrop.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+    backdrop.classList.add('show');
+    btnNo.focus();
+  });
+}
 
 async function api(path, opts = {}) {
   const r = await fetch(path, { credentials: 'include', cache: 'no-store', ...opts });
@@ -668,7 +763,12 @@ async function loadInvites() {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td style="padding-left:16px;font-family:var(--font-mono)">${x.code}</td><td>${x.uses} / ${x.max_uses}</td><td>${x.note || '—'}</td><td>${x.expires_at || '—'}</td><td><button type="button" class="action-btn danger" data-del="${x.id}">Suppr.</button></td>`;
     tr.querySelector('button').onclick = async () => {
-      if (!confirm('Supprimer ce code ?')) return;
+      const ok = await showConfirmModal(
+        'Supprimer ce code d’invitation ?',
+        'Le code ne pourra plus être utilisé pour de nouvelles inscriptions.',
+        { confirmText: 'Supprimer', cancelText: 'Annuler' },
+      );
+      if (!ok) return;
       await api('/api/admin/invites/' + x.id, { method: 'DELETE' });
       loadInvites();
     };
@@ -895,7 +995,12 @@ async function loadLibrary() {
     b2.className = 'action-btn danger';
     b2.textContent = 'Suppr.';
     b2.onclick = async () => {
-      if (!confirm('Supprimer ce film ?')) return;
+      const ok = await showConfirmModal(
+        'Supprimer ce film ?',
+        'Le film sera retiré du catalogue. Cette action est définitive.',
+        { confirmText: 'Supprimer', cancelText: 'Annuler' },
+      );
+      if (!ok) return;
       await api(`/api/films/${f.id}`, { method: 'DELETE' });
       loadLibrary();
     };
@@ -1121,15 +1226,52 @@ async function loadUsers() {
       await api(`/api/admin/users/${u.id}/deactivate`, { method: 'PATCH' });
       loadUsers();
     };
+    const bResetInv = document.createElement('button');
+    bResetInv.className = 'action-btn';
+    bResetInv.textContent = 'Réinit. quota inv.';
+    bResetInv.title =
+      'Supprime les codes d’invitation générés par ce membre pour le mois UTC en cours ; il pourra en créer un nouveau.';
+    bResetInv.onclick = async () => {
+      const ok = await showConfirmModal(
+        'Réinitialiser le quota d’invitation ?',
+        'Quota mensuel (UTC) pour cet utilisateur : les codes qu’il a créés ce mois-ci seront retirés de la base (y compris dans la liste des invitations).',
+        { confirmText: 'Réinitialiser', cancelText: 'Annuler' },
+      );
+      if (!ok) return;
+      const r = await api(`/api/admin/users/${u.id}/reset-invite-monthly-quota`, { method: 'POST' });
+      if (!r.ok) {
+        await showAlertModal('Réinitialisation impossible', 'La demande a échoué. Réessayez ou vérifiez les logs serveur.', {
+          okText: 'Fermer',
+        });
+        return;
+      }
+      const j = await r.json().catch(() => ({}));
+      loadUsers();
+      loadInvites();
+      await showAlertModal(
+        'Quota réinitialisé',
+        typeof j.deleted_invites === 'number'
+          ? j.deleted_invites +
+              ' code(s) supprimé(s). Le membre peut générer une nouvelle invitation ce mois-ci.'
+          : 'Le quota a été réinitialisé.',
+        { okText: 'OK' },
+      );
+    };
     const b1 = document.createElement('button');
     b1.className = 'action-btn danger';
     b1.textContent = 'Suppr.';
     b1.onclick = async () => {
-      if (!confirm('Supprimer utilisateur ?')) return;
+      const ok = await showConfirmModal(
+        'Supprimer cet utilisateur ?',
+        'Le compte et ses jetons de session seront supprimés. Cette action est définitive.',
+        { confirmText: 'Supprimer', cancelText: 'Annuler' },
+      );
+      if (!ok) return;
       await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
       loadUsers();
     };
     act.appendChild(b0);
+    act.appendChild(bResetInv);
     act.appendChild(b1);
     tds[4].appendChild(act);
     tb.appendChild(tr);
@@ -1146,7 +1288,10 @@ $('#nu-save').addEventListener('click', async () => {
     role: $('#nu-role').value,
   };
   const r = await api('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) { alert('Échec création'); return; }
+  if (!r.ok) {
+    await showAlertModal('Création impossible', 'Vérifiez les données (identifiant ou e-mail déjà utilisé, etc.).', { okText: 'Fermer' });
+    return;
+  }
   $('#modal-user').classList.remove('show');
   loadUsers();
 });
@@ -1247,7 +1392,11 @@ function startVideoUploadsFromFileList(fileList) {
   const skip = all.length - ok.length;
   ok.forEach(uploadWithProgress);
   if (skip > 0) {
-    alert(skip + ' fichier(s) ignoré(s) : extension non supportée pour l’upload direct.');
+    void showAlertModal(
+      'Fichiers ignorés',
+      skip + ' fichier(s) ignoré(s) : extension non prise en charge pour l’upload direct.',
+      { okText: 'OK' },
+    );
   }
 }
 
@@ -1267,9 +1416,15 @@ dz.addEventListener('drop', (e) => {
 
 $('#btn-magnet').addEventListener('click', async () => {
   const m = $('#magnet-input').value.trim();
-  if (!m.startsWith('magnet:?')) { alert('Magnet invalide'); return; }
+  if (!m.startsWith('magnet:?')) {
+    await showAlertModal('Lien magnet invalide', 'Collez un lien commençant par magnet:?xt=…', { okText: 'OK' });
+    return;
+  }
   const r = await api('/api/admin/torrents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ magnet: m }) });
-  if (!r.ok) { alert('Échec'); return; }
+  if (!r.ok) {
+    await showAlertModal('Ajout impossible', 'Le magnet n’a pas pu être ajouté à la file.', { okText: 'Fermer' });
+    return;
+  }
   refreshQueue();
 });
 
@@ -1278,7 +1433,10 @@ async function uploadTorrentFile(f) {
   fd.append('torrent', f);
   const r = await fetch('/api/admin/torrents/file', { method: 'POST', body: fd, credentials: 'include' });
   if (r.status === 401) window.location.href = '/login.html';
-  if (!r.ok) { alert('Échec torrent'); return; }
+  if (!r.ok) {
+    await showAlertModal('Envoi du .torrent impossible', 'Vérifiez le fichier ou réessayez.', { okText: 'Fermer' });
+    return;
+  }
   refreshQueue();
 }
 

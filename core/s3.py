@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import boto3
 from botocore.client import BaseClient
@@ -86,3 +86,42 @@ def list_film_objects_by_id() -> Dict[int, str]:
             if prev is None or ts >= prev[0]:
                 best[fid] = (ts, key)
     return {fid: pair[1] for fid, pair in best.items()}
+
+
+def delete_film_prefix(film_id: int) -> int:
+    """
+    Delete every object under films/{film_id}/ in the configured bucket.
+    Returns the number of keys removed. No-op (returns 0) when S3 is not configured.
+    Raises on API errors when S3 is configured.
+    """
+    s = get_settings()
+    if not s.S3_BUCKET_NAME or not s.S3_ENDPOINT_URL:
+        logger.debug("s3: skip delete for film_id=%s (S3 not configured)", film_id)
+        return 0
+    client = get_s3_client()
+    prefix = f"films/{int(film_id)}/"
+    keys: List[str] = []
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=s.S3_BUCKET_NAME, Prefix=prefix):
+        for obj in page.get("Contents") or []:
+            k = obj.get("Key")
+            if k:
+                keys.append(k)
+    if not keys:
+        logger.info("s3: no objects to delete under %s", prefix)
+        return 0
+    deleted = 0
+    for i in range(0, len(keys), 1000):
+        batch = keys[i : i + 1000]
+        resp = client.delete_objects(
+            Bucket=s.S3_BUCKET_NAME,
+            Delete={"Objects": [{"Key": k} for k in batch], "Quiet": True},
+        )
+        errs = resp.get("Errors") or []
+        if errs:
+            first = errs[0]
+            msg = first.get("Message") or str(first)
+            raise RuntimeError(f"S3 delete_objects error: {msg}")
+        deleted += len(batch)
+    logger.info("s3: deleted %s object(s) under %s", deleted, prefix)
+    return deleted

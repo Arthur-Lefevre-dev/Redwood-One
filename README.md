@@ -6,9 +6,10 @@ Plateforme de **catalogue et diffusion vidéo** pour un usage privé ou restrein
 
 - **Pipeline vidéo** : analyse `ffprobe`, décision transcodage / upload direct, encodage matériel optionnel (AMD VAAPI, NVIDIA, Intel QSV, CPU).
 - **Stockage S3** : clés du type `films/{id}/…` ; synchronisation catalogue → base via l’admin (`POST /api/admin/catalog/sync-s3`).
+- **Catalogue** : films et **séries** (épisodes regroupés par `series_key`) ; lecture via `/watch/film.html` et `/watch/serie.html`.
 - **Authentification** : JWT dans cookies httpOnly ; rôles **admin** et **viewer**.
-- **Spectateurs** : inscription avec **code d’invitation** (ou ouverture publique en dev via `REGISTRATION_OPEN=true`), recherche, derniers ajouts, navigation par genres, suggestion **« Choisir pour moi »** selon les genres favoris.
-- **Admin** : upload, torrents, file d’attente Celery, utilisateurs, **codes d’invitation**, sync S3.
+- **Spectateurs** : inscription avec **code d’invitation** (ou ouverture publique en dev via `REGISTRATION_OPEN=true`), recherche, derniers ajouts, navigation par genres, suggestion **« Choisir pour moi »** selon les genres favoris ; page **Paramètres** (`/watch/settings.html`) pour le profil, les préférences et les **codes d’invitation générés par le membre** (quota **d’un code par mois calendaire UTC** ; voir aussi `core/member_invites.py`).
+- **Admin** : upload, torrents, file d’attente Celery, utilisateurs, **codes d’invitation** (admin + suivi des codes membres), **réinitialisation du quota mensuel d’invitation** d’un utilisateur, sync S3 ; confirmations et erreurs affichées dans des **modales** (plus de `alert` / `confirm` navigateur).
 
 ## Stack technique
 
@@ -54,7 +55,7 @@ Plateforme de **catalogue et diffusion vidéo** pour un usage privé ou restrein
    - Site : **http://localhost** (nginx)
    - Connexion spectateur : `/login.html` — inscription : `/register.html`
    - Connexion admin uniquement : `/login-admin.html` — console : `/admin/`
-   - Catalogue spectateur : `/watch/`
+   - Catalogue spectateur : `/watch/` — paramètres / invitations membre : `/watch/settings.html`
    - API santé : `GET /api/health`
    - Flower : **http://localhost:5555** (auth basique selon `FLOWER_USER` / `FLOWER_PASSWORD`)
 
@@ -89,23 +90,28 @@ pytest
 ## Structure du dépôt (aperçu)
 
 ```
-api/           # FastAPI — routes auth, films, admin
-core/          # Pipeline vidéo, S3, TMDB, détection GPU, sync catalogue
+api/           # FastAPI — routes auth, films, séries, admin
+core/          # Pipeline vidéo, S3, TMDB, détection GPU, sync catalogue, invitations membres
 db/            # Modèles SQLAlchemy, session
 worker/        # Tâches Celery
-frontend/      # HTML/JS/CSS — login, register, admin, watch
+frontend/      # HTML/JS/CSS — login, register, admin, watch (dont settings)
 docker/        # Dockerfiles, compose, env.example
 nginx/         # Configuration reverse proxy
-scripts/       # seed_admin.py, utilitaires
+scripts/       # seed_admin.py, scripts SQL optionnels (migrations manuelles)
 ```
+
+### Schéma PostgreSQL (mises à jour)
+
+`init_db()` crée ou complète les tables au démarrage de l’API. Pour appliquer à la main des changements documentés (ou en secours), des scripts SQL sont fournis sous `scripts/` — par exemple `add_user_last_invite_at_postgres.sql`, `add_invitation_created_by_postgres.sql`, `add_series_columns_postgres.sql`, `add_trailers_manual_postgres.sql` (voir les en-têtes de chaque fichier).
 
 ## API (résumé)
 
 | Préfixe | Usage |
 |---------|--------|
-| `/api/auth/*` | Login, register, refresh, logout, profil (`/me`) |
+| `/api/auth/*` | Login, register, refresh, logout ; profil `GET`/`PATCH /me`, préférences `PATCH /me/preferences` ; invitations membre `POST /me/invite` (alias `POST /member-invite`) et état quota dans les réponses `/me` |
 | `/api/films/*` | Liste, featured, latest, genres, surprise-me, détail, URL de lecture |
-| `/api/admin/*` | Films, upload, torrents, file d’attente, sync S3, invitations, utilisateurs (protégé admin) |
+| `/api/series/*` | Liste des séries, détail par `series_key` (saisons / épisodes) |
+| `/api/admin/*` | Films, upload, torrents, file d’attente, sync S3, invitations, utilisateurs, `POST .../users/{id}/reset-invite-monthly-quota` (protégé admin) |
 
 Documentation interactive Swagger : `http://localhost:8000/docs` si vous exposez le port de l’API (ex. `docker compose port api 8000` ou profil de debug). Avec la config nginx fournie, seul le préfixe `/api/` est proxifié vers FastAPI : les routes `/docs` et `/openapi.json` ne sont pas servies sur le port 80 tant qu’elles ne sont pas ajoutées à nginx.
 
