@@ -78,16 +78,14 @@
 
     async function loadAll(q) {
       const url = '/api/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
-      const r = await api(url);
-      const rows = await r.json();
+      const rows = await apiJson(url);
       document.getElementById('films-title').textContent = q ? ('Résultats : « ' + q + ' »') : 'Tous les films';
       renderFilms(rows);
     }
 
     async function loadGenre(g) {
       document.getElementById('films-title').textContent = 'Genre : ' + g;
-      const r = await api('/api/films/by-genre?genre=' + encodeURIComponent(g));
-      const rows = await r.json();
+      const rows = await apiJson('/api/films/by-genre?genre=' + encodeURIComponent(g));
       renderFilms(rows);
     }
 
@@ -97,9 +95,8 @@
       tq = setTimeout(() => loadAll(document.getElementById('nav-q').value.trim()), 300);
     });
 
-    api('/api/auth/me').then(async () => {
-      const gr = await api('/api/films/genres-summary');
-      const genres = await gr.json();
+    apiJson('/api/auth/me').then(async () => {
+      const genres = await apiJson('/api/films/genres-summary');
       const gEl = document.getElementById('cats');
       genres.forEach(g => {
         const c = document.createElement('div');
@@ -111,7 +108,11 @@
         gEl.appendChild(c);
       });
       await loadAll('');
-    }).catch(() => location.href = '/login.html');
+    }).catch((e) => {
+      if (e && e.message === '401') { location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
+    });
   </script>
 </body>
 </html>

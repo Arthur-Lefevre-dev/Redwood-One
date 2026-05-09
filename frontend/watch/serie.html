@@ -75,8 +75,7 @@
     }
 
     async function bootList() {
-      const r = await api('/api/series');
-      const rows = await r.json();
+      const rows = await apiJson('/api/series');
       const g = document.getElementById('series-grid');
       const empty = document.getElementById('empty-list');
       g.innerHTML = '';
@@ -99,8 +98,7 @@
     }
 
     async function bootDetail(sk) {
-      const r = await api('/api/series/' + encodeURIComponent(sk) + '/detail');
-      const d = await r.json();
+      const d = await apiJson('/api/series/' + encodeURIComponent(sk) + '/detail');
       document.getElementById('d-title').textContent = d.title || sk;
       document.getElementById('d-syn').textContent = (d.synopsis || '').slice(0, 400) + (d.synopsis && d.synopsis.length > 400 ? '…' : '');
       const pu = d.poster_path ? posterUrl(d.poster_path) : '';
@@ -129,7 +127,7 @@
     }
 
     async function boot() {
-      await api('/api/auth/me');
+      await apiJson('/api/auth/me');
       if (key) {
         showDetail();
         await bootDetail(key);
@@ -138,7 +136,11 @@
         await bootList();
       }
     }
-    boot().catch(() => { location.href = '/login.html'; });
+    boot().catch((e) => {
+      if (e && e.message === '401') { location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
+    });
   </script>
 </body>
 </html>

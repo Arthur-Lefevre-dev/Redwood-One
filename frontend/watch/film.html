@@ -107,10 +107,9 @@
     const id = params.get('id');
 
     async function boot() {
-      await api('/api/auth/me');
+      await apiJson('/api/auth/me');
       if (!id) { location.href = '/watch/'; return; }
-      const r = await api('/api/films/' + id);
-      const f = await r.json();
+      const f = await apiJson('/api/films/' + id);
       document.getElementById('title').textContent = f.titre;
       const metaParts = [];
       if (f.playback && f.playback.season_number != null && f.playback.episode_number != null) {
@@ -153,8 +152,7 @@
         act.appendChild(p);
       });
 
-      const su = await api('/api/films/' + id + '/stream-url');
-      const stream = await su.json();
+      const stream = await apiJson('/api/films/' + id + '/stream-url');
       const video = document.getElementById('player');
       const loader = document.getElementById('vloader');
       const hideLoader = () => loader.classList.add('done');
@@ -172,8 +170,7 @@
       });
       setTimeout(() => { if (video.readyState >= 2) hideLoader(); }, 8000);
 
-      const all = await api('/api/films');
-      const films = await all.json();
+      const films = await apiJson('/api/films');
       const sim = document.getElementById('sim');
       films.filter(x => String(x.id) !== String(id)).slice(0, 12).forEach(x => {
         const c = document.createElement('div');
@@ -185,7 +182,12 @@
         sim.appendChild(c);
       });
     }
-    boot().catch(() => { location.href = '/login.html'; });
+    boot().catch((e) => {
+      if (e && e.message === '401') { location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Lecture impossible : ' + (e && e.message ? e.message : e));
+      location.href = '/watch/';
+    });
   </script>
 </body>
 </html>

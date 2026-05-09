@@ -104,7 +104,14 @@
         err.style.display = 'block';
         return;
       }
-      const j = await r.json();
+      let j;
+      try {
+        j = await r.json();
+      } catch (_) {
+        err.textContent = 'Réponse serveur invalide (vérifiez les logs API / la base de données).';
+        err.style.display = 'block';
+        return;
+      }
       if (j.role === 'admin') {
         window.location.href = '/login-admin.html';
       } else {

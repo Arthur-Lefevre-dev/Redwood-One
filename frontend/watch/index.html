@@ -94,8 +94,7 @@
       searchTimer = setTimeout(async () => {
         const q = document.getElementById('nav-q').value.trim();
         const url = '/api/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
-        const r = await api(url);
-        const rows = await r.json();
+        const rows = await apiJson(url);
         const row = document.getElementById('row-latest');
         document.getElementById('latest-head').textContent =
           q ? ('Résultats : « ' + q + ' »') : 'Derniers ajouts';
@@ -105,8 +104,7 @@
 
     document.getElementById('btn-surprise').addEventListener('click', async () => {
       try {
-        const r = await api('/api/films/surprise-me');
-        const f = await r.json();
+        const f = await apiJson('/api/films/surprise-me');
         location.href = '/watch/film.html?id=' + f.id;
       } catch (_) {}
     });
@@ -114,7 +112,7 @@
     document.getElementById('btn-save-tastes').addEventListener('click', async () => {
       const boxes = document.querySelectorAll('#taste-grid input:checked');
       const genres = Array.from(boxes).map(b => b.value);
-      await api('/api/auth/me/preferences', {
+      await apiJson('/api/auth/me/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ favorite_genres: genres }),
@@ -124,18 +122,14 @@
     });
 
     async function boot() {
-      const meR = await api('/api/auth/me');
-      const me = await meR.json();
+      const me = await apiJson('/api/auth/me');
       const prefs = (me.preferences && me.preferences.favorite_genres) ? me.preferences.favorite_genres : [];
 
-      const [fr, lr, gr] = await Promise.all([
-        api('/api/films/featured'),
-        api('/api/films/latest?limit=16'),
-        api('/api/films/genres-summary'),
+      const [featured, latest, genres] = await Promise.all([
+        apiJson('/api/films/featured'),
+        apiJson('/api/films/latest?limit=16'),
+        apiJson('/api/films/genres-summary'),
       ]);
-      const featured = await fr.json();
-      const latest = await lr.json();
-      const genres = await gr.json();
 
       const gEl = document.getElementById('taste-grid');
       gEl.innerHTML = '';
@@ -169,8 +163,7 @@
       renderCards(document.getElementById('row-featured'), featured);
 
       try {
-        const sr = await api('/api/series');
-        const series = await sr.json();
+        const series = await apiJson('/api/series');
         const rs = document.getElementById('row-series');
         rs.innerHTML = '';
         series.slice(0, 16).forEach((s) => {
@@ -184,7 +177,11 @@
         });
       } catch (_) {}
     }
-    boot().catch(() => { location.href = '/login.html'; });
+    boot().catch((e) => {
+      if (e && e.message === '401') { location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
+    });
   </script>
 </body>
 </html>
