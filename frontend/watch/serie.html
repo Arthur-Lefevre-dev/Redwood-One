@@ -209,11 +209,28 @@
       document.getElementById('serie-score-widget').setAttribute('aria-label', 'Score TMDB ' + pct + ' pour cent');
     }
 
+    // Prefer admin season poster for the hero: newest season number that has season_art.poster_path.
+    function heroPosterPathForSerieDetail(d) {
+      const art = d.season_art;
+      if (!art || typeof art !== 'object') return d.poster_path || '';
+      const nums = Object.keys(art)
+        .map((k) => parseInt(k, 10))
+        .filter((n) => !Number.isNaN(n))
+        .sort((a, b) => b - a);
+      for (const n of nums) {
+        const row = art[String(n)];
+        const p = row && row.poster_path != null ? String(row.poster_path).trim() : '';
+        if (p) return p;
+      }
+      return d.poster_path || '';
+    }
+
     async function bootDetail(sk) {
       const d = await apiJson('/api/series/' + encodeURIComponent(sk) + '/detail');
       document.getElementById('d-title').textContent = d.title || sk;
       document.getElementById('d-syn').textContent = (d.synopsis || '').slice(0, 400) + (d.synopsis && d.synopsis.length > 400 ? '…' : '');
-      const pu = d.poster_path ? posterUrl(d.poster_path) : '';
+      const heroPath = heroPosterPathForSerieDetail(d);
+      const pu = heroPath ? posterUrl(heroPath) : '';
       document.getElementById('d-poster').src = pu;
       applySerieTmdbScore(d.note_tmdb);
       const wrap = document.getElementById('seasons');
