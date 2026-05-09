@@ -3,7 +3,11 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from core.series_grouping import equivalent_series_keys, normalize_show_name
+from core.series_grouping import (
+    equivalent_series_keys,
+    normalize_show_name,
+    series_catalog_group_key,
+)
 from db.models import Base, ContentKind, Film, FilmSource, FilmStatut
 
 
@@ -20,6 +24,12 @@ def test_normalize_show_name_prefers_series_title():
 
 def test_normalize_show_name_strips_episode_from_titre():
     assert normalize_show_name(None, "Doctor Who S07E05 The Angels") == "doctor who"
+
+
+def test_series_catalog_group_key_uses_display_title_only_when_set():
+    a = series_catalog_group_key("Doctor Who (2005)", "Completely different episode title")
+    b = series_catalog_group_key("doctor  who", "Other ep")
+    assert a == b and a == "doctor who"
 
 
 def test_equivalent_series_keys_merges_by_normalized_title():

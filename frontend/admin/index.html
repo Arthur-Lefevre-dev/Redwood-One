@@ -1,1147 +1,2500 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Administration — Redwood Plus</title>
-  <style>
-:root{
-  --font-sans:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
-  --accent:#8B2500;
-  --color-background-primary:#141414;
-  --color-background-secondary:#1a1a1a;
-  --color-background-tertiary:#0a0a0a;
-  --color-border-secondary:#3f3f46;
-  --color-border-tertiary:#2a2a2a;
-  --color-text-primary:#f5f5f5;
-  --color-text-secondary:#a3a3a3;
-  --color-text-tertiary:#71717a;
-  --color-text-danger:#f87171;
-  --color-text-warning:#fbbf24;
-  --border-radius-md:8px;
-  --border-radius-lg:12px;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font-sans);background:var(--color-background-tertiary);color:var(--color-text-primary)}
-.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-.layout{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
-.sidebar{background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);padding:16px 0;display:flex;flex-direction:column}
-.sidebar-logo{padding:0 16px 16px;border-bottom:0.5px solid var(--color-border-tertiary);margin-bottom:8px}
-.logo-text{font-size:14px;font-weight:500;color:var(--accent)}
-.logo-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
-.nav-section{padding:8px 16px 4px;font-size:10px;color:var(--color-text-tertiary);letter-spacing:0.08em;text-transform:uppercase;margin-top:8px}
-.nav-item{display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:13px;color:var(--color-text-secondary);cursor:pointer;border-left:2px solid transparent}
-.nav-item:hover{background:var(--color-background-secondary);color:var(--color-text-primary)}
-.nav-item.active{color:#fca5a5;background:rgba(139,37,0,.2);border-left-color:var(--accent)}
-.nav-icon{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.nav-badge{margin-left:auto;font-size:10px;padding:2px 6px;border-radius:10px;background:var(--color-background-secondary);color:var(--color-text-tertiary)}
-.nav-badge.red{background:rgba(248,113,113,.15);color:#fca5a5}
-.sidebar-footer{margin-top:auto;padding:12px 16px;border-top:0.5px solid var(--color-border-tertiary)}
-.user-row{display:flex;align-items:center;gap:8px}
-.user-avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;color:#fff;flex-shrink:0}
-.user-info{min-width:0}
-.user-name{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-role{font-size:10px;color:var(--color-text-tertiary)}
-.main{display:flex;flex-direction:column;overflow:hidden;min-height:100vh}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary)}
-.page-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
-.page-sub{font-size:12px;color:var(--color-text-tertiary);margin-top:1px}
-.topbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.lib-search-wrap{position:relative;display:inline-block;vertical-align:middle}
-.lib-search-clear{
-  position:absolute;right:5px;top:50%;transform:translateY(-50%);
-  width:22px;height:22px;border:none;border-radius:6px;padding:0;margin:0;
-  display:flex;align-items:center;justify-content:center;
-  background:transparent;color:var(--color-text-tertiary);
-  cursor:pointer;font-size:16px;line-height:1;font-family:var(--font-sans);
-}
-.lib-search-clear:hover{color:var(--color-text-primary);background:var(--color-background-tertiary)}
-.lib-search-clear[hidden]{display:none!important}
-.btn{font-size:12px;padding:6px 14px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
-.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-.btn-primary:hover{background:#712B13;border-color:#712B13}
-.btn-refresh{
-  transition:transform 0.2s ease,border-color 0.2s ease,background 0.2s ease,color 0.2s ease,box-shadow 0.2s ease,opacity 0.2s ease;
-}
-.btn-refresh:hover:not(:disabled){
-  transform:translateY(-1px);
-  border-color:var(--accent);
-  color:var(--color-text-primary);
-  background:rgba(139,37,0,.2);
-  box-shadow:0 3px 12px rgba(139,37,0,.22);
-}
-.btn-refresh:active:not(:disabled){
-  transform:translateY(0);
-  box-shadow:0 1px 4px rgba(139,37,0,.15);
-}
-.btn-refresh:disabled{opacity:.65;cursor:wait}
-.btn-refresh .btn-refresh-glyph{
-  display:inline-block;
-  margin-right:5px;
-}
-.btn-refresh:hover:not(:disabled) .btn-refresh-glyph{
-  animation:btn-refresh-spin-once 0.65s ease-out;
-}
-.btn-refresh.is-refreshing .btn-refresh-glyph{
-  animation:btn-refresh-spin-loop 0.75s linear infinite;
-}
-@keyframes btn-refresh-spin-once{
-  from{transform:rotate(0deg)}
-  to{transform:rotate(-360deg)}
-}
-@keyframes btn-refresh-spin-loop{
-  from{transform:rotate(0deg)}
-  to{transform:rotate(-360deg)}
-}
-.gpu-pill{display:flex;align-items:center;gap:6px;font-size:11px;padding:4px 10px;border-radius:20px;background:rgba(99,153,34,.22);color:#c4e88d;border:0.5px solid rgba(153,193,102,.45);max-width:280px}
-.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.dot-green{background:#86c940}
-.dot-amber{background:#f59e0b}
-.content{flex:1;overflow-y:auto;padding:20px}
-.page{display:none}
-.page.active{display:block}
-.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.stat{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
-.stat-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
-.stat-val{font-size:20px;font-weight:500;color:var(--color-text-primary)}
-.stat-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
-.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);margin-bottom:16px}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:0.5px solid var(--color-border-tertiary)}
-.card-title{font-size:13px;font-weight:500;color:var(--color-text-primary)}
-.card-body{padding:16px}
-.upload-zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:28px 20px;text-align:center;background:var(--color-background-secondary);cursor:pointer;margin-bottom:12px}
-.upload-zone:hover{border-color:var(--accent);background:rgba(139,37,0,.1)}
-.upload-icon{width:36px;height:36px;border-radius:50%;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:16px}
-.upload-title{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
-.upload-sub{font-size:12px;color:var(--color-text-tertiary)}
-.magnet-row{display:flex;gap:8px;margin-bottom:16px}
-.magnet-input{flex:1;font-size:13px;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);font-family:var(--font-mono)}
-.queue-list{display:flex;flex-direction:column;gap:8px}
-.queue-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)}
-.qi-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#252530;color:#e5e5e5}
-.qi-info{flex:1;min-width:0}
-.qi-title{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.qi-sub{font-size:11px;color:var(--color-text-tertiary);margin-top:1px;white-space:pre-line;line-height:1.45}
-.qi-status{flex-shrink:0}
-.status-pill{font-size:10px;padding:3px 8px;border-radius:10px;white-space:nowrap}
-.s-transcoding{background:rgba(250,204,21,.12);color:#fcd34d}
-.s-done{background:rgba(99,153,34,.22);color:#c4e88d}
-.s-waiting{background:var(--color-background-secondary);color:var(--color-text-tertiary);border:0.5px solid var(--color-border-tertiary)}
-.s-error{background:rgba(248,113,113,.15);color:#fca5a5}
-.s-uploading{background:rgba(59,130,246,.18);color:#93c5fd}
-.s-direct{background:rgba(99,153,34,.22);color:#c4e88d}
-.s-opt{background:rgba(52,211,153,.14);color:#6ee7b7}
-.s-trans{background:rgba(250,204,21,.12);color:#fcd34d}
-.progress-bar{height:3px;background:var(--color-border-tertiary);border-radius:2px;margin-top:4px}
-.progress-fill{height:100%;border-radius:2px;background:var(--accent)}
-.film-table{width:100%;border-collapse:collapse}
-.film-table th{font-size:11px;color:var(--color-text-tertiary);text-align:left;padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary);font-weight:400}
-.film-table td{font-size:12px;padding:9px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
-.film-table tr:last-child td{border-bottom:none}
-.film-thumb{width:36px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:12px;background:#27272a;color:#fff}
-.film-actions{display:flex;gap:4px;flex-wrap:wrap}
-.action-btn{font-size:10px;padding:3px 8px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);background:transparent;color:var(--color-text-secondary);cursor:pointer}
-.action-btn.danger{color:#fca5a5;border-color:rgba(248,113,113,.45)}
-.users-table{width:100%;border-collapse:collapse}
-.users-table th{font-size:11px;color:var(--color-text-tertiary);text-align:left;padding:6px 10px;border-bottom:0.5px solid var(--color-border-tertiary);font-weight:400}
-.users-table td{font-size:12px;padding:9px 10px;border-bottom:0.5px solid var(--color-border-tertiary);color:var(--color-text-primary);vertical-align:middle}
-.users-table tr:last-child td{border-bottom:none}
-.role-badge{font-size:10px;padding:2px 8px;border-radius:10px}
-.role-admin{background:rgba(139,37,0,.28);color:#fca5a5}
-.role-viewer{background:rgba(59,130,246,.2);color:#93c5fd}
-.active-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
-.gpu-info{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.gpu-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px}
-.gpu-label{font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px}
-.gpu-val{font-size:13px;font-weight:500;color:var(--color-text-primary)}
-.gpu-bar{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin-top:8px}
-.gpu-fill{height:100%;border-radius:3px}
-.upload-progress-list{display:none;flex-direction:column;gap:10px;margin:12px 0}
-.upload-progress-list.is-active{display:flex}
-.upload-job{padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
-.upload-job-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
-.upload-job-name{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
-.upload-job-pct{font-size:11px;font-weight:600;color:var(--color-text-secondary);flex-shrink:0;font-variant-numeric:tabular-nums}
-.upload-job-track{height:6px;background:var(--color-border-tertiary);border-radius:3px;overflow:hidden}
-.upload-job-fill{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .1s linear}
-.upload-job.upload-job-ok .upload-job-fill{background:#22c55e}
-.upload-job.upload-job-err .upload-job-fill{background:#ef4444}
-.upload-job-msg{font-size:11px;color:#fca5a5;margin-top:6px;line-height:1.35}
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:50}
-.modal-backdrop.show{display:flex}
-.modal-backdrop.dlg-overlay{z-index:100}
-.modal{background:var(--color-background-primary);border-radius:12px;padding:18px;width:min(420px,92vw);border:1px solid var(--color-border-tertiary);color:var(--color-text-primary)}
-.modal h3{font-size:14px;margin-bottom:12px;color:var(--color-text-primary)}
-.modal input,.modal select{width:100%;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);font-family:var(--font-sans);font-size:13px;background:#0f0f0f;color:var(--color-text-primary)}
-.modal label{display:block;font-size:11px;color:var(--color-text-tertiary);margin-bottom:4px}
-.modal .hint{font-size:11px;color:var(--color-text-tertiary);margin:-4px 0 10px}
-.modal .err-msg{font-size:12px;color:var(--color-text-danger);margin-bottom:8px;display:none}
-.modal .success-msg{font-size:12px;color:#86efac;margin-bottom:8px;display:none;word-break:break-all}
-.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
-.modal.modal-film{width:min(520px,94vw);max-height:90vh;overflow-y:auto}
-.modal textarea{width:100%;min-height:88px;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);font-family:var(--font-sans);font-size:13px;resize:vertical;background:#0f0f0f;color:var(--color-text-primary)}
-.hidden{display:none!important}
-a.btn-viewer-site{display:block;width:100%;margin-top:10px;text-align:center;text-decoration:none;box-sizing:border-box;border-color:var(--color-border-secondary);color:var(--color-text-secondary)}
-a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accent);background:rgba(139,37,0,.12)}
-  </style>
-</head>
-<body>
-<h2 class="sr-only">Administration Redwood Plus</h2>
-<div class="admin-shell" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;margin:12px;background:var(--color-background-tertiary)">
-<div class="layout">
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-text">Redwood Plus</div>
-      <div class="logo-sub">Administration</div>
-    </div>
-    <div class="nav-section">Principal</div>
-    <div class="nav-item active" data-page="pipeline">
-      <span class="nav-icon">▦</span>
-      Pipeline
-      <span class="nav-badge red" id="badge-queue">0</span>
-    </div>
-    <div class="nav-item" data-page="films">
-      <span class="nav-icon">▣</span>
-      Bibliothèque
-      <span class="nav-badge" id="badge-lib">0</span>
-    </div>
-    <div class="nav-section">Système</div>
-    <div class="nav-item" data-page="users">
-      <span class="nav-icon">◎</span>
-      Utilisateurs
-    </div>
-    <div class="nav-item" data-page="gpu">
-      <span class="nav-icon">▤</span>
-      GPU & Système
-    </div>
-    <div class="sidebar-footer">
-      <div class="user-row">
-        <div class="user-avatar" id="sb-av">?</div>
-        <div class="user-info">
-          <div class="user-name" id="sb-name">…</div>
-          <div class="user-role" id="sb-role">…</div>
-        </div>
-      </div>
-      <a class="btn btn-viewer-site" id="btn-viewer" href="/watch/">Espace spectateur</a>
-      <button class="btn" id="btn-logout" style="width:100%;margin-top:10px">Déconnexion</button>
-    </div>
-  </aside>
-
-  <div class="main">
-    <section class="page active" id="page-pipeline">
-      <header class="topbar">
-        <div>
-          <div class="page-title">Pipeline</div>
-          <div class="page-sub">Ajout et traitement des films</div>
-        </div>
-        <div class="topbar-right">
-          <div class="gpu-pill" id="gpu-pill-pipeline"><span class="dot dot-green"></span><span id="gpu-pill-text">GPU</span></div>
-        </div>
-      </header>
-      <div class="content">
-        <div class="stat-grid">
-          <div class="stat"><div class="stat-label">En cours</div><div class="stat-val" id="st-running">0</div><div class="stat-sub">transcodage / file</div></div>
-          <div class="stat"><div class="stat-label">En attente</div><div class="stat-val" id="st-wait">0</div><div class="stat-sub">dans la file</div></div>
-          <div class="stat"><div class="stat-label">Bibliothèque</div><div class="stat-val" id="st-done">0</div><div class="stat-sub">disponibles</div></div>
-          <div class="stat"><div class="stat-label">Erreurs</div><div class="stat-val" id="st-err" style="color:var(--color-text-danger)">0</div><div class="stat-sub">à traiter</div></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div class="card-title">Annonce spectateurs</div></div>
-          <div class="card-body" style="font-size:12px;color:var(--color-text-secondary);line-height:1.55">
-            <p style="margin-bottom:12px">Message général affiché sous la barre de navigation de l’espace spectateur (utilisateurs connectés). Durée comptée à partir de l’enregistrement. Laissez le message vide pour désactiver.</p>
-            <label for="va-message">Message</label>
-            <textarea id="va-message" style="display:block;width:100%;min-height:88px;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);background:#0f0f0f;color:var(--color-text-primary);font-family:var(--font-sans);font-size:13px;resize:vertical"></textarea>
-            <label for="va-hours">Durée (heures)</label>
-            <input type="number" id="va-hours" min="1" max="720" value="24" style="width:120px;margin-bottom:10px;padding:8px;border-radius:8px;border:1px solid var(--color-border-secondary);background:#0f0f0f;color:var(--color-text-primary)" />
-            <p id="va-status" style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px"></p>
-            <button type="button" class="btn btn-primary" id="va-save">Enregistrer</button>
-            <button type="button" class="btn" id="va-clear" style="margin-left:8px">Effacer l’annonce</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">Synchroniser le stockage S3</div>
-            <button class="btn btn-primary" type="button" id="btn-sync-s3">Importer les objets films/*</button>
-          </div>
-          <div class="card-body" style="font-size:12px;color:var(--color-text-secondary);line-height:1.55">
-            Parcourt le bucket (préfixe <code>films/&lt;id&gt;/</code>) et crée ou met à jour les fiches <strong>disponibles</strong> pour les spectateurs.
-            <span id="sync-s3-msg" style="display:block;margin-top:8px;color:var(--color-text-tertiary)"></span>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div class="card-title">Ajouter un film</div></div>
-          <div class="card-body">
-            <div class="ingest-kind-bar" style="margin-bottom:16px;padding:12px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)">
-              <div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em">Type de contenu (upload & torrent)</div>
-              <div style="display:flex;flex-wrap:wrap;gap:16px 24px;align-items:center">
-                <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-primary);cursor:pointer">
-                  <input type="radio" name="ingest-content-kind" id="ingest-kind-film" value="film" checked />
-                  Film
-                </label>
-                <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-primary);cursor:pointer">
-                  <input type="radio" name="ingest-content-kind" id="ingest-kind-series" value="series_episode" />
-                  Série (épisode)
-                </label>
-              </div>
-              <p style="font-size:11px;color:var(--color-text-tertiary);margin-top:10px;line-height:1.45">Pour une série, indiquez la clé, le titre, la saison et l’épisode dans <strong>Modifier</strong> une fois le traitement terminé.</p>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-              <div>
-                <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;font-weight:500">Upload direct</div>
-                <div class="upload-zone" id="drop-zone">
-                  <div class="upload-icon">↑</div>
-                  <div class="upload-title">Glisser des fichiers ici</div>
-                  <div class="upload-sub">MP4, MKV, AVI, MOV, WMV, M4V — plusieurs fichiers possibles — max 50 GB chacun</div>
-                </div>
-                <input type="file" id="file-input" class="hidden" multiple accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v" />
-                <div id="upload-progress-list" class="upload-progress-list" aria-live="polite"></div>
-                <button class="btn btn-primary" style="width:100%" id="btn-browse" type="button">Parcourir les fichiers</button>
-              </div>
-              <div>
-                <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;font-weight:500">Via torrent</div>
-                <div class="magnet-row">
-                  <input class="magnet-input" id="magnet-input" placeholder="magnet:?xt=urn:btih:…" />
-                </div>
-                <div class="upload-zone" id="torrent-drop" style="padding:14px;margin-bottom:8px">
-                  <div style="font-size:12px;color:var(--color-text-tertiary)">Déposer un fichier .torrent</div>
-                </div>
-                <input type="file" id="torrent-input" class="hidden" accept=".torrent" />
-                <button class="btn btn-primary" style="width:100%" id="btn-magnet" type="button">Ajouter à la file (magnet)</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">File de traitement</div>
-            <div style="font-size:12px;color:var(--color-text-tertiary)" id="queue-meta"></div>
-          </div>
-          <div class="card-body" style="padding:8px 12px">
-            <div class="queue-list" id="queue-list"></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="page" id="page-films">
-      <header class="topbar">
-        <div>
-          <div class="page-title">Bibliothèque</div>
-          <div class="page-sub" id="lib-sub">Films</div>
-        </div>
-        <div class="topbar-right">
-          <button class="btn btn-refresh" type="button" id="btn-refresh-lib" title="Actualiser la liste"><span class="btn-refresh-glyph" aria-hidden="true">↻</span>Actualiser</button>
-          <div class="lib-search-wrap">
-            <input id="lib-search" type="text" autocomplete="off" style="font-size:12px;padding:5px 28px 5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:180px" placeholder="Rechercher…" />
-            <button type="button" class="lib-search-clear" id="lib-search-clear" hidden aria-label="Effacer la recherche" title="Effacer">×</button>
-          </div>
-        </div>
-      </header>
-      <div class="content">
-        <div class="card">
-          <div class="card-head"><div class="card-title">Films</div></div>
-          <div class="card-body" style="padding:0;overflow:auto">
-            <table class="film-table">
-              <thead>
-                <tr>
-                  <th style="padding-left:16px">Film</th>
-                  <th>Année</th>
-                  <th>Taille</th>
-                  <th>Codec</th>
-                  <th>Traitement</th>
-                  <th>Statut</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="lib-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="page" id="page-users">
-      <header class="topbar">
-        <div>
-          <div class="page-title">Utilisateurs</div>
-          <div class="page-sub" id="users-sub">Gestion des accès</div>
-        </div>
-        <div class="topbar-right">
-          <button class="btn btn-refresh" type="button" id="btn-refresh-users" title="Actualiser utilisateurs et invitations"><span class="btn-refresh-glyph" aria-hidden="true">↻</span>Actualiser</button>
-          <button class="btn btn-primary" id="btn-new-user" type="button">+ Nouvel utilisateur</button>
-        </div>
-      </header>
-      <div class="content">
-        <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-          <div class="stat"><div class="stat-label">Total</div><div class="stat-val" id="u-total">0</div></div>
-          <div class="stat"><div class="stat-label">Admins</div><div class="stat-val" id="u-adm">0</div></div>
-          <div class="stat"><div class="stat-label">Viewers</div><div class="stat-val" id="u-view">0</div></div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <div>
-              <div class="card-title">Codes d’invitation</div>
-              <div id="invites-sub" style="font-size:11px;color:var(--color-text-tertiary);margin-top:4px;line-height:1.35">—</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div class="lib-search-wrap">
-                <input id="invites-search" type="text" autocomplete="off" style="font-size:12px;padding:5px 28px 5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:200px" placeholder="Rechercher un code…" />
-                <button type="button" class="lib-search-clear" id="invites-search-clear" hidden aria-label="Effacer la recherche" title="Effacer">×</button>
-              </div>
-              <button class="btn btn-primary" type="button" id="btn-new-invite">+ Code</button>
-            </div>
-          </div>
-          <div class="card-body" style="padding:0">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th style="padding-left:16px">Code</th>
-                  <th>Utilisations</th>
-                  <th>Note</th>
-                  <th>Expire</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="invites-body"></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">Comptes</div>
-            <div class="lib-search-wrap">
-              <input id="users-search" type="text" autocomplete="off" style="font-size:12px;padding:5px 28px 5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:220px" placeholder="Rechercher un utilisateur…" />
-              <button type="button" class="lib-search-clear" id="users-search-clear" hidden aria-label="Effacer la recherche" title="Effacer">×</button>
-            </div>
-          </div>
-          <div class="card-body" style="padding:0">
-            <table class="users-table">
-              <thead>
-                <tr>
-                  <th style="padding-left:16px">Utilisateur</th>
-                  <th>Rôle</th>
-                  <th>Statut</th>
-                  <th>Dernière connexion</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody id="users-body"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="page" id="page-gpu">
-      <header class="topbar">
-        <div>
-          <div class="page-title">GPU & Système</div>
-          <div class="page-sub">Ressources locales</div>
-        </div>
-        <div class="topbar-right">
-          <div class="gpu-pill" id="gpu-pill2"><span class="dot dot-green"></span><span id="gpu-active">GPU</span></div>
-        </div>
-      </header>
-      <div class="content">
-        <div class="stat-grid">
-          <div class="stat"><div class="stat-label">GPU</div><div class="stat-val" style="font-size:13px" id="g-name">—</div><div class="stat-sub" id="g-sub">—</div></div>
-          <div class="stat"><div class="stat-label">VRAM</div><div class="stat-val" id="g-vram">—</div><div class="stat-sub" id="g-vram-sub">—</div></div>
-          <div class="stat"><div class="stat-label">Charge GPU</div><div class="stat-val" id="g-load">—</div><div class="stat-sub">utilisation</div></div>
-          <div class="stat"><div class="stat-label">Température</div><div class="stat-val" id="g-temp">—</div><div class="stat-sub">°C</div></div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div class="card-title">Ressources en temps réel</div></div>
-          <div class="card-body">
-            <div class="gpu-info">
-              <div class="gpu-card"><div class="gpu-label">Charge GPU</div><div class="gpu-val" id="b-gpu">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-gpu" style="width:0;background:#8B2500"></div></div></div>
-              <div class="gpu-card"><div class="gpu-label">VRAM</div><div class="gpu-val" id="b-vram">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-vram" style="width:0;background:#185FA5"></div></div></div>
-              <div class="gpu-card"><div class="gpu-label">CPU</div><div class="gpu-val" id="b-cpu">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-cpu" style="width:0;background:#3B6D11"></div></div></div>
-              <div class="gpu-card"><div class="gpu-label">RAM</div><div class="gpu-val" id="b-ram">0%</div><div class="gpu-bar"><div class="gpu-fill" id="f-ram" style="width:0;background:#633806"></div></div></div>
-            </div>
-            <div style="margin-top:14px;padding:12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">
-              <div style="font-size:12px;font-weight:500;color:var(--color-text-primary);margin-bottom:6px">Encodeur sélectionné</div>
-              <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6" id="enc-block"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  </div>
-</div>
-</div>
-
-<div class="modal-backdrop" id="modal-user">
-  <div class="modal">
-    <h3>Nouvel utilisateur</h3>
-    <input id="nu-user" placeholder="username" autocomplete="off" />
-    <input id="nu-email" placeholder="email" type="email" />
-    <input id="nu-pass" placeholder="mot de passe" type="password" />
-    <select id="nu-role" style="width:100%;padding:8px;border-radius:8px;margin-bottom:10px">
-      <option value="viewer">viewer</option>
-      <option value="admin">admin</option>
-    </select>
-    <div class="row">
-      <button class="btn" type="button" id="nu-cancel">Annuler</button>
-      <button class="btn btn-primary" type="button" id="nu-save">Créer</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="modal-invite">
-  <div class="modal">
-    <h3>Nouveau code d’invitation</h3>
-    <p class="err-msg" id="inv-err"></p>
-    <p class="success-msg" id="inv-ok"></p>
-    <label for="inv-max">Nombre max d’utilisations</label>
-    <input id="inv-max" type="number" min="1" value="1" />
-    <p class="hint">Chaque inscription réussie consomme une utilisation.</p>
-    <label for="inv-note">Note (optionnel)</label>
-    <input id="inv-note" type="text" placeholder="ex. Famille — printemps 2026" autocomplete="off" />
-    <label for="inv-code">Code personnalisé (optionnel)</label>
-    <input id="inv-code" type="text" placeholder="Vide = code généré automatiquement" autocomplete="off" />
-    <label for="inv-exp">Expire dans (jours, optionnel)</label>
-    <input id="inv-exp" type="number" min="1" placeholder="Laisser vide = sans expiration" />
-    <div class="row">
-      <button class="btn" type="button" id="inv-cancel">Annuler</button>
-      <button class="btn btn-primary" type="button" id="inv-save">Créer le code</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="modal-film">
-  <div class="modal modal-film">
-    <h3>Modifier le film</h3>
-    <p class="err-msg" id="fm-err" style="display:none"></p>
-    <input type="hidden" id="fm-id" />
-    <label for="fm-kind">Type de contenu</label>
-    <select id="fm-kind">
-      <option value="film">Film</option>
-      <option value="series_episode">Épisode de série</option>
-    </select>
-    <p class="hint">Pour une série : même <strong>clé série</strong> et titre de série sur tous les épisodes ; numérotez saison et épisode.</p>
-    <div id="fm-series-box" class="hidden">
-      <label for="fm-series-key">Clé série (identifiant unique)</label>
-      <input id="fm-series-key" type="text" placeholder="ex. mon-show-2024" autocomplete="off" />
-      <label for="fm-series-title">Titre affiché de la série</label>
-      <input id="fm-series-title" type="text" placeholder="ex. Mon Show" autocomplete="off" />
-      <label for="fm-season">Saison</label>
-      <input id="fm-season" type="number" min="0" placeholder="1" />
-      <label for="fm-episode">Épisode</label>
-      <input id="fm-episode" type="number" min="0" placeholder="1" />
-    </div>
-    <label for="fm-titre">Titre</label>
-    <input id="fm-titre" type="text" autocomplete="off" />
-    <label for="fm-titre-orig">Titre original</label>
-    <input id="fm-titre-orig" type="text" autocomplete="off" />
-    <label for="fm-annee">Année</label>
-    <input id="fm-annee" type="number" min="1880" max="2100" placeholder="ex. 2024" />
-    <label for="fm-realisateur">Réalisateur</label>
-    <input id="fm-realisateur" type="text" autocomplete="off" />
-    <label for="fm-genres">Genres (séparés par des virgules)</label>
-    <input id="fm-genres" type="text" placeholder="Drame, Science-fiction" autocomplete="off" />
-    <label for="fm-acteurs">Acteurs (séparés par des virgules)</label>
-    <input id="fm-acteurs" type="text" placeholder="Nom A, Nom B" autocomplete="off" />
-    <label for="fm-synopsis">Synopsis</label>
-    <textarea id="fm-synopsis" placeholder="Résumé…"></textarea>
-    <label for="fm-duree">Durée (minutes)</label>
-    <input id="fm-duree" type="number" min="0" placeholder="ex. 118" />
-    <label for="fm-resolution">Résolution</label>
-    <input id="fm-resolution" type="text" placeholder="ex. 1920x1080" autocomplete="off" />
-    <label for="fm-langue">Langue originale</label>
-    <input id="fm-langue" type="text" placeholder="ex. fr" autocomplete="off" />
-    <label for="fm-tmdb-id">ID TMDB</label>
-    <input id="fm-tmdb-id" type="number" min="0" placeholder="ex. 1054867" />
-    <label for="fm-trailers">Bande-annonce YouTube (manuel)</label>
-    <textarea id="fm-trailers" rows="3" placeholder="Une seule URL (https://www.youtube.com/watch?v=… ou youtu.be/…). Optionnel : Titre affiché|URL"></textarea>
-    <p class="hint">S’affichent <strong>avant</strong> les vidéos récupérées via TMDB. Laissez vide pour n’utiliser que TMDB. Pour <a href="https://www.themoviedb.org/movie/1054867-one-battle-after-another" target="_blank" rel="noopener">One Battle After Another</a>, renseignez aussi l’ID TMDB ci-dessus.</p>
-    <label for="fm-note">Note TMDB</label>
-    <input id="fm-note" type="text" placeholder="ex. 7.8" autocomplete="off" />
-    <label for="fm-poster">Chemin affiche (poster_path TMDB)</label>
-    <input id="fm-poster" type="text" placeholder="/abc.jpg ou URL" autocomplete="off" />
-    <div class="row">
-      <button class="btn" type="button" id="fm-cancel">Annuler</button>
-      <button class="btn btn-primary" type="button" id="fm-save">Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop dlg-overlay" id="modal-dlg-alert" aria-modal="true" role="alertdialog" aria-labelledby="dlg-alert-title">
-  <div class="modal" role="document">
-    <h3 id="dlg-alert-title">Message</h3>
-    <p id="dlg-alert-body" style="font-size:13px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 16px"></p>
-    <div class="row">
-      <button class="btn btn-primary" type="button" id="dlg-alert-ok">OK</button>
-    </div>
-  </div>
-</div>
-<div class="modal-backdrop dlg-overlay" id="modal-dlg-confirm" aria-modal="true" role="dialog" aria-labelledby="dlg-confirm-title">
-  <div class="modal" role="document">
-    <h3 id="dlg-confirm-title">Confirmer</h3>
-    <p id="dlg-confirm-body" style="font-size:13px;line-height:1.55;color:var(--color-text-secondary);margin:0 0 16px"></p>
-    <div class="row">
-      <button class="btn" type="button" id="dlg-confirm-no">Annuler</button>
-      <button class="btn btn-primary" type="button" id="dlg-confirm-yes">Confirmer</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop dlg-overlay" id="modal-dlg-imdbapi" aria-modal="true" role="dialog" aria-labelledby="dlg-imdbapi-title">
-  <div class="modal" role="document" style="max-width:420px">
-    <h3 id="dlg-imdbapi-title">Rafraîchir via IMDb API</h3>
-    <p id="dlg-imdbapi-film-label" style="font-size:12px;color:var(--color-text-tertiary);margin:0 0 12px"></p>
-    <label for="dlg-imdbapi-input">Identifiant IMDb</label>
-    <input id="dlg-imdbapi-input" type="text" placeholder="ex. tt1375666" autocomplete="off" style="width:100%;margin-bottom:8px" />
-    <p class="hint" style="font-size:12px;line-height:1.45;margin:0 0 16px;color:var(--color-text-secondary)">
-      Laisser vide pour une <strong>recherche automatique</strong> à partir du nom du fichier sur le stockage.
-    </p>
-    <div class="row" style="justify-content:flex-end;gap:8px">
-      <button class="btn" type="button" id="dlg-imdbapi-cancel">Annuler</button>
-      <button class="btn btn-primary" type="button" id="dlg-imdbapi-ok">Appliquer</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const $ = (s) => document.querySelector(s);
-
-/** In-app modal (no window.alert). */
-function showAlertModal(title, message, opts = {}) {
-  const okText = opts.okText || 'OK';
-  return new Promise((resolve) => {
-    const backdrop = $('#modal-dlg-alert');
-    const titleEl = $('#dlg-alert-title');
-    const bodyEl = $('#dlg-alert-body');
-    const btnOk = $('#dlg-alert-ok');
-    titleEl.textContent = title;
-    bodyEl.textContent = message;
-    bodyEl.style.whiteSpace = 'pre-line';
-    btnOk.textContent = okText;
-    const finish = () => {
-      backdrop.classList.remove('show');
-      document.removeEventListener('keydown', onKey);
-      btnOk.removeEventListener('click', onOk);
-      backdrop.removeEventListener('click', onBackdrop);
-      resolve();
-    };
-    const onOk = () => finish();
-    const onBackdrop = (e) => {
-      if (e.target === backdrop) finish();
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') finish();
-    };
-    btnOk.addEventListener('click', onOk);
-    backdrop.addEventListener('click', onBackdrop);
-    document.addEventListener('keydown', onKey);
-    backdrop.classList.add('show');
-    btnOk.focus();
-  });
-}
-
-/** In-app confirm (no window.confirm). Resolves true if confirmed. */
-function showConfirmModal(title, message, opts = {}) {
-  const confirmText = opts.confirmText || 'Confirmer';
-  const cancelText = opts.cancelText || 'Annuler';
-  return new Promise((resolve) => {
-    const backdrop = $('#modal-dlg-confirm');
-    const titleEl = $('#dlg-confirm-title');
-    const bodyEl = $('#dlg-confirm-body');
-    const btnNo = $('#dlg-confirm-no');
-    const btnYes = $('#dlg-confirm-yes');
-    titleEl.textContent = title;
-    bodyEl.textContent = message;
-    bodyEl.style.whiteSpace = 'pre-line';
-    btnYes.textContent = confirmText;
-    btnNo.textContent = cancelText;
-    const cleanup = (value) => {
-      backdrop.classList.remove('show');
-      document.removeEventListener('keydown', onKey);
-      btnYes.removeEventListener('click', onYes);
-      btnNo.removeEventListener('click', onNo);
-      backdrop.removeEventListener('click', onBackdrop);
-      resolve(value);
-    };
-    const onYes = () => cleanup(true);
-    const onNo = () => cleanup(false);
-    const onBackdrop = (e) => {
-      if (e.target === backdrop) cleanup(false);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') cleanup(false);
-    };
-    btnYes.addEventListener('click', onYes);
-    btnNo.addEventListener('click', onNo);
-    backdrop.addEventListener('click', onBackdrop);
-    document.addEventListener('keydown', onKey);
-    backdrop.classList.add('show');
-    btnNo.focus();
-  });
-}
-
-/**
- * Ask for optional IMDb tt id before refresh-imdbapi. Resolves null if cancelled,
- * or { imdbTitleId: string } (empty string = auto search from filename).
- */
-function showImdbApiRefreshModal(filmLabel) {
-  return new Promise((resolve) => {
-    const backdrop = $('#modal-dlg-imdbapi');
-    const labelEl = $('#dlg-imdbapi-film-label');
-    const inp = $('#dlg-imdbapi-input');
-    const btnCancel = $('#dlg-imdbapi-cancel');
-    const btnOk = $('#dlg-imdbapi-ok');
-    labelEl.textContent = filmLabel ? `Fiche : ${filmLabel}` : '';
-    inp.value = '';
-    const cleanup = (value) => {
-      backdrop.classList.remove('show');
-      document.removeEventListener('keydown', onKey);
-      btnCancel.removeEventListener('click', onCancel);
-      btnOk.removeEventListener('click', onOk);
-      backdrop.removeEventListener('click', onBackdrop);
-      resolve(value);
-    };
-    const onCancel = () => cleanup(null);
-    const onOk = async () => {
-      const v = inp.value.trim();
-      if (v && !/^tt\d+$/i.test(v)) {
-        await showAlertModal(
-          'IMDb API',
-          'Format attendu : tt suivi de chiffres (ex. tt1375666).',
-        );
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administration — Redwood Plus</title>
+    <style>
+      :root {
+        --font-sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+        --accent: #8b2500;
+        --color-background-primary: #141414;
+        --color-background-secondary: #1a1a1a;
+        --color-background-tertiary: #0a0a0a;
+        --color-border-secondary: #3f3f46;
+        --color-border-tertiary: #2a2a2a;
+        --color-text-primary: #f5f5f5;
+        --color-text-secondary: #a3a3a3;
+        --color-text-tertiary: #71717a;
+        --color-text-danger: #f87171;
+        --color-text-warning: #fbbf24;
+        --border-radius-md: 8px;
+        --border-radius-lg: 12px;
       }
-      cleanup({ imdbTitleId: v });
-    };
-    const onBackdrop = (e) => {
-      if (e.target === backdrop) cleanup(null);
-    };
-    const onKey = (e) => {
-      if (e.key === 'Escape') cleanup(null);
-      if (e.key === 'Enter') onOk();
-    };
-    btnCancel.addEventListener('click', onCancel);
-    btnOk.addEventListener('click', onOk);
-    backdrop.addEventListener('click', onBackdrop);
-    document.addEventListener('keydown', onKey);
-    backdrop.classList.add('show');
-    inp.focus();
-  });
-}
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-sans);
+        background: var(--color-background-tertiary);
+        color: var(--color-text-primary);
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        min-height: 100vh;
+      }
+      .sidebar {
+        background: var(--color-background-primary);
+        border-right: 0.5px solid var(--color-border-tertiary);
+        padding: 16px 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar-logo {
+        padding: 0 16px 16px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        margin-bottom: 8px;
+      }
+      .logo-text {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--accent);
+      }
+      .logo-sub {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-top: 2px;
+      }
+      .nav-section {
+        padding: 8px 16px 4px;
+        font-size: 10px;
+        color: var(--color-text-tertiary);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-top: 8px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 16px;
+        font-size: 13px;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        border-left: 2px solid transparent;
+      }
+      .nav-item:hover {
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+      }
+      .nav-item.active {
+        color: #fca5a5;
+        background: rgba(139, 37, 0, 0.2);
+        border-left-color: var(--accent);
+      }
+      .nav-icon {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .nav-badge {
+        margin-left: auto;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        background: var(--color-background-secondary);
+        color: var(--color-text-tertiary);
+      }
+      .nav-badge.red {
+        background: rgba(248, 113, 113, 0.15);
+        color: #fca5a5;
+      }
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 12px 16px;
+        border-top: 0.5px solid var(--color-border-tertiary);
+      }
+      .user-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .user-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 500;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .user-info {
+        min-width: 0;
+      }
+      .user-name {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .user-role {
+        font-size: 10px;
+        color: var(--color-text-tertiary);
+      }
+      .main {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 100vh;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        background: var(--color-background-primary);
+      }
+      .page-title {
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      .page-sub {
+        font-size: 12px;
+        color: var(--color-text-tertiary);
+        margin-top: 1px;
+      }
+      .topbar-right {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .lib-search-wrap {
+        position: relative;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .lib-search-clear {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        border: none;
+        border-radius: 6px;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        color: var(--color-text-tertiary);
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        font-family: var(--font-sans);
+      }
+      .lib-search-clear:hover {
+        color: var(--color-text-primary);
+        background: var(--color-background-tertiary);
+      }
+      .lib-search-clear[hidden] {
+        display: none !important;
+      }
+      .btn {
+        font-size: 12px;
+        padding: 6px 14px;
+        border-radius: var(--border-radius-md);
+        border: 0.5px solid var(--color-border-secondary);
+        background: transparent;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+        font-family: var(--font-sans);
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+      .btn-primary:hover {
+        background: #712b13;
+        border-color: #712b13;
+      }
+      .btn-refresh {
+        transition:
+          transform 0.2s ease,
+          border-color 0.2s ease,
+          background 0.2s ease,
+          color 0.2s ease,
+          box-shadow 0.2s ease,
+          opacity 0.2s ease;
+      }
+      .btn-refresh:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+        color: var(--color-text-primary);
+        background: rgba(139, 37, 0, 0.2);
+        box-shadow: 0 3px 12px rgba(139, 37, 0, 0.22);
+      }
+      .btn-refresh:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 1px 4px rgba(139, 37, 0, 0.15);
+      }
+      .btn-refresh:disabled {
+        opacity: 0.65;
+        cursor: wait;
+      }
+      .btn-refresh .btn-refresh-glyph {
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .btn-refresh:hover:not(:disabled) .btn-refresh-glyph {
+        animation: btn-refresh-spin-once 0.65s ease-out;
+      }
+      .btn-refresh.is-refreshing .btn-refresh-glyph {
+        animation: btn-refresh-spin-loop 0.75s linear infinite;
+      }
+      @keyframes btn-refresh-spin-once {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+      @keyframes btn-refresh-spin-loop {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(-360deg);
+        }
+      }
+      .gpu-pill {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: rgba(99, 153, 34, 0.22);
+        color: #c4e88d;
+        border: 0.5px solid rgba(153, 193, 102, 0.45);
+        max-width: 280px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .dot-green {
+        background: #86c940;
+      }
+      .dot-amber {
+        background: #f59e0b;
+      }
+      .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+      }
+      .page {
+        display: none;
+      }
+      .page.active {
+        display: block;
+      }
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      .stat {
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md);
+        padding: 12px 14px;
+      }
+      .stat-label {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-bottom: 4px;
+      }
+      .stat-val {
+        font-size: 20px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      .stat-sub {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-top: 2px;
+      }
+      .card {
+        background: var(--color-background-primary);
+        border: 0.5px solid var(--color-border-tertiary);
+        border-radius: var(--border-radius-lg);
+        margin-bottom: 16px;
+      }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
+      .card-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      .card-body {
+        padding: 16px;
+      }
+      .upload-zone {
+        border: 1.5px dashed var(--color-border-secondary);
+        border-radius: var(--border-radius-lg);
+        padding: 28px 20px;
+        text-align: center;
+        background: var(--color-background-secondary);
+        cursor: pointer;
+        margin-bottom: 12px;
+      }
+      .upload-zone:hover {
+        border-color: var(--accent);
+        background: rgba(139, 37, 0, 0.1);
+      }
+      .upload-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--color-background-primary);
+        border: 0.5px solid var(--color-border-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 10px;
+        font-size: 16px;
+      }
+      .upload-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        margin-bottom: 4px;
+      }
+      .upload-sub {
+        font-size: 12px;
+        color: var(--color-text-tertiary);
+      }
+      .magnet-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .magnet-input {
+        flex: 1;
+        font-size: 13px;
+        padding: 8px 12px;
+        border: 0.5px solid var(--color-border-secondary);
+        border-radius: var(--border-radius-md);
+        background: var(--color-background-secondary);
+        color: var(--color-text-primary);
+        font-family: var(--font-mono);
+      }
+      .queue-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .queue-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px;
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md);
+      }
+      .qi-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        flex-shrink: 0;
+        background: #252530;
+        color: #e5e5e5;
+      }
+      .qi-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .qi-title {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .qi-sub {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-top: 1px;
+        white-space: pre-line;
+        line-height: 1.45;
+      }
+      .qi-status {
+        flex-shrink: 0;
+      }
+      .status-pill {
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+      }
+      .s-transcoding {
+        background: rgba(250, 204, 21, 0.12);
+        color: #fcd34d;
+      }
+      .s-done {
+        background: rgba(99, 153, 34, 0.22);
+        color: #c4e88d;
+      }
+      .s-waiting {
+        background: var(--color-background-secondary);
+        color: var(--color-text-tertiary);
+        border: 0.5px solid var(--color-border-tertiary);
+      }
+      .s-error {
+        background: rgba(248, 113, 113, 0.15);
+        color: #fca5a5;
+      }
+      .s-uploading {
+        background: rgba(59, 130, 246, 0.18);
+        color: #93c5fd;
+      }
+      .s-direct {
+        background: rgba(99, 153, 34, 0.22);
+        color: #c4e88d;
+      }
+      .s-opt {
+        background: rgba(52, 211, 153, 0.14);
+        color: #6ee7b7;
+      }
+      .s-trans {
+        background: rgba(250, 204, 21, 0.12);
+        color: #fcd34d;
+      }
+      .progress-bar {
+        height: 3px;
+        background: var(--color-border-tertiary);
+        border-radius: 2px;
+        margin-top: 4px;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: var(--accent);
+      }
+      .film-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .film-table th {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        font-weight: 400;
+      }
+      .film-table td {
+        font-size: 12px;
+        padding: 9px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        color: var(--color-text-primary);
+        vertical-align: middle;
+      }
+      .film-table tr:last-child td {
+        border-bottom: none;
+      }
+      .film-thumb {
+        width: 36px;
+        height: 24px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        background: #27272a;
+        color: #fff;
+      }
+      .film-actions {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .action-btn {
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        border: 0.5px solid var(--color-border-tertiary);
+        background: transparent;
+        color: var(--color-text-secondary);
+        cursor: pointer;
+      }
+      .action-btn.danger {
+        color: #fca5a5;
+        border-color: rgba(248, 113, 113, 0.45);
+      }
+      .users-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .users-table th {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        text-align: left;
+        padding: 6px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        font-weight: 400;
+      }
+      .users-table td {
+        font-size: 12px;
+        padding: 9px 10px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        color: var(--color-text-primary);
+        vertical-align: middle;
+      }
+      .users-table tr:last-child td {
+        border-bottom: none;
+      }
+      .role-badge {
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
+      }
+      .role-admin {
+        background: rgba(139, 37, 0, 0.28);
+        color: #fca5a5;
+      }
+      .role-viewer {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+      }
+      .active-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+        vertical-align: middle;
+      }
+      .gpu-info {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .gpu-card {
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md);
+        padding: 12px 14px;
+      }
+      .gpu-label {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-bottom: 6px;
+      }
+      .gpu-val {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+      }
+      .gpu-bar {
+        height: 6px;
+        background: var(--color-border-tertiary);
+        border-radius: 3px;
+        margin-top: 8px;
+      }
+      .gpu-fill {
+        height: 100%;
+        border-radius: 3px;
+      }
+      .upload-progress-list {
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+        margin: 12px 0;
+      }
+      .upload-progress-list.is-active {
+        display: flex;
+      }
+      .upload-job {
+        padding: 10px 12px;
+        background: var(--color-background-secondary);
+        border-radius: var(--border-radius-md);
+        border: 0.5px solid var(--color-border-tertiary);
+      }
+      .upload-job-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .upload-job-name {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+        flex: 1;
+      }
+      .upload-job-pct {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-secondary);
+        flex-shrink: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .upload-job-track {
+        height: 6px;
+        background: var(--color-border-tertiary);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .upload-job-fill {
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        border-radius: 3px;
+        transition: width 0.1s linear;
+      }
+      .upload-job.upload-job-ok .upload-job-fill {
+        background: #22c55e;
+      }
+      .upload-job.upload-job-err .upload-job-fill {
+        background: #ef4444;
+      }
+      .upload-job-msg {
+        font-size: 11px;
+        color: #fca5a5;
+        margin-top: 6px;
+        line-height: 1.35;
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+      .modal-backdrop.show {
+        display: flex;
+      }
+      .modal-backdrop.dlg-overlay {
+        z-index: 100;
+      }
+      .modal {
+        background: var(--color-background-primary);
+        border-radius: 12px;
+        padding: 18px;
+        width: min(420px, 92vw);
+        border: 1px solid var(--color-border-tertiary);
+        color: var(--color-text-primary);
+      }
+      .modal h3 {
+        font-size: 14px;
+        margin-bottom: 12px;
+        color: var(--color-text-primary);
+      }
+      .modal input,
+      .modal select {
+        width: 100%;
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border-secondary);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        background: #0f0f0f;
+        color: var(--color-text-primary);
+      }
+      .modal label {
+        display: block;
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-bottom: 4px;
+      }
+      .modal .hint {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin: -4px 0 10px;
+      }
+      .modal .err-msg {
+        font-size: 12px;
+        color: var(--color-text-danger);
+        margin-bottom: 8px;
+        display: none;
+      }
+      .modal .success-msg {
+        font-size: 12px;
+        color: #86efac;
+        margin-bottom: 8px;
+        display: none;
+        word-break: break-all;
+      }
+      .modal .row {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+      .modal.modal-film {
+        width: min(520px, 94vw);
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .modal textarea {
+        width: 100%;
+        min-height: 88px;
+        margin-bottom: 10px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border-secondary);
+        font-family: var(--font-sans);
+        font-size: 13px;
+        resize: vertical;
+        background: #0f0f0f;
+        color: var(--color-text-primary);
+      }
+      .hidden {
+        display: none !important;
+      }
+      a.btn-viewer-site {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        text-align: center;
+        text-decoration: none;
+        box-sizing: border-box;
+        border-color: var(--color-border-secondary);
+        color: var(--color-text-secondary);
+      }
+      a.btn-viewer-site:hover {
+        color: var(--color-text-primary);
+        border-color: var(--accent);
+        background: rgba(139, 37, 0, 0.12);
+      }
+    </style>
+  </head>
+  <body>
+    <h2 class="sr-only">Administration Redwood Plus</h2>
+    <div
+      class="admin-shell"
+      style="
+        border: 0.5px solid var(--color-border-tertiary);
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        margin: 12px;
+        background: var(--color-background-tertiary);
+      "
+    >
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <div class="logo-text">Redwood Plus</div>
+            <div class="logo-sub">Administration</div>
+          </div>
+          <div class="nav-section">Principal</div>
+          <div class="nav-item active" data-page="pipeline">
+            <span class="nav-icon">▦</span>
+            Pipeline
+            <span class="nav-badge red" id="badge-queue">0</span>
+          </div>
+          <div class="nav-item" data-page="films">
+            <span class="nav-icon">▣</span>
+            Bibliothèque
+            <span class="nav-badge" id="badge-lib">0</span>
+          </div>
+          <div class="nav-section">Administration</div>
+          <div class="nav-item" data-page="announcement">
+            <span class="nav-icon">◆</span>
+            Annonce spectateurs
+          </div>
+          <div class="nav-section">Système</div>
+          <div class="nav-item" data-page="users">
+            <span class="nav-icon">◎</span>
+            Utilisateurs
+          </div>
+          <div class="nav-item" data-page="gpu">
+            <span class="nav-icon">▤</span>
+            GPU & Système
+          </div>
+          <div class="sidebar-footer">
+            <div class="user-row">
+              <div class="user-avatar" id="sb-av">?</div>
+              <div class="user-info">
+                <div class="user-name" id="sb-name">…</div>
+                <div class="user-role" id="sb-role">…</div>
+              </div>
+            </div>
+            <a class="btn btn-viewer-site" id="btn-viewer" href="/watch/"
+              >Espace spectateur</a
+            >
+            <button
+              class="btn"
+              id="btn-logout"
+              style="width: 100%; margin-top: 10px"
+            >
+              Déconnexion
+            </button>
+          </div>
+        </aside>
 
-async function api(path, opts = {}) {
-  const r = await fetch(path, { credentials: 'include', cache: 'no-store', ...opts });
-  if (r.status === 401) {
-    window.location.href = '/login-admin.html';
-    throw new Error('401');
-  }
-  if (r.status === 403) {
-    let detail = '';
-    try {
-      const j = await r.clone().json();
-      detail = typeof j.detail === 'string' ? j.detail : '';
-    } catch (_) {}
-    if (detail === 'Admin only') {
-      window.location.href = '/watch/';
-      throw new Error('403-admin');
-    }
-  }
-  return r;
-}
+        <div class="main">
+          <section class="page active" id="page-pipeline">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Pipeline</div>
+                <div class="page-sub">Ajout et traitement des films</div>
+              </div>
+              <div class="topbar-right">
+                <div class="gpu-pill" id="gpu-pill-pipeline">
+                  <span class="dot dot-green"></span
+                  ><span id="gpu-pill-text">GPU</span>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="stat-grid">
+                <div class="stat">
+                  <div class="stat-label">En cours</div>
+                  <div class="stat-val" id="st-running">0</div>
+                  <div class="stat-sub">transcodage / file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">En attente</div>
+                  <div class="stat-val" id="st-wait">0</div>
+                  <div class="stat-sub">dans la file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Bibliothèque</div>
+                  <div class="stat-val" id="st-done">0</div>
+                  <div class="stat-sub">disponibles</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Erreurs</div>
+                  <div
+                    class="stat-val"
+                    id="st-err"
+                    style="color: var(--color-text-danger)"
+                  >
+                    0
+                  </div>
+                  <div class="stat-sub">à traiter</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Synchroniser le stockage S3</div>
+                  <button
+                    class="btn btn-primary"
+                    type="button"
+                    id="btn-sync-s3"
+                  >
+                    Importer les objets films/*
+                  </button>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.55;
+                  "
+                >
+                  Parcourt le bucket (préfixe <code>films/&lt;id&gt;/</code>) et
+                  crée ou met à jour les fiches
+                  <strong>disponibles</strong> pour les spectateurs.
+                  <span
+                    id="sync-s3-msg"
+                    style="
+                      display: block;
+                      margin-top: 8px;
+                      color: var(--color-text-tertiary);
+                    "
+                  ></span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Ajouter un film</div>
+                </div>
+                <div class="card-body">
+                  <div
+                    class="ingest-kind-bar"
+                    style="
+                      margin-bottom: 16px;
+                      padding: 12px 14px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                      border: 0.5px solid var(--color-border-tertiary);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Type de contenu (upload & torrent)
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 16px 24px;
+                        align-items: center;
+                      "
+                    >
+                      <label
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        <input
+                          type="radio"
+                          name="ingest-content-kind"
+                          id="ingest-kind-film"
+                          value="film"
+                          checked
+                        />
+                        Film
+                      </label>
+                      <label
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        <input
+                          type="radio"
+                          name="ingest-content-kind"
+                          id="ingest-kind-series"
+                          value="series_episode"
+                        />
+                        Série (épisode)
+                      </label>
+                    </div>
+                    <p
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-top: 10px;
+                        line-height: 1.45;
+                      "
+                    >
+                      Pour une série, indiquez la clé, le titre, la saison et
+                      l’épisode dans <strong>Modifier</strong> une fois le
+                      traitement terminé.
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 16px;
+                    "
+                  >
+                    <div>
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                        "
+                      >
+                        Upload direct
+                      </div>
+                      <div class="upload-zone" id="drop-zone">
+                        <div class="upload-icon">↑</div>
+                        <div class="upload-title">Glisser des fichiers ici</div>
+                        <div class="upload-sub">
+                          MP4, MKV, AVI, MOV, WMV, M4V — plusieurs fichiers
+                          possibles — max 50 GB chacun
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="file-input"
+                        class="hidden"
+                        multiple
+                        accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+                      />
+                      <div
+                        id="upload-progress-list"
+                        class="upload-progress-list"
+                        aria-live="polite"
+                      ></div>
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-browse"
+                        type="button"
+                      >
+                        Parcourir les fichiers
+                      </button>
+                    </div>
+                    <div>
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                        "
+                      >
+                        Via torrent
+                      </div>
+                      <div class="magnet-row">
+                        <input
+                          class="magnet-input"
+                          id="magnet-input"
+                          placeholder="magnet:?xt=urn:btih:…"
+                        />
+                      </div>
+                      <div
+                        class="upload-zone"
+                        id="torrent-drop"
+                        style="padding: 14px; margin-bottom: 8px"
+                      >
+                        <div
+                          style="
+                            font-size: 12px;
+                            color: var(--color-text-tertiary);
+                          "
+                        >
+                          Déposer un fichier .torrent
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="torrent-input"
+                        class="hidden"
+                        accept=".torrent"
+                      />
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-magnet"
+                        type="button"
+                      >
+                        Ajouter à la file (magnet)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">File de traitement</div>
+                  <div
+                    style="font-size: 12px; color: var(--color-text-tertiary)"
+                    id="queue-meta"
+                  ></div>
+                </div>
+                <div class="card-body" style="padding: 8px 12px">
+                  <div class="queue-list" id="queue-list"></div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-function initials(name) {
-  return (name || '?').split(/[.\s]+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('') || '?';
-}
+          <section class="page" id="page-announcement">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Annonce spectateurs</div>
+                <div class="page-sub">
+                  Message global pour les utilisateurs connectés (espace
+                  spectateur)
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Configuration</div>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.55;
+                  "
+                >
+                  <p style="margin-bottom: 12px">
+                    Message général affiché sous la barre de navigation de
+                    l’espace spectateur (utilisateurs connectés). Durée comptée
+                    à partir de l’enregistrement. Laissez le message vide pour
+                    désactiver.
+                  </p>
+                  <label for="va-message">Message</label>
+                  <textarea
+                    id="va-message"
+                    style="
+                      display: block;
+                      width: 100%;
+                      min-height: 88px;
+                      margin-bottom: 10px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                      font-family: var(--font-sans);
+                      font-size: 13px;
+                      resize: vertical;
+                    "
+                  ></textarea>
+                  <label for="va-hours">Durée (heures)</label>
+                  <input
+                    type="number"
+                    id="va-hours"
+                    min="1"
+                    max="720"
+                    value="24"
+                    style="
+                      width: 120px;
+                      margin-bottom: 10px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                    "
+                  />
+                  <p
+                    id="va-status"
+                    style="
+                      font-size: 11px;
+                      color: var(--color-text-tertiary);
+                      margin-bottom: 10px;
+                    "
+                  ></p>
+                  <button type="button" class="btn btn-primary" id="va-save">
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    id="va-clear"
+                    style="margin-left: 8px"
+                  >
+                    Effacer l’annonce
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
 
-function fmtBytes(n) {
-  if (n == null) return '—';
-  const u = ['o', 'Ko', 'Mo', 'Go', 'To'];
-  let i = 0;
-  let x = Number(n);
-  while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
-  return `${x.toFixed(i ? 1 : 0)} ${u[i]}`;
-}
+          <section class="page" id="page-films">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Bibliothèque</div>
+                <div class="page-sub" id="lib-sub">Films</div>
+              </div>
+              <div class="topbar-right">
+                <button
+                  class="btn btn-refresh"
+                  type="button"
+                  id="btn-refresh-lib"
+                  title="Actualiser la liste"
+                >
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+                <div class="lib-search-wrap">
+                  <input
+                    id="lib-search"
+                    type="text"
+                    autocomplete="off"
+                    style="
+                      font-size: 12px;
+                      padding: 5px 28px 5px 10px;
+                      border: 0.5px solid var(--color-border-secondary);
+                      border-radius: var(--border-radius-md);
+                      background: var(--color-background-secondary);
+                      color: var(--color-text-primary);
+                      width: 180px;
+                    "
+                    placeholder="Rechercher…"
+                  />
+                  <button
+                    type="button"
+                    class="lib-search-clear"
+                    id="lib-search-clear"
+                    hidden
+                    aria-label="Effacer la recherche"
+                    title="Effacer"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="card">
+                <div class="card-head"><div class="card-title">Films</div></div>
+                <div class="card-body" style="padding: 0; overflow: auto">
+                  <table class="film-table">
+                    <thead>
+                      <tr>
+                        <th style="padding-left: 16px">Film</th>
+                        <th>Année</th>
+                        <th>Taille</th>
+                        <th>Codec</th>
+                        <th>Traitement</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="lib-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
 
-function fmtRate(bps) {
-  const n = Number(bps) || 0;
-  if (n <= 0) return '0 o/s';
-  const u = ['o/s', 'Ko/s', 'Mo/s', 'Go/s'];
-  let i = 0;
-  let x = n;
-  while (x >= 1024 && i < u.length - 1) { x /= 1024; i++; }
-  return `${x < 10 && i > 0 ? x.toFixed(1) : Math.round(x)} ${u[i]}`;
-}
+          <section class="page" id="page-users">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Utilisateurs</div>
+                <div class="page-sub" id="users-sub">Gestion des accès</div>
+              </div>
+              <div class="topbar-right">
+                <button
+                  class="btn btn-refresh"
+                  type="button"
+                  id="btn-refresh-users"
+                  title="Actualiser utilisateurs et invitations"
+                >
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+                <button class="btn btn-primary" id="btn-new-user" type="button">
+                  + Nouvel utilisateur
+                </button>
+              </div>
+            </header>
+            <div class="content">
+              <div
+                class="stat-grid"
+                style="grid-template-columns: repeat(3, 1fr)"
+              >
+                <div class="stat">
+                  <div class="stat-label">Total</div>
+                  <div class="stat-val" id="u-total">0</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Admins</div>
+                  <div class="stat-val" id="u-adm">0</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Viewers</div>
+                  <div class="stat-val" id="u-view">0</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">Codes d’invitation</div>
+                    <div
+                      id="invites-sub"
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-top: 4px;
+                        line-height: 1.35;
+                      "
+                    >
+                      —
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 8px;
+                      flex-wrap: wrap;
+                    "
+                  >
+                    <div class="lib-search-wrap">
+                      <input
+                        id="invites-search"
+                        type="text"
+                        autocomplete="off"
+                        style="
+                          font-size: 12px;
+                          padding: 5px 28px 5px 10px;
+                          border: 0.5px solid var(--color-border-secondary);
+                          border-radius: var(--border-radius-md);
+                          background: var(--color-background-secondary);
+                          color: var(--color-text-primary);
+                          width: 200px;
+                        "
+                        placeholder="Rechercher un code…"
+                      />
+                      <button
+                        type="button"
+                        class="lib-search-clear"
+                        id="invites-search-clear"
+                        hidden
+                        aria-label="Effacer la recherche"
+                        title="Effacer"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <button
+                      class="btn btn-primary"
+                      type="button"
+                      id="btn-new-invite"
+                    >
+                      + Code
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body" style="padding: 0">
+                  <table class="users-table">
+                    <thead>
+                      <tr>
+                        <th style="padding-left: 16px">Code</th>
+                        <th>Utilisations</th>
+                        <th>Note</th>
+                        <th>Expire</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody id="invites-body"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Comptes</div>
+                  <div class="lib-search-wrap">
+                    <input
+                      id="users-search"
+                      type="text"
+                      autocomplete="off"
+                      style="
+                        font-size: 12px;
+                        padding: 5px 28px 5px 10px;
+                        border: 0.5px solid var(--color-border-secondary);
+                        border-radius: var(--border-radius-md);
+                        background: var(--color-background-secondary);
+                        color: var(--color-text-primary);
+                        width: 220px;
+                      "
+                      placeholder="Rechercher un utilisateur…"
+                    />
+                    <button
+                      type="button"
+                      class="lib-search-clear"
+                      id="users-search-clear"
+                      hidden
+                      aria-label="Effacer la recherche"
+                      title="Effacer"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                <div class="card-body" style="padding: 0">
+                  <table class="users-table">
+                    <thead>
+                      <tr>
+                        <th style="padding-left: 16px">Utilisateur</th>
+                        <th>Rôle</th>
+                        <th>Statut</th>
+                        <th>Dernière connexion</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="users-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
 
-function transcodeProgressLabel(progress, traitement, statut) {
-  if (statut !== 'en_cours') return '';
-  if (!traitement || (traitement !== 'transcode' && traitement !== 'optimise')) return '';
-  const p = Number(progress);
-  if (Number.isNaN(p)) return '';
-  if (p >= 45 && p < 75) {
-    const inner = Math.round(((p - 45) / 30) * 100);
-    return `Transcodage: ${inner}%`;
-  }
-  if (p >= 75 && p < 100) return `Envoi S3… (${p}%)`;
-  return '';
-}
+          <section class="page" id="page-gpu">
+            <header class="topbar">
+              <div>
+                <div class="page-title">GPU & Système</div>
+                <div class="page-sub">Ressources locales</div>
+              </div>
+              <div class="topbar-right">
+                <div class="gpu-pill" id="gpu-pill2">
+                  <span class="dot dot-green"></span
+                  ><span id="gpu-active">GPU</span>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="stat-grid">
+                <div class="stat">
+                  <div class="stat-label">GPU</div>
+                  <div class="stat-val" style="font-size: 13px" id="g-name">
+                    —
+                  </div>
+                  <div class="stat-sub" id="g-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">VRAM</div>
+                  <div class="stat-val" id="g-vram">—</div>
+                  <div class="stat-sub" id="g-vram-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Charge GPU</div>
+                  <div class="stat-val" id="g-load">—</div>
+                  <div class="stat-sub">utilisation</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Température</div>
+                  <div class="stat-val" id="g-temp">—</div>
+                  <div class="stat-sub">°C</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Ressources en temps réel</div>
+                </div>
+                <div class="card-body">
+                  <div class="gpu-info">
+                    <div class="gpu-card">
+                      <div class="gpu-label">Charge GPU</div>
+                      <div class="gpu-val" id="b-gpu">0%</div>
+                      <div class="gpu-bar">
+                        <div
+                          class="gpu-fill"
+                          id="f-gpu"
+                          style="width: 0; background: #8b2500"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="gpu-card">
+                      <div class="gpu-label">VRAM</div>
+                      <div class="gpu-val" id="b-vram">0%</div>
+                      <div class="gpu-bar">
+                        <div
+                          class="gpu-fill"
+                          id="f-vram"
+                          style="width: 0; background: #185fa5"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="gpu-card">
+                      <div class="gpu-label">CPU</div>
+                      <div class="gpu-val" id="b-cpu">0%</div>
+                      <div class="gpu-bar">
+                        <div
+                          class="gpu-fill"
+                          id="f-cpu"
+                          style="width: 0; background: #3b6d11"
+                        ></div>
+                      </div>
+                    </div>
+                    <div class="gpu-card">
+                      <div class="gpu-label">RAM</div>
+                      <div class="gpu-val" id="b-ram">0%</div>
+                      <div class="gpu-bar">
+                        <div
+                          class="gpu-fill"
+                          id="f-ram"
+                          style="width: 0; background: #633806"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style="
+                      margin-top: 14px;
+                      padding: 12px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 12px;
+                        font-weight: 500;
+                        color: var(--color-text-primary);
+                        margin-bottom: 6px;
+                      "
+                    >
+                      Encodeur sélectionné
+                    </div>
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--color-text-secondary);
+                        line-height: 1.6;
+                      "
+                      id="enc-block"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
 
-function torrentCompletionPct(ts) {
-  const done = Number(ts.completed_bytes) || 0;
-  const total = Number(ts.total_bytes) || 0;
-  if (total <= 0) return null;
-  return Math.min(100, Math.max(0, Math.round((100 * done) / total)));
-}
+    <div class="modal-backdrop" id="modal-user">
+      <div class="modal">
+        <h3>Nouvel utilisateur</h3>
+        <input id="nu-user" placeholder="username" autocomplete="off" />
+        <input id="nu-email" placeholder="email" type="email" />
+        <input id="nu-pass" placeholder="mot de passe" type="password" />
+        <select
+          id="nu-role"
+          style="
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+          "
+        >
+          <option value="viewer">viewer</option>
+          <option value="admin">admin</option>
+        </select>
+        <div class="row">
+          <button class="btn" type="button" id="nu-cancel">Annuler</button>
+          <button class="btn btn-primary" type="button" id="nu-save">
+            Créer
+          </button>
+        </div>
+      </div>
+    </div>
 
-function torrentStatsLine(ts, source) {
-  if (source !== 'torrent' || !ts || typeof ts !== 'object') return '';
-  const pct = torrentCompletionPct(ts);
-  const done = Number(ts.completed_bytes) || 0;
-  const total = Number(ts.total_bytes) || 0;
-  let completion = '';
-  if (pct != null) {
-    completion = `Complétion: ${pct} % (${fmtBytes(done)} / ${fmtBytes(total)})`;
-  }
-  const s = ts.seeders != null ? ts.seeders : '—';
-  const l = ts.leechers != null ? ts.leechers : '—';
-  const p = ts.connections != null ? ts.connections : '—';
-  const d = fmtRate(ts.download_bps);
-  const u = fmtRate(ts.upload_bps);
-  const peers = `S: ${s} · L: ${l} · pairs: ${p} · ↓ ${d} · ↑ ${u}`;
-  return completion ? `${completion}\n${peers}` : peers;
-}
+    <div class="modal-backdrop" id="modal-invite">
+      <div class="modal">
+        <h3>Nouveau code d’invitation</h3>
+        <p class="err-msg" id="inv-err"></p>
+        <p class="success-msg" id="inv-ok"></p>
+        <label for="inv-max">Nombre max d’utilisations</label>
+        <input id="inv-max" type="number" min="1" value="1" />
+        <p class="hint">Chaque inscription réussie consomme une utilisation.</p>
+        <label for="inv-note">Note (optionnel)</label>
+        <input
+          id="inv-note"
+          type="text"
+          placeholder="ex. Famille — printemps 2026"
+          autocomplete="off"
+        />
+        <label for="inv-code">Code personnalisé (optionnel)</label>
+        <input
+          id="inv-code"
+          type="text"
+          placeholder="Vide = code généré automatiquement"
+          autocomplete="off"
+        />
+        <label for="inv-exp">Expire dans (jours, optionnel)</label>
+        <input
+          id="inv-exp"
+          type="number"
+          min="1"
+          placeholder="Laisser vide = sans expiration"
+        />
+        <div class="row">
+          <button class="btn" type="button" id="inv-cancel">Annuler</button>
+          <button class="btn btn-primary" type="button" id="inv-save">
+            Créer le code
+          </button>
+        </div>
+      </div>
+    </div>
 
-function goPage(p) {
-  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById('page-' + p).classList.add('active');
-  const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
-  if (nav) nav.classList.add('active');
-  if (p === 'pipeline') loadViewerAnnouncementAdmin();
-  if (p === 'films') loadLibrary();
-  if (p === 'users') { loadUsers(); loadInvites(); }
-  if (p === 'gpu') loadGpuOnce();
-}
+    <div class="modal-backdrop" id="modal-film">
+      <div class="modal modal-film">
+        <h3 id="fm-heading">Modifier le film</h3>
+        <p class="err-msg" id="fm-err" style="display: none"></p>
+        <input type="hidden" id="fm-id" />
+        <label for="fm-kind">Type de contenu</label>
+        <select id="fm-kind">
+          <option value="film">Film</option>
+          <option value="series_episode">Épisode de série</option>
+        </select>
+        <p class="hint">
+          Pour une série : le même <strong>titre affiché de la série</strong> sur
+          tous les épisodes les regroupe côté spectateurs (la
+          <strong>clé série</strong> peut différer si besoin). Numérotez saison et épisode.
+        </p>
+        <div id="fm-series-box" class="hidden">
+          <label for="fm-series-key">Clé série (identifiant unique)</label>
+          <input
+            id="fm-series-key"
+            type="text"
+            placeholder="ex. mon-show-2024"
+            autocomplete="off"
+          />
+          <label for="fm-series-title">Titre affiché de la série</label>
+          <input
+            id="fm-series-title"
+            type="text"
+            placeholder="ex. Mon Show"
+            autocomplete="off"
+          />
+          <label for="fm-season">Saison</label>
+          <input id="fm-season" type="number" min="0" placeholder="1" />
+          <label for="fm-episode">Épisode</label>
+          <input id="fm-episode" type="number" min="0" placeholder="1" />
+        </div>
+        <label for="fm-titre">Titre</label>
+        <input id="fm-titre" type="text" autocomplete="off" />
+        <label for="fm-titre-orig">Titre original</label>
+        <input id="fm-titre-orig" type="text" autocomplete="off" />
+        <label for="fm-annee">Année</label>
+        <input
+          id="fm-annee"
+          type="number"
+          min="1880"
+          max="2100"
+          placeholder="ex. 2024"
+        />
+        <label for="fm-realisateur">Réalisateur</label>
+        <input id="fm-realisateur" type="text" autocomplete="off" />
+        <label for="fm-genres">Genres (séparés par des virgules)</label>
+        <input
+          id="fm-genres"
+          type="text"
+          placeholder="Drame, Science-fiction"
+          autocomplete="off"
+        />
+        <label for="fm-acteurs">Acteurs (séparés par des virgules)</label>
+        <input
+          id="fm-acteurs"
+          type="text"
+          placeholder="Nom A, Nom B"
+          autocomplete="off"
+        />
+        <label for="fm-synopsis">Synopsis</label>
+        <textarea id="fm-synopsis" placeholder="Résumé…"></textarea>
+        <label for="fm-duree">Durée (minutes)</label>
+        <input id="fm-duree" type="number" min="0" placeholder="ex. 118" />
+        <label for="fm-resolution">Résolution</label>
+        <input
+          id="fm-resolution"
+          type="text"
+          placeholder="ex. 1920x1080"
+          autocomplete="off"
+        />
+        <label for="fm-langue">Langue originale</label>
+        <input
+          id="fm-langue"
+          type="text"
+          placeholder="ex. fr"
+          autocomplete="off"
+        />
+        <label for="fm-tmdb-id">ID TMDB</label>
+        <input
+          id="fm-tmdb-id"
+          type="number"
+          min="0"
+          placeholder="ex. 1054867"
+        />
+        <label for="fm-imdb-id">ID IMDb (épisode ou film, optionnel)</label>
+        <input
+          id="fm-imdb-id"
+          type="text"
+          placeholder="ex. tt0562992"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="hint" style="margin-top: -6px">
+          Format <code>tt</code> + chiffres. Utile pour l’enrichissement IMDb API et les épisodes.
+        </p>
+        <label for="fm-trailers">Bande-annonce YouTube (manuel)</label>
+        <textarea
+          id="fm-trailers"
+          rows="3"
+          placeholder="Une seule URL (https://www.youtube.com/watch?v=… ou youtu.be/…). Optionnel : Titre affiché|URL"
+        ></textarea>
+        <p class="hint">
+          S’affichent <strong>avant</strong> les vidéos récupérées via TMDB.
+          Laissez vide pour n’utiliser que TMDB. Pour
+          <a
+            href="https://www.themoviedb.org/movie/1054867-one-battle-after-another"
+            target="_blank"
+            rel="noopener"
+            >One Battle After Another</a
+          >, renseignez aussi l’ID TMDB ci-dessus.
+        </p>
+        <label for="fm-note">Note TMDB</label>
+        <input
+          id="fm-note"
+          type="text"
+          placeholder="ex. 7.8"
+          autocomplete="off"
+        />
+        <label for="fm-poster">Chemin affiche (poster_path TMDB)</label>
+        <input
+          id="fm-poster"
+          type="text"
+          placeholder="/abc.jpg ou URL"
+          autocomplete="off"
+        />
+        <div class="row">
+          <button class="btn" type="button" id="fm-cancel">Annuler</button>
+          <button class="btn btn-primary" type="button" id="fm-save">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
 
-document.querySelectorAll('.nav-item[data-page]').forEach(el => {
-  el.addEventListener('click', () => goPage(el.dataset.page));
-});
+    <div
+      class="modal-backdrop dlg-overlay"
+      id="modal-dlg-alert"
+      aria-modal="true"
+      role="alertdialog"
+      aria-labelledby="dlg-alert-title"
+    >
+      <div class="modal" role="document">
+        <h3 id="dlg-alert-title">Message</h3>
+        <p
+          id="dlg-alert-body"
+          style="
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--color-text-secondary);
+            margin: 0 0 16px;
+          "
+        ></p>
+        <div class="row">
+          <button class="btn btn-primary" type="button" id="dlg-alert-ok">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+    <div
+      class="modal-backdrop dlg-overlay"
+      id="modal-dlg-confirm"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="dlg-confirm-title"
+    >
+      <div class="modal" role="document">
+        <h3 id="dlg-confirm-title">Confirmer</h3>
+        <p
+          id="dlg-confirm-body"
+          style="
+            font-size: 13px;
+            line-height: 1.55;
+            color: var(--color-text-secondary);
+            margin: 0 0 16px;
+          "
+        ></p>
+        <div class="row">
+          <button class="btn" type="button" id="dlg-confirm-no">Annuler</button>
+          <button class="btn btn-primary" type="button" id="dlg-confirm-yes">
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
 
-async function boot() {
-  const r = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
-  if (r.status === 401) {
-    window.location.href = '/login-admin.html';
-    return;
-  }
-  const me = await r.json();
-  $('#sb-name').textContent = me.username;
-  $('#sb-role').textContent = me.role === 'admin' ? 'Administrateur' : 'Viewer';
-  $('#sb-av').textContent = initials(me.username);
-  if (me.role !== 'admin') {
-    window.location.href = '/watch/';
-    return;
-  }
-  await refreshStats();
-  await refreshQueue();
-  await refreshGpuPill();
-  await loadViewerAnnouncementAdmin();
-  setInterval(refreshStats, 8000);
-  setInterval(() => { if ($('#page-pipeline').classList.contains('active')) refreshQueue(); }, 2000);
-  setInterval(() => { if ($('#page-gpu').classList.contains('active')) loadGpuOnce(); }, 3000);
-}
+    <div
+      class="modal-backdrop dlg-overlay"
+      id="modal-dlg-imdbapi"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="dlg-imdbapi-title"
+    >
+      <div class="modal" role="document" style="max-width: 420px">
+        <h3 id="dlg-imdbapi-title">Rafraîchir via IMDb API</h3>
+        <p
+          id="dlg-imdbapi-film-label"
+          style="
+            font-size: 12px;
+            color: var(--color-text-tertiary);
+            margin: 0 0 12px;
+          "
+        ></p>
+        <label for="dlg-imdbapi-input">Identifiant IMDb</label>
+        <input
+          id="dlg-imdbapi-input"
+          type="text"
+          placeholder="ex. tt1375666"
+          autocomplete="off"
+          style="width: 100%; margin-bottom: 8px"
+        />
+        <p
+          class="hint"
+          style="
+            font-size: 12px;
+            line-height: 1.45;
+            margin: 0 0 16px;
+            color: var(--color-text-secondary);
+          "
+        >
+          Laisser vide pour une <strong>recherche automatique</strong> à partir
+          du nom du fichier sur le stockage.
+        </p>
+        <div class="row" style="justify-content: flex-end; gap: 8px">
+          <button class="btn" type="button" id="dlg-imdbapi-cancel">
+            Annuler
+          </button>
+          <button class="btn btn-primary" type="button" id="dlg-imdbapi-ok">
+            Appliquer
+          </button>
+        </div>
+      </div>
+    </div>
 
-$('#btn-logout').addEventListener('click', async () => {
-  await api('/api/auth/logout', { method: 'POST' });
-  window.location.href = '/login-admin.html';
-});
+    <script>
+      const $ = (s) => document.querySelector(s);
 
-async function loadViewerAnnouncementAdmin() {
-  const st = $('#va-status');
-  if (!st || !$('#va-message')) return;
-  try {
-    const r = await api('/api/admin/viewer-announcement');
-    if (!r.ok) {
-      st.textContent = 'Impossible de charger l’annonce.';
-      return;
-    }
-    const j = await r.json();
-    $('#va-message').value = j.message || '';
-    if (j.active && j.ends_at) {
-      const d = new Date(j.ends_at.endsWith('Z') ? j.ends_at : j.ends_at + 'Z');
-      st.textContent = Number.isNaN(d.getTime())
-        ? 'Annonce active.'
-        : 'Actif jusqu’au : ' + d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-    } else if ((j.message || '').trim()) {
-      st.textContent = 'Message enregistré mais expiré. Ré-enregistrez pour republier.';
-    } else {
-      st.textContent = 'Aucune annonce publiée.';
-    }
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    st.textContent = 'Erreur réseau.';
-  }
-}
+      /** In-app modal (no window.alert). */
+      function showAlertModal(title, message, opts = {}) {
+        const okText = opts.okText || "OK";
+        return new Promise((resolve) => {
+          const backdrop = $("#modal-dlg-alert");
+          const titleEl = $("#dlg-alert-title");
+          const bodyEl = $("#dlg-alert-body");
+          const btnOk = $("#dlg-alert-ok");
+          titleEl.textContent = title;
+          bodyEl.textContent = message;
+          bodyEl.style.whiteSpace = "pre-line";
+          btnOk.textContent = okText;
+          const finish = () => {
+            backdrop.classList.remove("show");
+            document.removeEventListener("keydown", onKey);
+            btnOk.removeEventListener("click", onOk);
+            backdrop.removeEventListener("click", onBackdrop);
+            resolve();
+          };
+          const onOk = () => finish();
+          const onBackdrop = (e) => {
+            if (e.target === backdrop) finish();
+          };
+          const onKey = (e) => {
+            if (e.key === "Escape") finish();
+          };
+          btnOk.addEventListener("click", onOk);
+          backdrop.addEventListener("click", onBackdrop);
+          document.addEventListener("keydown", onKey);
+          backdrop.classList.add("show");
+          btnOk.focus();
+        });
+      }
 
-$('#va-save').addEventListener('click', async () => {
-  const st = $('#va-status');
-  const msg = ($('#va-message').value || '').trim();
-  const hours = parseInt($('#va-hours').value, 10);
-  if (msg && (!Number.isFinite(hours) || hours < 1 || hours > 720)) {
-    st.textContent = 'Durée : entre 1 et 720 heures.';
-    return;
-  }
-  st.textContent = 'Enregistrement…';
-  try {
-    const r = await api('/api/admin/viewer-announcement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, duration_hours: Number.isFinite(hours) ? hours : 24 }),
-    });
-    if (!r.ok) {
-      let t = 'Échec';
-      try {
-        const j = await r.json();
-        if (j.detail) t = typeof j.detail === 'string' ? j.detail : t;
-      } catch (_) {}
-      st.textContent = t;
-      return;
-    }
-    await loadViewerAnnouncementAdmin();
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    st.textContent = 'Erreur réseau.';
-  }
-});
+      /** In-app confirm (no window.confirm). Resolves true if confirmed. */
+      function showConfirmModal(title, message, opts = {}) {
+        const confirmText = opts.confirmText || "Confirmer";
+        const cancelText = opts.cancelText || "Annuler";
+        return new Promise((resolve) => {
+          const backdrop = $("#modal-dlg-confirm");
+          const titleEl = $("#dlg-confirm-title");
+          const bodyEl = $("#dlg-confirm-body");
+          const btnNo = $("#dlg-confirm-no");
+          const btnYes = $("#dlg-confirm-yes");
+          titleEl.textContent = title;
+          bodyEl.textContent = message;
+          bodyEl.style.whiteSpace = "pre-line";
+          btnYes.textContent = confirmText;
+          btnNo.textContent = cancelText;
+          const cleanup = (value) => {
+            backdrop.classList.remove("show");
+            document.removeEventListener("keydown", onKey);
+            btnYes.removeEventListener("click", onYes);
+            btnNo.removeEventListener("click", onNo);
+            backdrop.removeEventListener("click", onBackdrop);
+            resolve(value);
+          };
+          const onYes = () => cleanup(true);
+          const onNo = () => cleanup(false);
+          const onBackdrop = (e) => {
+            if (e.target === backdrop) cleanup(false);
+          };
+          const onKey = (e) => {
+            if (e.key === "Escape") cleanup(false);
+          };
+          btnYes.addEventListener("click", onYes);
+          btnNo.addEventListener("click", onNo);
+          backdrop.addEventListener("click", onBackdrop);
+          document.addEventListener("keydown", onKey);
+          backdrop.classList.add("show");
+          btnNo.focus();
+        });
+      }
 
-$('#va-clear').addEventListener('click', async () => {
-  $('#va-message').value = '';
-  const st = $('#va-status');
-  st.textContent = 'Effacement…';
-  try {
-    const r = await api('/api/admin/viewer-announcement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: '', duration_hours: 24 }),
-    });
-    if (!r.ok) {
-      st.textContent = 'Échec';
-      return;
-    }
-    await loadViewerAnnouncementAdmin();
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    st.textContent = 'Erreur réseau.';
-  }
-});
+      /**
+       * Ask for optional IMDb tt id before refresh-imdbapi. Resolves null if cancelled,
+       * or { imdbTitleId: string } (empty string = auto search from filename).
+       */
+      function showImdbApiRefreshModal(filmLabel) {
+        return new Promise((resolve) => {
+          const backdrop = $("#modal-dlg-imdbapi");
+          const labelEl = $("#dlg-imdbapi-film-label");
+          const inp = $("#dlg-imdbapi-input");
+          const btnCancel = $("#dlg-imdbapi-cancel");
+          const btnOk = $("#dlg-imdbapi-ok");
+          labelEl.textContent = filmLabel ? `Fiche : ${filmLabel}` : "";
+          inp.value = "";
+          const cleanup = (value) => {
+            backdrop.classList.remove("show");
+            document.removeEventListener("keydown", onKey);
+            btnCancel.removeEventListener("click", onCancel);
+            btnOk.removeEventListener("click", onOk);
+            backdrop.removeEventListener("click", onBackdrop);
+            resolve(value);
+          };
+          const onCancel = () => cleanup(null);
+          const onOk = async () => {
+            const v = inp.value.trim();
+            if (v && !/^tt\d+$/i.test(v)) {
+              await showAlertModal(
+                "IMDb API",
+                "Format attendu : tt suivi de chiffres (ex. tt1375666).",
+              );
+              return;
+            }
+            cleanup({ imdbTitleId: v });
+          };
+          const onBackdrop = (e) => {
+            if (e.target === backdrop) cleanup(null);
+          };
+          const onKey = (e) => {
+            if (e.key === "Escape") cleanup(null);
+            if (e.key === "Enter") onOk();
+          };
+          btnCancel.addEventListener("click", onCancel);
+          btnOk.addEventListener("click", onOk);
+          backdrop.addEventListener("click", onBackdrop);
+          document.addEventListener("keydown", onKey);
+          backdrop.classList.add("show");
+          inp.focus();
+        });
+      }
 
-$('#btn-sync-s3').addEventListener('click', async () => {
-  const msg = $('#sync-s3-msg');
-  msg.textContent = 'Synchronisation…';
-  try {
-    const r = await api('/api/admin/catalog/sync-s3', { method: 'POST' });
-    if (!r.ok) {
-      let t = `Erreur ${r.status}`;
-      try {
-        const j = await r.json();
-        if (j.detail) t = typeof j.detail === 'string' ? j.detail : t;
-      } catch (_) {}
-      msg.textContent = t;
-      return;
-    }
-    const j = await r.json();
-    msg.textContent = `Créés: ${j.created}, mis à jour: ${j.updated}, clés bucket: ${j.keys_in_bucket}`;
-    await refreshStats();
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    msg.textContent = 'Échec (S3 non configuré ou erreur réseau).';
-  }
-});
+      async function api(path, opts = {}) {
+        const r = await fetch(path, {
+          credentials: "include",
+          cache: "no-store",
+          ...opts,
+        });
+        if (r.status === 401) {
+          window.location.href = "/login-admin.html";
+          throw new Error("401");
+        }
+        if (r.status === 403) {
+          let detail = "";
+          try {
+            const j = await r.clone().json();
+            detail = typeof j.detail === "string" ? j.detail : "";
+          } catch (_) {}
+          if (detail === "Admin only") {
+            window.location.href = "/watch/";
+            throw new Error("403-admin");
+          }
+        }
+        return r;
+      }
 
-/** Full invite list from last GET /api/admin/invites; table shows a filtered subset. */
-let adminInvitesCache = null;
-
-function syncInvitesSearchClearBtn() {
-  const inp = $('#invites-search');
-  const btn = $('#invites-search-clear');
-  if (!inp || !btn) return;
-  btn.hidden = !inp.value.trim();
-}
-
-function applyInvitesFilterAndRender() {
-  const rows = adminInvitesCache;
-  if (!rows) return;
-  const qRaw = ($('#invites-search') && $('#invites-search').value) || '';
-  const q = qRaw.trim().toLowerCase();
-  const filtered = !q
-    ? rows
-    : rows.filter((x) => {
-        const code = x.code != null ? String(x.code).toLowerCase() : '';
-        const note = x.note != null ? String(x.note).toLowerCase() : '';
-        const exp = x.expires_at != null ? String(x.expires_at).toLowerCase() : '';
-        const uses = `${x.uses ?? ''} / ${x.max_uses ?? ''}`.toLowerCase();
+      function initials(name) {
         return (
-          code.includes(q) ||
-          note.includes(q) ||
-          exp.includes(q) ||
-          uses.includes(q)
+          (name || "?")
+            .split(/[.\s]+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((s) => s[0].toUpperCase())
+            .join("") || "?"
         );
+      }
+
+      function fmtBytes(n) {
+        if (n == null) return "—";
+        const u = ["o", "Ko", "Mo", "Go", "To"];
+        let i = 0;
+        let x = Number(n);
+        while (x >= 1024 && i < u.length - 1) {
+          x /= 1024;
+          i++;
+        }
+        return `${x.toFixed(i ? 1 : 0)} ${u[i]}`;
+      }
+
+      function fmtRate(bps) {
+        const n = Number(bps) || 0;
+        if (n <= 0) return "0 o/s";
+        const u = ["o/s", "Ko/s", "Mo/s", "Go/s"];
+        let i = 0;
+        let x = n;
+        while (x >= 1024 && i < u.length - 1) {
+          x /= 1024;
+          i++;
+        }
+        return `${x < 10 && i > 0 ? x.toFixed(1) : Math.round(x)} ${u[i]}`;
+      }
+
+      function transcodeProgressLabel(progress, traitement, statut) {
+        if (statut !== "en_cours") return "";
+        if (
+          !traitement ||
+          (traitement !== "transcode" && traitement !== "optimise")
+        )
+          return "";
+        const p = Number(progress);
+        if (Number.isNaN(p)) return "";
+        if (p >= 45 && p < 75) {
+          const inner = Math.round(((p - 45) / 30) * 100);
+          return `Transcodage: ${inner}%`;
+        }
+        if (p >= 75 && p < 100) return `Envoi S3… (${p}%)`;
+        return "";
+      }
+
+      function torrentCompletionPct(ts) {
+        const done = Number(ts.completed_bytes) || 0;
+        const total = Number(ts.total_bytes) || 0;
+        if (total <= 0) return null;
+        return Math.min(100, Math.max(0, Math.round((100 * done) / total)));
+      }
+
+      function torrentStatsLine(ts, source) {
+        if (source !== "torrent" || !ts || typeof ts !== "object") return "";
+        const pct = torrentCompletionPct(ts);
+        const done = Number(ts.completed_bytes) || 0;
+        const total = Number(ts.total_bytes) || 0;
+        let completion = "";
+        if (pct != null) {
+          completion = `Complétion: ${pct} % (${fmtBytes(done)} / ${fmtBytes(total)})`;
+        }
+        const s = ts.seeders != null ? ts.seeders : "—";
+        const l = ts.leechers != null ? ts.leechers : "—";
+        const p = ts.connections != null ? ts.connections : "—";
+        const d = fmtRate(ts.download_bps);
+        const u = fmtRate(ts.upload_bps);
+        const peers = `S: ${s} · L: ${l} · pairs: ${p} · ↓ ${d} · ↑ ${u}`;
+        return completion ? `${completion}\n${peers}` : peers;
+      }
+
+      function goPage(p) {
+        document
+          .querySelectorAll(".page")
+          .forEach((el) => el.classList.remove("active"));
+        document
+          .querySelectorAll(".nav-item")
+          .forEach((el) => el.classList.remove("active"));
+        document.getElementById("page-" + p).classList.add("active");
+        const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
+        if (nav) nav.classList.add("active");
+        if (p === "announcement") loadViewerAnnouncementAdmin();
+        if (p === "films") loadLibrary();
+        if (p === "users") {
+          loadUsers();
+          loadInvites();
+        }
+        if (p === "gpu") loadGpuOnce();
+      }
+
+      document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
+        el.addEventListener("click", () => goPage(el.dataset.page));
       });
-  const sub = $('#invites-sub');
-  if (sub) {
-    sub.textContent = q
-      ? `${filtered.length} résultat(s) sur ${rows.length} code(s)`
-      : `${rows.length} code(s)`;
-  }
-  const tb = $('#invites-body');
-  tb.innerHTML = '';
-  filtered.forEach((x) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td style="padding-left:16px;font-family:var(--font-mono)">${x.code}</td><td>${x.uses} / ${x.max_uses}</td><td>${x.note || '—'}</td><td>${x.expires_at || '—'}</td><td><button type="button" class="action-btn danger" data-del="${x.id}">Suppr.</button></td>`;
-    tr.querySelector('button').onclick = async () => {
-      const ok = await showConfirmModal(
-        'Supprimer ce code d’invitation ?',
-        'Le code ne pourra plus être utilisé pour de nouvelles inscriptions.',
-        { confirmText: 'Supprimer', cancelText: 'Annuler' },
-      );
-      if (!ok) return;
-      await api('/api/admin/invites/' + x.id, { method: 'DELETE' });
-      loadInvites();
-    };
-    tb.appendChild(tr);
-  });
-}
 
-async function loadInvites() {
-  const r = await api('/api/admin/invites');
-  adminInvitesCache = await r.json();
-  syncInvitesSearchClearBtn();
-  applyInvitesFilterAndRender();
-}
+      async function boot() {
+        const r = await fetch("/api/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (r.status === 401) {
+          window.location.href = "/login-admin.html";
+          return;
+        }
+        const me = await r.json();
+        $("#sb-name").textContent = me.username;
+        $("#sb-role").textContent =
+          me.role === "admin" ? "Administrateur" : "Viewer";
+        $("#sb-av").textContent = initials(me.username);
+        if (me.role !== "admin") {
+          window.location.href = "/watch/";
+          return;
+        }
+        await refreshStats();
+        await refreshQueue();
+        await refreshGpuPill();
+        setInterval(refreshStats, 8000);
+        setInterval(() => {
+          if ($("#page-pipeline").classList.contains("active")) refreshQueue();
+        }, 2000);
+        setInterval(() => {
+          if ($("#page-gpu").classList.contains("active")) loadGpuOnce();
+        }, 3000);
+      }
 
-$('#invites-search').addEventListener('input', () => {
-  syncInvitesSearchClearBtn();
-  clearTimeout(window._invSearchT);
-  window._invSearchT = setTimeout(applyInvitesFilterAndRender, 250);
-});
-$('#invites-search-clear').addEventListener('click', () => {
-  const inp = $('#invites-search');
-  inp.value = '';
-  syncInvitesSearchClearBtn();
-  inp.focus();
-  clearTimeout(window._invSearchT);
-  applyInvitesFilterAndRender();
-});
+      $("#btn-logout").addEventListener("click", async () => {
+        await api("/api/auth/logout", { method: "POST" });
+        window.location.href = "/login-admin.html";
+      });
 
-function openInviteModal() {
-  $('#inv-err').style.display = 'none';
-  $('#inv-ok').style.display = 'none';
-  $('#inv-max').value = '1';
-  $('#inv-note').value = '';
-  $('#inv-code').value = '';
-  $('#inv-exp').value = '';
-  $('#modal-invite').classList.add('show');
-  $('#inv-max').focus();
-}
+      async function loadViewerAnnouncementAdmin() {
+        const st = $("#va-status");
+        if (!st || !$("#va-message")) return;
+        try {
+          const r = await api("/api/admin/viewer-announcement");
+          if (!r.ok) {
+            st.textContent = "Impossible de charger l’annonce.";
+            return;
+          }
+          const j = await r.json();
+          $("#va-message").value = j.message || "";
+          if (j.active && j.ends_at) {
+            const d = new Date(
+              j.ends_at.endsWith("Z") ? j.ends_at : j.ends_at + "Z",
+            );
+            st.textContent = Number.isNaN(d.getTime())
+              ? "Annonce active."
+              : "Actif jusqu’au : " +
+                d.toLocaleString("fr-FR", {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                });
+          } else if ((j.message || "").trim()) {
+            st.textContent =
+              "Message enregistré mais expiré. Ré-enregistrez pour republier.";
+          } else {
+            st.textContent = "Aucune annonce publiée.";
+          }
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          st.textContent = "Erreur réseau.";
+        }
+      }
 
-function closeInviteModal() {
-  $('#modal-invite').classList.remove('show');
-}
+      $("#va-save").addEventListener("click", async () => {
+        const st = $("#va-status");
+        const msg = ($("#va-message").value || "").trim();
+        const hours = parseInt($("#va-hours").value, 10);
+        if (msg && (!Number.isFinite(hours) || hours < 1 || hours > 720)) {
+          st.textContent = "Durée : entre 1 et 720 heures.";
+          return;
+        }
+        st.textContent = "Enregistrement…";
+        try {
+          const r = await api("/api/admin/viewer-announcement", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: msg,
+              duration_hours: Number.isFinite(hours) ? hours : 24,
+            }),
+          });
+          if (!r.ok) {
+            let t = "Échec";
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            st.textContent = t;
+            return;
+          }
+          await loadViewerAnnouncementAdmin();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          st.textContent = "Erreur réseau.";
+        }
+      });
 
-$('#btn-new-invite').addEventListener('click', () => openInviteModal());
+      $("#va-clear").addEventListener("click", async () => {
+        $("#va-message").value = "";
+        const st = $("#va-status");
+        st.textContent = "Effacement…";
+        try {
+          const r = await api("/api/admin/viewer-announcement", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: "", duration_hours: 24 }),
+          });
+          if (!r.ok) {
+            st.textContent = "Échec";
+            return;
+          }
+          await loadViewerAnnouncementAdmin();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          st.textContent = "Erreur réseau.";
+        }
+      });
 
-$('#inv-cancel').addEventListener('click', () => closeInviteModal());
+      $("#btn-sync-s3").addEventListener("click", async () => {
+        const msg = $("#sync-s3-msg");
+        msg.textContent = "Synchronisation…";
+        try {
+          const r = await api("/api/admin/catalog/sync-s3", { method: "POST" });
+          if (!r.ok) {
+            let t = `Erreur ${r.status}`;
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            msg.textContent = t;
+            return;
+          }
+          const j = await r.json();
+          msg.textContent = `Créés: ${j.created}, mis à jour: ${j.updated}, clés bucket: ${j.keys_in_bucket}`;
+          await refreshStats();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          msg.textContent = "Échec (S3 non configuré ou erreur réseau).";
+        }
+      });
 
-$('#modal-invite').addEventListener('click', (e) => {
-  if (e.target.id === 'modal-invite') closeInviteModal();
-});
+      /** Full invite list from last GET /api/admin/invites; table shows a filtered subset. */
+      let adminInvitesCache = null;
 
-$('#inv-save').addEventListener('click', async () => {
-  const errEl = $('#inv-err');
-  const okEl = $('#inv-ok');
-  errEl.style.display = 'none';
-  okEl.style.display = 'none';
-  const maxRaw = parseInt($('#inv-max').value, 10);
-  const maxUses = Number.isFinite(maxRaw) && maxRaw >= 1 ? maxRaw : 1;
-  const note = $('#inv-note').value.trim() || null;
-  const codeRaw = $('#inv-code').value.trim() || null;
-  const expRaw = $('#inv-exp').value.trim();
-  let expires_days = null;
-  if (expRaw) {
-    const d = parseInt(expRaw, 10);
-    if (Number.isFinite(d) && d > 0) expires_days = d;
-  }
-  const payload = { max_uses: maxUses, note, code: codeRaw, expires_days };
-  try {
-    const r = await fetch('/api/admin/invites', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (r.status === 401) {
-      window.location.href = '/login-admin.html';
-      return;
-    }
-    if (!r.ok) {
-      let msg = 'Échec de la création';
-      try {
-        const j = await r.json();
-        if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
-      } catch (_) {}
-      errEl.textContent = msg;
-      errEl.style.display = 'block';
-      return;
-    }
-    const j = await r.json();
-    okEl.textContent = 'Code créé : ' + j.code + ' (copiez-le avant de fermer)';
-    okEl.style.display = 'block';
-    loadInvites();
-  } catch (_) {
-    errEl.textContent = 'Erreur réseau';
-    errEl.style.display = 'block';
-  }
-});
+      function syncInvitesSearchClearBtn() {
+        const inp = $("#invites-search");
+        const btn = $("#invites-search-clear");
+        if (!inp || !btn) return;
+        btn.hidden = !inp.value.trim();
+      }
 
-async function refreshStats() {
-  try {
-    const r = await api('/api/films/stats');
-    if (!r.ok) return;
-    const s = await r.json();
-    $('#st-running').textContent = s.en_cours;
-    $('#st-wait').textContent = Math.max(0, s.en_cours);
-    $('#st-done').textContent = s.disponible;
-    $('#st-err').textContent = s.erreur;
-    $('#badge-lib').textContent = s.disponible;
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-  }
-}
+      function applyInvitesFilterAndRender() {
+        const rows = adminInvitesCache;
+        if (!rows) return;
+        const qRaw = ($("#invites-search") && $("#invites-search").value) || "";
+        const q = qRaw.trim().toLowerCase();
+        const filtered = !q
+          ? rows
+          : rows.filter((x) => {
+              const code = x.code != null ? String(x.code).toLowerCase() : "";
+              const note = x.note != null ? String(x.note).toLowerCase() : "";
+              const exp =
+                x.expires_at != null ? String(x.expires_at).toLowerCase() : "";
+              const uses =
+                `${x.uses ?? ""} / ${x.max_uses ?? ""}`.toLowerCase();
+              return (
+                code.includes(q) ||
+                note.includes(q) ||
+                exp.includes(q) ||
+                uses.includes(q)
+              );
+            });
+        const sub = $("#invites-sub");
+        if (sub) {
+          sub.textContent = q
+            ? `${filtered.length} résultat(s) sur ${rows.length} code(s)`
+            : `${rows.length} code(s)`;
+        }
+        const tb = $("#invites-body");
+        tb.innerHTML = "";
+        filtered.forEach((x) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td style="padding-left:16px;font-family:var(--font-mono)">${x.code}</td><td>${x.uses} / ${x.max_uses}</td><td>${x.note || "—"}</td><td>${x.expires_at || "—"}</td><td><button type="button" class="action-btn danger" data-del="${x.id}">Suppr.</button></td>`;
+          tr.querySelector("button").onclick = async () => {
+            const ok = await showConfirmModal(
+              "Supprimer ce code d’invitation ?",
+              "Le code ne pourra plus être utilisé pour de nouvelles inscriptions.",
+              { confirmText: "Supprimer", cancelText: "Annuler" },
+            );
+            if (!ok) return;
+            await api("/api/admin/invites/" + x.id, { method: "DELETE" });
+            loadInvites();
+          };
+          tb.appendChild(tr);
+        });
+      }
 
-async function refreshQueue() {
-  let r;
-  try {
-    r = await api('/api/admin/queue');
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    return;
-  }
-  if (!r.ok) return;
-  const q = await r.json();
-  const items = q.items || [];
-  $('#badge-queue').textContent = items.filter(i => i.statut === 'en_cours').length;
-  $('#queue-meta').textContent = `${items.length} élément(s)`;
-  const list = $('#queue-list');
-  list.innerHTML = '';
-  items.forEach(i => {
-    const row = document.createElement('div');
-    row.className = 'queue-item';
-    const st = i.statut;
-    const pill = st === 'erreur' ? 's-error' : (st === 'en_cours' ? 's-transcoding' : 's-waiting');
-    const label = st === 'en_cours' ? 'En cours' : (st === 'erreur' ? 'Erreur' : st);
-    let progW = Math.min(100, i.progress || 0);
-    if (i.source === 'torrent' && i.torrent_stats && typeof i.torrent_stats === 'object') {
-      const tcp = torrentCompletionPct(i.torrent_stats);
-      if (tcp != null) progW = tcp;
-    }
-    row.innerHTML = `
+      async function loadInvites() {
+        const r = await api("/api/admin/invites");
+        adminInvitesCache = await r.json();
+        syncInvitesSearchClearBtn();
+        applyInvitesFilterAndRender();
+      }
+
+      $("#invites-search").addEventListener("input", () => {
+        syncInvitesSearchClearBtn();
+        clearTimeout(window._invSearchT);
+        window._invSearchT = setTimeout(applyInvitesFilterAndRender, 250);
+      });
+      $("#invites-search-clear").addEventListener("click", () => {
+        const inp = $("#invites-search");
+        inp.value = "";
+        syncInvitesSearchClearBtn();
+        inp.focus();
+        clearTimeout(window._invSearchT);
+        applyInvitesFilterAndRender();
+      });
+
+      function openInviteModal() {
+        $("#inv-err").style.display = "none";
+        $("#inv-ok").style.display = "none";
+        $("#inv-max").value = "1";
+        $("#inv-note").value = "";
+        $("#inv-code").value = "";
+        $("#inv-exp").value = "";
+        $("#modal-invite").classList.add("show");
+        $("#inv-max").focus();
+      }
+
+      function closeInviteModal() {
+        $("#modal-invite").classList.remove("show");
+      }
+
+      $("#btn-new-invite").addEventListener("click", () => openInviteModal());
+
+      $("#inv-cancel").addEventListener("click", () => closeInviteModal());
+
+      $("#modal-invite").addEventListener("click", (e) => {
+        if (e.target.id === "modal-invite") closeInviteModal();
+      });
+
+      $("#inv-save").addEventListener("click", async () => {
+        const errEl = $("#inv-err");
+        const okEl = $("#inv-ok");
+        errEl.style.display = "none";
+        okEl.style.display = "none";
+        const maxRaw = parseInt($("#inv-max").value, 10);
+        const maxUses = Number.isFinite(maxRaw) && maxRaw >= 1 ? maxRaw : 1;
+        const note = $("#inv-note").value.trim() || null;
+        const codeRaw = $("#inv-code").value.trim() || null;
+        const expRaw = $("#inv-exp").value.trim();
+        let expires_days = null;
+        if (expRaw) {
+          const d = parseInt(expRaw, 10);
+          if (Number.isFinite(d) && d > 0) expires_days = d;
+        }
+        const payload = {
+          max_uses: maxUses,
+          note,
+          code: codeRaw,
+          expires_days,
+        };
+        try {
+          const r = await fetch("/api/admin/invites", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (r.status === 401) {
+            window.location.href = "/login-admin.html";
+            return;
+          }
+          if (!r.ok) {
+            let msg = "Échec de la création";
+            try {
+              const j = await r.json();
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            errEl.textContent = msg;
+            errEl.style.display = "block";
+            return;
+          }
+          const j = await r.json();
+          okEl.textContent =
+            "Code créé : " + j.code + " (copiez-le avant de fermer)";
+          okEl.style.display = "block";
+          loadInvites();
+        } catch (_) {
+          errEl.textContent = "Erreur réseau";
+          errEl.style.display = "block";
+        }
+      });
+
+      async function refreshStats() {
+        try {
+          const r = await api("/api/films/stats");
+          if (!r.ok) return;
+          const s = await r.json();
+          $("#st-running").textContent = s.en_cours;
+          $("#st-wait").textContent = Math.max(0, s.en_cours);
+          $("#st-done").textContent = s.disponible;
+          $("#st-err").textContent = s.erreur;
+          $("#badge-lib").textContent = s.disponible;
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+        }
+      }
+
+      async function refreshQueue() {
+        let r;
+        try {
+          r = await api("/api/admin/queue");
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const q = await r.json();
+        const items = q.items || [];
+        $("#badge-queue").textContent = items.filter(
+          (i) => i.statut === "en_cours",
+        ).length;
+        $("#queue-meta").textContent = `${items.length} élément(s)`;
+        const list = $("#queue-list");
+        list.innerHTML = "";
+        items.forEach((i) => {
+          const row = document.createElement("div");
+          row.className = "queue-item";
+          const st = i.statut;
+          const pill =
+            st === "erreur"
+              ? "s-error"
+              : st === "en_cours"
+                ? "s-transcoding"
+                : "s-waiting";
+          const label =
+            st === "en_cours" ? "En cours" : st === "erreur" ? "Erreur" : st;
+          let progW = Math.min(100, i.progress || 0);
+          if (
+            i.source === "torrent" &&
+            i.torrent_stats &&
+            typeof i.torrent_stats === "object"
+          ) {
+            const tcp = torrentCompletionPct(i.torrent_stats);
+            if (tcp != null) progW = tcp;
+          }
+          row.innerHTML = `
       <div class="qi-icon">▶</div>
       <div class="qi-info">
         <div class="qi-title"></div>
@@ -1149,73 +2502,88 @@ async function refreshQueue() {
         <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
       </div>
       <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
-    row.querySelector('.qi-title').textContent = i.filename || ('#' + i.id);
-    const tline = torrentStatsLine(i.torrent_stats, i.source);
-    const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
-    const base = i.erreur_message || (i.traitement || 'Pipeline') + ' · ' + (i.source || '');
-    const subParts = [base];
-    if (tx) subParts.push(tx);
-    if (tline) subParts.push(tline);
-    row.querySelector('.qi-sub').textContent = subParts.join('\n');
-    list.appendChild(row);
-  });
-}
+          row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
+          const tline = torrentStatsLine(i.torrent_stats, i.source);
+          const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
+          const base =
+            i.erreur_message ||
+            (i.traitement || "Pipeline") + " · " + (i.source || "");
+          const subParts = [base];
+          if (tx) subParts.push(tx);
+          if (tline) subParts.push(tline);
+          row.querySelector(".qi-sub").textContent = subParts.join("\n");
+          list.appendChild(row);
+        });
+      }
 
-async function refreshGpuPill() {
-  try {
-    const r = await api('/api/admin/system/stats');
-    const s = await r.json();
-    const enc = s.encoder || {};
-    const txt = (enc.vendor === 'cpu' ? '⚠ CPU — ' : '') + (s.gpu_label || enc.label || enc.vendor || 'GPU');
-    $('#gpu-pill-text').textContent = txt;
-    $('#gpu-active').textContent = txt;
-  } catch (_) {}
-}
+      async function refreshGpuPill() {
+        try {
+          const r = await api("/api/admin/system/stats");
+          const s = await r.json();
+          const enc = s.encoder || {};
+          const txt =
+            (enc.vendor === "cpu" ? "⚠ CPU — " : "") +
+            (s.gpu_label || enc.label || enc.vendor || "GPU");
+          $("#gpu-pill-text").textContent = txt;
+          $("#gpu-active").textContent = txt;
+        } catch (_) {}
+      }
 
-async function loadGpuOnce() {
-  const r = await api('/api/admin/system/stats');
-  const s = await r.json();
-  $('#g-name').textContent = s.gpu_label || '—';
-  $('#g-sub').textContent = (s.encoder && s.encoder.vendor) ? String(s.encoder.vendor).toUpperCase() : '';
-  $('#g-vram').textContent = s.vram_total_mb ? `${(s.vram_used_mb/1024).toFixed(1)} / ${(s.vram_total_mb/1024).toFixed(1)} GB` : '—';
-  $('#g-vram-sub').textContent = s.vram_total_mb ? 'VRAM' : 'nvidia-smi indisponible';
-  $('#g-load').textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
-  $('#g-temp').textContent = s.gpu_temp_c ? `${Math.round(s.gpu_temp_c)}°C` : '—';
-  $('#b-gpu').textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
-  $('#f-gpu').style.width = `${Math.min(100, s.gpu_util_percent || 0)}%`;
-  $('#b-vram').textContent = `${s.vram_percent || 0}%`;
-  $('#f-vram').style.width = `${Math.min(100, s.vram_percent || 0)}%`;
-  $('#b-cpu').textContent = `${s.cpu_percent || 0}%`;
-  $('#f-cpu').style.width = `${Math.min(100, s.cpu_percent || 0)}%`;
-  $('#b-ram').textContent = `${s.ram_percent || 0}%`;
-  $('#f-ram').style.width = `${Math.min(100, s.ram_percent || 0)}%`;
-  const enc = s.encoder || {};
-  const warn = enc.vendor === 'cpu' ? '⚠ Fallback CPU (lent). ' : '';
-  $('#enc-block').innerHTML = `${warn}Vendor <b>${enc.vendor || '—'}</b> — vidéo ` +
-    `<code>${enc.h264 || ''}</code> / <code>${enc.h265 || ''}</code>` +
-    (enc.hwaccel ? `<br>Hwaccel: <code>${enc.hwaccel}</code>` : '');
-  await refreshGpuPill();
-}
+      async function loadGpuOnce() {
+        const r = await api("/api/admin/system/stats");
+        const s = await r.json();
+        $("#g-name").textContent = s.gpu_label || "—";
+        $("#g-sub").textContent =
+          s.encoder && s.encoder.vendor
+            ? String(s.encoder.vendor).toUpperCase()
+            : "";
+        $("#g-vram").textContent = s.vram_total_mb
+          ? `${(s.vram_used_mb / 1024).toFixed(1)} / ${(s.vram_total_mb / 1024).toFixed(1)} GB`
+          : "—";
+        $("#g-vram-sub").textContent = s.vram_total_mb
+          ? "VRAM"
+          : "nvidia-smi indisponible";
+        $("#g-load").textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
+        $("#g-temp").textContent = s.gpu_temp_c
+          ? `${Math.round(s.gpu_temp_c)}°C`
+          : "—";
+        $("#b-gpu").textContent = `${Math.round(s.gpu_util_percent || 0)}%`;
+        $("#f-gpu").style.width = `${Math.min(100, s.gpu_util_percent || 0)}%`;
+        $("#b-vram").textContent = `${s.vram_percent || 0}%`;
+        $("#f-vram").style.width = `${Math.min(100, s.vram_percent || 0)}%`;
+        $("#b-cpu").textContent = `${s.cpu_percent || 0}%`;
+        $("#f-cpu").style.width = `${Math.min(100, s.cpu_percent || 0)}%`;
+        $("#b-ram").textContent = `${s.ram_percent || 0}%`;
+        $("#f-ram").style.width = `${Math.min(100, s.ram_percent || 0)}%`;
+        const enc = s.encoder || {};
+        const warn = enc.vendor === "cpu" ? "⚠ Fallback CPU (lent). " : "";
+        $("#enc-block").innerHTML =
+          `${warn}Vendor <b>${enc.vendor || "—"}</b> — vidéo ` +
+          `<code>${enc.h264 || ""}</code> / <code>${enc.h265 || ""}</code>` +
+          (enc.hwaccel ? `<br>Hwaccel: <code>${enc.hwaccel}</code>` : "");
+        await refreshGpuPill();
+      }
 
-function traitClass(t) {
-  if (t === 'direct') return 's-direct';
-  if (t === 'optimise') return 's-opt';
-  if (t === 'transcode') return 's-trans';
-  return 's-waiting';
-}
+      function traitClass(t) {
+        if (t === "direct") return "s-direct";
+        if (t === "optimise") return "s-opt";
+        if (t === "transcode") return "s-trans";
+        return "s-waiting";
+      }
 
-async function loadLibrary() {
-  const q = $('#lib-search').value.trim();
-  const url = '/api/admin/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
-  const r = await api(url);
-  const rows = await r.json();
-  $('#lib-sub').textContent = `${rows.length} titre(s)`;
-  const tb = $('#lib-body');
-  tb.innerHTML = '';
-  rows.forEach(f => {
-    const tr = document.createElement('tr');
-    const thumb = (f.poster_path ? '🎬' : '🎞');
-    tr.innerHTML = `
+      async function loadLibrary() {
+        const q = $("#lib-search").value.trim();
+        const url =
+          "/api/admin/films" + (q ? "?q=" + encodeURIComponent(q) : "");
+        const r = await api(url);
+        const rows = await r.json();
+        $("#lib-sub").textContent = `${rows.length} titre(s)`;
+        const tb = $("#lib-body");
+        tb.innerHTML = "";
+        rows.forEach((f) => {
+          const tr = document.createElement("tr");
+          const thumb = f.poster_path ? "🎬" : "🎞";
+          tr.innerHTML = `
       <td style="padding-left:16px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="film-thumb">${thumb}</div>
@@ -1226,310 +2594,362 @@ async function loadLibrary() {
         </div>
       </td>
       <td></td><td></td><td></td><td></td><td></td><td></td>`;
-    tr.querySelector('div[style*="font-weight:500"]').textContent = f.titre;
-    tr.querySelector('div[style*="font-size:10px"]').textContent = f.realisateur || '';
-    const tds = tr.querySelectorAll('td');
-    tds[1].textContent = f.annee ?? '—';
-    tds[2].textContent = fmtBytes(f.taille_octets);
-    tds[3].innerHTML = f.codec_video ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>` : '—';
-    const tp = f.traitement || '—';
-    tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
-    tds[5].innerHTML = `<span class="status-pill ${f.statut === 'disponible' ? 's-done' : (f.statut === 'erreur' ? 's-error' : 's-transcoding')}">${f.statut}</span>`;
-    const actions = document.createElement('div');
-    actions.className = 'film-actions';
-    const b0 = document.createElement('button');
-    b0.className = 'action-btn';
-    b0.textContent = 'Modifier';
-    b0.onclick = () => openFilmModal(f.id);
-    const b1 = document.createElement('button');
-    b1.className = 'action-btn';
-    b1.textContent = 'TMDB';
-    b1.title = 'Rafraîchir les métadonnées (TheMovieDB)';
-    b1.onclick = async () => {
-      await api(`/api/admin/films/${f.id}/refresh-tmdb`, { method: 'POST' });
-      loadLibrary();
-    };
-    const b1b = document.createElement('button');
-    b1b.className = 'action-btn';
-    b1b.textContent = 'IMDb API';
-    b1b.title = 'Rafraîchir les métadonnées (imdbapi.dev)';
-    b1b.onclick = async () => {
-      const choice = await showImdbApiRefreshModal(f.titre || '');
-      if (choice == null) return;
-      const payload = {};
-      if (choice.imdbTitleId) payload.imdb_title_id = choice.imdbTitleId;
-      const r = await api(`/api/admin/films/${f.id}/refresh-imdbapi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) {
-        let msg = 'Échec du rafraîchissement IMDb API';
-        try {
-          const j = await r.json();
-          if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
-        } catch (_) {}
-        await showAlertModal('IMDb API', msg);
-        return;
+          tr.querySelector('div[style*="font-weight:500"]').textContent =
+            f.titre;
+          tr.querySelector('div[style*="font-size:10px"]').textContent =
+            f.realisateur || "";
+          const tds = tr.querySelectorAll("td");
+          tds[1].textContent = f.annee ?? "—";
+          tds[2].textContent = fmtBytes(f.taille_octets);
+          tds[3].innerHTML = f.codec_video
+            ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>`
+            : "—";
+          const tp = f.traitement || "—";
+          tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
+          tds[5].innerHTML = `<span class="status-pill ${f.statut === "disponible" ? "s-done" : f.statut === "erreur" ? "s-error" : "s-transcoding"}">${f.statut}</span>`;
+          const actions = document.createElement("div");
+          actions.className = "film-actions";
+          const b0 = document.createElement("button");
+          b0.className = "action-btn";
+          b0.textContent = "Modifier";
+          b0.onclick = () => openFilmModal(f.id);
+          const b1 = document.createElement("button");
+          b1.className = "action-btn";
+          b1.textContent = "TMDB";
+          b1.title = "Rafraîchir les métadonnées (TheMovieDB)";
+          b1.onclick = async () => {
+            await api(`/api/admin/films/${f.id}/refresh-tmdb`, {
+              method: "POST",
+            });
+            loadLibrary();
+          };
+          const b1b = document.createElement("button");
+          b1b.className = "action-btn";
+          b1b.textContent = "IMDb API";
+          b1b.title = "Rafraîchir les métadonnées (imdbapi.dev)";
+          b1b.onclick = async () => {
+            const choice = await showImdbApiRefreshModal(f.titre || "");
+            if (choice == null) return;
+            const payload = {};
+            if (choice.imdbTitleId) payload.imdb_title_id = choice.imdbTitleId;
+            const r = await api(`/api/admin/films/${f.id}/refresh-imdbapi`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!r.ok) {
+              let msg = "Échec du rafraîchissement IMDb API";
+              try {
+                const j = await r.json();
+                if (j.detail)
+                  msg = typeof j.detail === "string" ? j.detail : msg;
+              } catch (_) {}
+              await showAlertModal("IMDb API", msg);
+              return;
+            }
+            loadLibrary();
+          };
+          const b2 = document.createElement("button");
+          b2.className = "action-btn danger";
+          b2.textContent = "Suppr.";
+          b2.onclick = async () => {
+            const ok = await showConfirmModal(
+              "Supprimer ce film ?",
+              "Le film sera retiré du catalogue. Cette action est définitive.",
+              { confirmText: "Supprimer", cancelText: "Annuler" },
+            );
+            if (!ok) return;
+            await api(`/api/films/${f.id}`, { method: "DELETE" });
+            loadLibrary();
+          };
+          actions.appendChild(b0);
+          actions.appendChild(b1);
+          actions.appendChild(b1b);
+          actions.appendChild(b2);
+          tds[6].appendChild(actions);
+          tb.appendChild(tr);
+        });
       }
-      loadLibrary();
-    };
-    const b2 = document.createElement('button');
-    b2.className = 'action-btn danger';
-    b2.textContent = 'Suppr.';
-    b2.onclick = async () => {
-      const ok = await showConfirmModal(
-        'Supprimer ce film ?',
-        'Le film sera retiré du catalogue. Cette action est définitive.',
-        { confirmText: 'Supprimer', cancelText: 'Annuler' },
-      );
-      if (!ok) return;
-      await api(`/api/films/${f.id}`, { method: 'DELETE' });
-      loadLibrary();
-    };
-    actions.appendChild(b0);
-    actions.appendChild(b1);
-    actions.appendChild(b1b);
-    actions.appendChild(b2);
-    tds[6].appendChild(actions);
-    tb.appendChild(tr);
-  });
-}
 
-function syncLibSearchClearBtn() {
-  const inp = $('#lib-search');
-  const btn = $('#lib-search-clear');
-  if (!inp || !btn) return;
-  btn.hidden = !inp.value.trim();
-}
-$('#lib-search').addEventListener('input', () => {
-  syncLibSearchClearBtn();
-  clearTimeout(window._ls);
-  window._ls = setTimeout(loadLibrary, 300);
-});
-$('#lib-search-clear').addEventListener('click', () => {
-  const inp = $('#lib-search');
-  inp.value = '';
-  syncLibSearchClearBtn();
-  inp.focus();
-  clearTimeout(window._ls);
-  loadLibrary();
-});
-syncLibSearchClearBtn();
-$('#btn-refresh-lib').addEventListener('click', async () => {
-  const b = document.getElementById('btn-refresh-lib');
-  b.classList.add('is-refreshing');
-  b.disabled = true;
-  try {
-    await loadLibrary();
-  } finally {
-    b.classList.remove('is-refreshing');
-    b.disabled = false;
-  }
-});
-$('#btn-refresh-users').addEventListener('click', async () => {
-  const b = document.getElementById('btn-refresh-users');
-  b.classList.add('is-refreshing');
-  b.disabled = true;
-  try {
-    await Promise.all([loadUsers(), loadInvites()]);
-  } finally {
-    b.classList.remove('is-refreshing');
-    b.disabled = false;
-  }
-});
+      function syncLibSearchClearBtn() {
+        const inp = $("#lib-search");
+        const btn = $("#lib-search-clear");
+        if (!inp || !btn) return;
+        btn.hidden = !inp.value.trim();
+      }
+      $("#lib-search").addEventListener("input", () => {
+        syncLibSearchClearBtn();
+        clearTimeout(window._ls);
+        window._ls = setTimeout(loadLibrary, 300);
+      });
+      $("#lib-search-clear").addEventListener("click", () => {
+        const inp = $("#lib-search");
+        inp.value = "";
+        syncLibSearchClearBtn();
+        inp.focus();
+        clearTimeout(window._ls);
+        loadLibrary();
+      });
+      syncLibSearchClearBtn();
+      $("#btn-refresh-lib").addEventListener("click", async () => {
+        const b = document.getElementById("btn-refresh-lib");
+        b.classList.add("is-refreshing");
+        b.disabled = true;
+        try {
+          await loadLibrary();
+        } finally {
+          b.classList.remove("is-refreshing");
+          b.disabled = false;
+        }
+      });
+      $("#btn-refresh-users").addEventListener("click", async () => {
+        const b = document.getElementById("btn-refresh-users");
+        b.classList.add("is-refreshing");
+        b.disabled = true;
+        try {
+          await Promise.all([loadUsers(), loadInvites()]);
+        } finally {
+          b.classList.remove("is-refreshing");
+          b.disabled = false;
+        }
+      });
 
-function splitList(s) {
-  return String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
-}
+      function splitList(s) {
+        return String(s || "")
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean);
+      }
 
-function closeFilmModal() {
-  $('#modal-film').classList.remove('show');
-}
+      function closeFilmModal() {
+        $("#modal-film").classList.remove("show");
+      }
 
-async function openFilmModal(filmId) {
-  const err = $('#fm-err');
-  err.style.display = 'none';
-  err.textContent = '';
-  $('#modal-film').classList.add('show');
-  try {
-    const r = await api('/api/admin/films/' + filmId);
-    if (!r.ok) {
-      err.textContent = 'Impossible de charger le film';
-      err.style.display = 'block';
-      return;
-    }
-    const d = await r.json();
-    $('#fm-id').value = String(d.id);
-    $('#fm-titre').value = d.titre || '';
-    $('#fm-titre-orig').value = d.titre_original || '';
-    $('#fm-annee').value = d.annee != null ? String(d.annee) : '';
-    $('#fm-realisateur').value = d.realisateur || '';
-    $('#fm-genres').value = Array.isArray(d.genres) ? d.genres.join(', ') : '';
-    $('#fm-acteurs').value = Array.isArray(d.acteurs) ? d.acteurs.join(', ') : '';
-    $('#fm-synopsis').value = d.synopsis || '';
-    $('#fm-duree').value = d.duree_min != null ? String(d.duree_min) : '';
-    $('#fm-resolution').value = d.resolution || '';
-    $('#fm-langue').value = d.langue_originale || '';
-    $('#fm-tmdb-id').value = d.tmdb_id != null ? String(d.tmdb_id) : '';
-    $('#fm-trailers').value = Array.isArray(d.trailers_manual_lines) ? d.trailers_manual_lines.join('\n') : '';
-    $('#fm-note').value = d.note_tmdb != null ? String(d.note_tmdb) : '';
-    $('#fm-poster').value = d.poster_path || '';
-    $('#fm-kind').value = d.content_kind === 'series_episode' ? 'series_episode' : 'film';
-    $('#fm-series-key').value = d.series_key || '';
-    $('#fm-series-title').value = d.series_title || '';
-    $('#fm-season').value = d.season_number != null ? String(d.season_number) : '';
-    $('#fm-episode').value = d.episode_number != null ? String(d.episode_number) : '';
-    $('#fm-series-box').classList.toggle('hidden', $('#fm-kind').value !== 'series_episode');
-    $('#fm-titre').focus();
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    err.textContent = 'Erreur réseau';
-    err.style.display = 'block';
-  }
-}
+      async function openFilmModal(filmId) {
+        const err = $("#fm-err");
+        err.style.display = "none";
+        err.textContent = "";
+        $("#modal-film").classList.add("show");
+        const heading = $("#fm-heading");
+        try {
+          const r = await api("/api/admin/films/" + filmId);
+          if (!r.ok) {
+            err.textContent = "Impossible de charger le film";
+            err.style.display = "block";
+            return;
+          }
+          const d = await r.json();
+          if (heading) {
+            heading.textContent =
+              d.content_kind === "series_episode"
+                ? "Modifier l’épisode de série"
+                : "Modifier le film";
+          }
+          $("#fm-id").value = String(d.id);
+          $("#fm-titre").value = d.titre || "";
+          $("#fm-titre-orig").value = d.titre_original || "";
+          $("#fm-annee").value = d.annee != null ? String(d.annee) : "";
+          $("#fm-realisateur").value = d.realisateur || "";
+          $("#fm-genres").value = Array.isArray(d.genres)
+            ? d.genres.join(", ")
+            : "";
+          $("#fm-acteurs").value = Array.isArray(d.acteurs)
+            ? d.acteurs.join(", ")
+            : "";
+          $("#fm-synopsis").value = d.synopsis || "";
+          $("#fm-duree").value = d.duree_min != null ? String(d.duree_min) : "";
+          $("#fm-resolution").value = d.resolution || "";
+          $("#fm-langue").value = d.langue_originale || "";
+          $("#fm-tmdb-id").value = d.tmdb_id != null ? String(d.tmdb_id) : "";
+          $("#fm-imdb-id").value = d.imdb_title_id || "";
+          $("#fm-trailers").value = Array.isArray(d.trailers_manual_lines)
+            ? d.trailers_manual_lines.join("\n")
+            : "";
+          $("#fm-note").value = d.note_tmdb != null ? String(d.note_tmdb) : "";
+          $("#fm-poster").value = d.poster_path || "";
+          $("#fm-kind").value =
+            d.content_kind === "series_episode" ? "series_episode" : "film";
+          $("#fm-series-key").value = d.series_key || "";
+          $("#fm-series-title").value = d.series_title || "";
+          $("#fm-season").value =
+            d.season_number != null ? String(d.season_number) : "";
+          $("#fm-episode").value =
+            d.episode_number != null ? String(d.episode_number) : "";
+          $("#fm-series-box").classList.toggle(
+            "hidden",
+            $("#fm-kind").value !== "series_episode",
+          );
+          $("#fm-titre").focus();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          err.textContent = "Erreur réseau";
+          err.style.display = "block";
+        }
+      }
 
-$('#fm-cancel').addEventListener('click', () => closeFilmModal());
+      $("#fm-cancel").addEventListener("click", () => closeFilmModal());
 
-$('#modal-film').addEventListener('click', (e) => {
-  if (e.target.id === 'modal-film') closeFilmModal();
-});
+      $("#modal-film").addEventListener("click", (e) => {
+        if (e.target.id === "modal-film") closeFilmModal();
+      });
 
-$('#fm-kind').addEventListener('change', () => {
-  $('#fm-series-box').classList.toggle('hidden', $('#fm-kind').value !== 'series_episode');
-});
+      $("#fm-kind").addEventListener("change", () => {
+        $("#fm-series-box").classList.toggle(
+          "hidden",
+          $("#fm-kind").value !== "series_episode",
+        );
+      });
 
-$('#fm-save').addEventListener('click', async () => {
-  const err = $('#fm-err');
-  err.style.display = 'none';
-  const id = $('#fm-id').value;
-  const titre = $('#fm-titre').value.trim();
-  if (!titre) {
-    err.textContent = 'Le titre est obligatoire';
-    err.style.display = 'block';
-    return;
-  }
-  const kind = $('#fm-kind').value;
-  if (kind === 'series_episode') {
-    if (!$('#fm-series-key').value.trim()) {
-      err.textContent = 'La clé série est obligatoire pour un épisode';
-      err.style.display = 'block';
-      return;
-    }
-    const sn = parseInt($('#fm-season').value, 10);
-    const en = parseInt($('#fm-episode').value, 10);
-    if (!Number.isFinite(sn) || sn < 0 || !Number.isFinite(en) || en < 1) {
-      err.textContent = 'Saison ≥ 0 et épisode ≥ 1 requis';
-      err.style.display = 'block';
-      return;
-    }
-  }
-  const parseOptInt = (el) => {
-    const v = el.value.trim();
-    if (v === '') return null;
-    const n = parseInt(v, 10);
-    return Number.isFinite(n) ? n : null;
-  };
-  const noteRaw = $('#fm-note').value.trim();
-  let note_tmdb = null;
-  if (noteRaw !== '') {
-    const n = parseFloat(noteRaw.replace(',', '.'));
-    if (Number.isNaN(n)) {
-      err.textContent = 'Note TMDB invalide';
-      err.style.display = 'block';
-      return;
-    }
-    note_tmdb = n;
-  }
-  const trailerLines = $('#fm-trailers').value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
-  const payload = {
-    titre,
-    titre_original: $('#fm-titre-orig').value.trim() || null,
-    annee: parseOptInt($('#fm-annee')),
-    synopsis: $('#fm-synopsis').value.trim() || null,
-    genres: splitList($('#fm-genres').value),
-    realisateur: $('#fm-realisateur').value.trim() || null,
-    acteurs: splitList($('#fm-acteurs').value),
-    note_tmdb,
-    poster_path: $('#fm-poster').value.trim() || null,
-    duree_min: parseOptInt($('#fm-duree')),
-    resolution: $('#fm-resolution').value.trim() || null,
-    langue_originale: $('#fm-langue').value.trim() || null,
-    tmdb_id: parseOptInt($('#fm-tmdb-id')),
-    trailers_manual: trailerLines,
-    content_kind: kind,
-    series_key: kind === 'series_episode' ? $('#fm-series-key').value.trim() : null,
-    series_title: kind === 'series_episode' ? ($('#fm-series-title').value.trim() || null) : null,
-    season_number: kind === 'series_episode' ? parseInt($('#fm-season').value, 10) : null,
-    episode_number: kind === 'series_episode' ? parseInt($('#fm-episode').value, 10) : null,
-  };
-  try {
-    const r = await api('/api/admin/films/' + id, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      let msg = 'Enregistrement impossible';
-      try {
-        const j = await r.json();
-        if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
-      } catch (_) {}
-      err.textContent = msg;
-      err.style.display = 'block';
-      return;
-    }
-    closeFilmModal();
-    loadLibrary();
-  } catch (e) {
-    if (e && e.message === '403-admin') return;
-    err.textContent = 'Erreur réseau';
-    err.style.display = 'block';
-  }
-});
+      $("#fm-save").addEventListener("click", async () => {
+        const err = $("#fm-err");
+        err.style.display = "none";
+        const id = $("#fm-id").value;
+        const titre = $("#fm-titre").value.trim();
+        if (!titre) {
+          err.textContent = "Le titre est obligatoire";
+          err.style.display = "block";
+          return;
+        }
+        const kind = $("#fm-kind").value;
+        if (kind === "series_episode") {
+          if (!$("#fm-series-key").value.trim()) {
+            err.textContent = "La clé série est obligatoire pour un épisode";
+            err.style.display = "block";
+            return;
+          }
+          const sn = parseInt($("#fm-season").value, 10);
+          const en = parseInt($("#fm-episode").value, 10);
+          if (
+            !Number.isFinite(sn) ||
+            sn < 0 ||
+            !Number.isFinite(en) ||
+            en < 1
+          ) {
+            err.textContent = "Saison ≥ 0 et épisode ≥ 1 requis";
+            err.style.display = "block";
+            return;
+          }
+        }
+        const parseOptInt = (el) => {
+          const v = el.value.trim();
+          if (v === "") return null;
+          const n = parseInt(v, 10);
+          return Number.isFinite(n) ? n : null;
+        };
+        const noteRaw = $("#fm-note").value.trim();
+        let note_tmdb = null;
+        if (noteRaw !== "") {
+          const n = parseFloat(noteRaw.replace(",", "."));
+          if (Number.isNaN(n)) {
+            err.textContent = "Note TMDB invalide";
+            err.style.display = "block";
+            return;
+          }
+          note_tmdb = n;
+        }
+        const trailerLines = $("#fm-trailers")
+          .value.split(/\r?\n/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const payload = {
+          titre,
+          titre_original: $("#fm-titre-orig").value.trim() || null,
+          annee: parseOptInt($("#fm-annee")),
+          synopsis: $("#fm-synopsis").value.trim() || null,
+          genres: splitList($("#fm-genres").value),
+          realisateur: $("#fm-realisateur").value.trim() || null,
+          acteurs: splitList($("#fm-acteurs").value),
+          note_tmdb,
+          poster_path: $("#fm-poster").value.trim() || null,
+          duree_min: parseOptInt($("#fm-duree")),
+          resolution: $("#fm-resolution").value.trim() || null,
+          langue_originale: $("#fm-langue").value.trim() || null,
+          tmdb_id: parseOptInt($("#fm-tmdb-id")),
+          imdb_title_id: $("#fm-imdb-id").value.trim() || null,
+          trailers_manual: trailerLines,
+          content_kind: kind,
+          series_key:
+            kind === "series_episode" ? $("#fm-series-key").value.trim() : null,
+          series_title:
+            kind === "series_episode"
+              ? $("#fm-series-title").value.trim() || null
+              : null,
+          season_number:
+            kind === "series_episode"
+              ? parseInt($("#fm-season").value, 10)
+              : null,
+          episode_number:
+            kind === "series_episode"
+              ? parseInt($("#fm-episode").value, 10)
+              : null,
+        };
+        try {
+          const r = await api("/api/admin/films/" + id, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!r.ok) {
+            let msg = "Enregistrement impossible";
+            try {
+              const j = await r.json();
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            err.textContent = msg;
+            err.style.display = "block";
+            return;
+          }
+          closeFilmModal();
+          loadLibrary();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          err.textContent = "Erreur réseau";
+          err.style.display = "block";
+        }
+      });
 
-/** Full user list from last GET /api/admin/users; table shows a filtered subset. */
-let adminUsersCache = null;
+      /** Full user list from last GET /api/admin/users; table shows a filtered subset. */
+      let adminUsersCache = null;
 
-function syncUsersSearchClearBtn() {
-  const inp = $('#users-search');
-  const btn = $('#users-search-clear');
-  if (!inp || !btn) return;
-  btn.hidden = !inp.value.trim();
-}
+      function syncUsersSearchClearBtn() {
+        const inp = $("#users-search");
+        const btn = $("#users-search-clear");
+        if (!inp || !btn) return;
+        btn.hidden = !inp.value.trim();
+      }
 
-function applyUsersFilterAndRender() {
-  const rows = adminUsersCache;
-  if (!rows) return;
-  let na = 0;
-  let nv = 0;
-  rows.forEach((u) => {
-    if (u.role === 'admin') na++;
-    else nv++;
-  });
-  $('#u-total').textContent = rows.length;
-  $('#u-adm').textContent = na;
-  $('#u-view').textContent = nv;
-  const qRaw = ($('#users-search') && $('#users-search').value) || '';
-  const q = qRaw.trim().toLowerCase();
-  const filtered = !q
-    ? rows
-    : rows.filter(
-        (u) =>
-          (u.username && String(u.username).toLowerCase().includes(q)) ||
-          (u.email && String(u.email).toLowerCase().includes(q)),
-      );
-  const sub = $('#users-sub');
-  if (sub) {
-    sub.textContent = q
-      ? `Gestion des accès — ${filtered.length} résultat(s) sur ${rows.length}`
-      : `Gestion des accès — ${rows.length} compte(s)`;
-  }
-  const tb = $('#users-body');
-  tb.innerHTML = '';
-  filtered.forEach((u) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
+      function applyUsersFilterAndRender() {
+        const rows = adminUsersCache;
+        if (!rows) return;
+        let na = 0;
+        let nv = 0;
+        rows.forEach((u) => {
+          if (u.role === "admin") na++;
+          else nv++;
+        });
+        $("#u-total").textContent = rows.length;
+        $("#u-adm").textContent = na;
+        $("#u-view").textContent = nv;
+        const qRaw = ($("#users-search") && $("#users-search").value) || "";
+        const q = qRaw.trim().toLowerCase();
+        const filtered = !q
+          ? rows
+          : rows.filter(
+              (u) =>
+                (u.username && String(u.username).toLowerCase().includes(q)) ||
+                (u.email && String(u.email).toLowerCase().includes(q)),
+            );
+        const sub = $("#users-sub");
+        if (sub) {
+          sub.textContent = q
+            ? `Gestion des accès — ${filtered.length} résultat(s) sur ${rows.length}`
+            : `Gestion des accès — ${rows.length} compte(s)`;
+        }
+        const tb = $("#users-body");
+        tb.innerHTML = "";
+        filtered.forEach((u) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
       <td style="padding-left:16px">
         <div style="display:flex;align-items:center;gap:8px">
           <div style="width:26px;height:26px;border-radius:50%;background:#8B2500;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;color:#fff;flex-shrink:0"></div>
@@ -1540,285 +2960,355 @@ function applyUsersFilterAndRender() {
         </div>
       </td>
       <td></td><td></td><td></td><td></td>`;
-    tr.querySelector('div[style*="width:26px"]').textContent = initials(u.username);
-    tr.querySelector('div[style*="font-weight:500"]').textContent = u.username;
-    tr.querySelector('div[style*="font-size:10px"]').textContent = u.email;
-    const tds = tr.querySelectorAll('td');
-    tds[1].innerHTML = `<span class="role-badge ${u.role === 'admin' ? 'role-admin' : 'role-viewer'}">${u.role}</span>`;
-    const dot = u.is_active ? '#639922' : '#BA7517';
-    tds[2].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? 'Actif' : 'Inactif'}</span>`;
-    const dc = u.derniere_connexion ? new Date(u.derniere_connexion).toLocaleString() : '—';
-    tds[3].textContent = dc;
-    const act = document.createElement('div');
-    act.className = 'film-actions';
-    const b0 = document.createElement('button');
-    b0.className = 'action-btn danger';
-    b0.textContent = 'Désactiver';
-    b0.onclick = async () => {
-      await api(`/api/admin/users/${u.id}/deactivate`, { method: 'PATCH' });
-      loadUsers();
-    };
-    const bResetInv = document.createElement('button');
-    bResetInv.className = 'action-btn';
-    bResetInv.textContent = 'Réinit. quota inv.';
-    bResetInv.title =
-      'Supprime les codes d’invitation générés par ce membre pour le mois UTC en cours ; il pourra en créer un nouveau.';
-    bResetInv.onclick = async () => {
-      const ok = await showConfirmModal(
-        'Réinitialiser le quota d’invitation ?',
-        'Quota mensuel (UTC) pour cet utilisateur : les codes qu’il a créés ce mois-ci seront retirés de la base (y compris dans la liste des invitations).',
-        { confirmText: 'Réinitialiser', cancelText: 'Annuler' },
-      );
-      if (!ok) return;
-      const r = await api(`/api/admin/users/${u.id}/reset-invite-monthly-quota`, { method: 'POST' });
-      if (!r.ok) {
-        await showAlertModal('Réinitialisation impossible', 'La demande a échoué. Réessayez ou vérifiez les logs serveur.', {
-          okText: 'Fermer',
+          tr.querySelector('div[style*="width:26px"]').textContent = initials(
+            u.username,
+          );
+          tr.querySelector('div[style*="font-weight:500"]').textContent =
+            u.username;
+          tr.querySelector('div[style*="font-size:10px"]').textContent =
+            u.email;
+          const tds = tr.querySelectorAll("td");
+          tds[1].innerHTML = `<span class="role-badge ${u.role === "admin" ? "role-admin" : "role-viewer"}">${u.role}</span>`;
+          const dot = u.is_active ? "#639922" : "#BA7517";
+          tds[2].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? "Actif" : "Inactif"}</span>`;
+          const dc = u.derniere_connexion
+            ? new Date(u.derniere_connexion).toLocaleString()
+            : "—";
+          tds[3].textContent = dc;
+          const act = document.createElement("div");
+          act.className = "film-actions";
+          const b0 = document.createElement("button");
+          b0.className = "action-btn danger";
+          b0.textContent = "Désactiver";
+          b0.onclick = async () => {
+            await api(`/api/admin/users/${u.id}/deactivate`, {
+              method: "PATCH",
+            });
+            loadUsers();
+          };
+          const bResetInv = document.createElement("button");
+          bResetInv.className = "action-btn";
+          bResetInv.textContent = "Réinit. quota inv.";
+          bResetInv.title =
+            "Supprime les codes d’invitation générés par ce membre pour le mois UTC en cours ; il pourra en créer un nouveau.";
+          bResetInv.onclick = async () => {
+            const ok = await showConfirmModal(
+              "Réinitialiser le quota d’invitation ?",
+              "Quota mensuel (UTC) pour cet utilisateur : les codes qu’il a créés ce mois-ci seront retirés de la base (y compris dans la liste des invitations).",
+              { confirmText: "Réinitialiser", cancelText: "Annuler" },
+            );
+            if (!ok) return;
+            const r = await api(
+              `/api/admin/users/${u.id}/reset-invite-monthly-quota`,
+              { method: "POST" },
+            );
+            if (!r.ok) {
+              await showAlertModal(
+                "Réinitialisation impossible",
+                "La demande a échoué. Réessayez ou vérifiez les logs serveur.",
+                {
+                  okText: "Fermer",
+                },
+              );
+              return;
+            }
+            const j = await r.json().catch(() => ({}));
+            loadUsers();
+            loadInvites();
+            await showAlertModal(
+              "Quota réinitialisé",
+              typeof j.deleted_invites === "number"
+                ? j.deleted_invites +
+                    " code(s) supprimé(s). Le membre peut générer une nouvelle invitation ce mois-ci."
+                : "Le quota a été réinitialisé.",
+              { okText: "OK" },
+            );
+          };
+          const b1 = document.createElement("button");
+          b1.className = "action-btn danger";
+          b1.textContent = "Suppr.";
+          b1.onclick = async () => {
+            const ok = await showConfirmModal(
+              "Supprimer cet utilisateur ?",
+              "Le compte et ses jetons de session seront supprimés. Cette action est définitive.",
+              { confirmText: "Supprimer", cancelText: "Annuler" },
+            );
+            if (!ok) return;
+            await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
+            loadUsers();
+          };
+          act.appendChild(b0);
+          act.appendChild(bResetInv);
+          act.appendChild(b1);
+          tds[4].appendChild(act);
+          tb.appendChild(tr);
         });
-        return;
       }
-      const j = await r.json().catch(() => ({}));
-      loadUsers();
-      loadInvites();
-      await showAlertModal(
-        'Quota réinitialisé',
-        typeof j.deleted_invites === 'number'
-          ? j.deleted_invites +
-              ' code(s) supprimé(s). Le membre peut générer une nouvelle invitation ce mois-ci.'
-          : 'Le quota a été réinitialisé.',
-        { okText: 'OK' },
+
+      async function loadUsers() {
+        const r = await api("/api/admin/users");
+        adminUsersCache = await r.json();
+        syncUsersSearchClearBtn();
+        applyUsersFilterAndRender();
+      }
+
+      $("#users-search").addEventListener("input", () => {
+        syncUsersSearchClearBtn();
+        clearTimeout(window._us);
+        window._us = setTimeout(applyUsersFilterAndRender, 250);
+      });
+      $("#users-search-clear").addEventListener("click", () => {
+        const inp = $("#users-search");
+        inp.value = "";
+        syncUsersSearchClearBtn();
+        inp.focus();
+        clearTimeout(window._us);
+        applyUsersFilterAndRender();
+      });
+
+      $("#btn-new-user").addEventListener("click", () => {
+        $("#modal-user").classList.add("show");
+      });
+      $("#nu-cancel").addEventListener("click", () => {
+        $("#modal-user").classList.remove("show");
+      });
+      $("#nu-save").addEventListener("click", async () => {
+        const body = {
+          username: $("#nu-user").value.trim(),
+          email: $("#nu-email").value.trim(),
+          password: $("#nu-pass").value,
+          role: $("#nu-role").value,
+        };
+        const r = await api("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          await showAlertModal(
+            "Création impossible",
+            "Vérifiez les données (identifiant ou e-mail déjà utilisé, etc.).",
+            { okText: "Fermer" },
+          );
+          return;
+        }
+        $("#modal-user").classList.remove("show");
+        loadUsers();
+      });
+
+      const VIDEO_UPLOAD_EXT = new Set([
+        ".mp4",
+        ".mkv",
+        ".avi",
+        ".mov",
+        ".wmv",
+        ".m4v",
+      ]);
+      function getUploadContentKind() {
+        const el = document.querySelector(
+          'input[name="ingest-content-kind"]:checked',
+        );
+        return el && el.value === "series_episode" ? "series_episode" : "film";
+      }
+      function isVideoUploadFile(f) {
+        const n = f && f.name ? f.name.toLowerCase() : "";
+        const dot = n.lastIndexOf(".");
+        return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
+      }
+
+      let uploadJobSeq = 0;
+
+      function uploadProgressListEl() {
+        return $("#upload-progress-list");
+      }
+
+      function ensureUploadListVisible() {
+        const list = uploadProgressListEl();
+        list.classList.add("is-active");
+      }
+
+      function uploadWithProgress(file) {
+        ensureUploadListVisible();
+        const id = "upload-job-" + ++uploadJobSeq;
+        const list = uploadProgressListEl();
+        const row = document.createElement("div");
+        row.className = "upload-job";
+        row.id = id;
+        const head = document.createElement("div");
+        head.className = "upload-job-head";
+        const nameEl = document.createElement("span");
+        nameEl.className = "upload-job-name";
+        nameEl.title = file.name;
+        nameEl.textContent = file.name;
+        const pctEl = document.createElement("span");
+        pctEl.className = "upload-job-pct";
+        pctEl.textContent = "0%";
+        head.appendChild(nameEl);
+        head.appendChild(pctEl);
+        const track = document.createElement("div");
+        track.className = "upload-job-track";
+        const fill = document.createElement("div");
+        fill.className = "upload-job-fill";
+        track.appendChild(fill);
+        const msgEl = document.createElement("div");
+        msgEl.className = "upload-job-msg hidden";
+        row.appendChild(head);
+        row.appendChild(track);
+        row.appendChild(msgEl);
+        list.appendChild(row);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/admin/upload");
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) {
+            pctEl.textContent = "…";
+            return;
+          }
+          const p = Math.min(100, Math.round((100 * e.loaded) / e.total));
+          fill.style.width = p + "%";
+          pctEl.textContent = p + "%";
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            fill.style.width = "100%";
+            pctEl.textContent = "100%";
+            row.classList.add("upload-job-ok");
+            refreshQueue();
+            refreshStats();
+          } else {
+            row.classList.add("upload-job-err");
+            let msg = "Échec upload (HTTP " + xhr.status + ")";
+            try {
+              const j = JSON.parse(xhr.responseText || "{}");
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            msgEl.textContent = msg;
+            msgEl.classList.remove("hidden");
+            pctEl.textContent = "—";
+          }
+        };
+        xhr.onerror = () => {
+          row.classList.add("upload-job-err");
+          msgEl.textContent = "Erreur réseau";
+          msgEl.classList.remove("hidden");
+          pctEl.textContent = "—";
+        };
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        fd.append("content_kind", getUploadContentKind());
+        xhr.send(fd);
+      }
+
+      function startVideoUploadsFromFileList(fileList) {
+        const all = Array.from(fileList || []);
+        const ok = all.filter(isVideoUploadFile);
+        const skip = all.length - ok.length;
+        ok.forEach(uploadWithProgress);
+        if (skip > 0) {
+          void showAlertModal(
+            "Fichiers ignorés",
+            skip +
+              " fichier(s) ignoré(s) : extension non prise en charge pour l’upload direct.",
+            { okText: "OK" },
+          );
+        }
+      }
+
+      $("#btn-browse").addEventListener("click", () =>
+        $("#file-input").click(),
       );
-    };
-    const b1 = document.createElement('button');
-    b1.className = 'action-btn danger';
-    b1.textContent = 'Suppr.';
-    b1.onclick = async () => {
-      const ok = await showConfirmModal(
-        'Supprimer cet utilisateur ?',
-        'Le compte et ses jetons de session seront supprimés. Cette action est définitive.',
-        { confirmText: 'Supprimer', cancelText: 'Annuler' },
+      $("#file-input").addEventListener("change", (e) => {
+        startVideoUploadsFromFileList(e.target.files);
+        e.target.value = "";
+      });
+
+      const dz = $("#drop-zone");
+      dz.addEventListener("click", () => $("#file-input").click());
+      ["dragenter", "dragover"].forEach((ev) =>
+        dz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }),
       );
-      if (!ok) return;
-      await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
-      loadUsers();
-    };
-    act.appendChild(b0);
-    act.appendChild(bResetInv);
-    act.appendChild(b1);
-    tds[4].appendChild(act);
-    tb.appendChild(tr);
-  });
-}
+      dz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        startVideoUploadsFromFileList(e.dataTransfer.files);
+      });
 
-async function loadUsers() {
-  const r = await api('/api/admin/users');
-  adminUsersCache = await r.json();
-  syncUsersSearchClearBtn();
-  applyUsersFilterAndRender();
-}
+      $("#btn-magnet").addEventListener("click", async () => {
+        const m = $("#magnet-input").value.trim();
+        if (!m.startsWith("magnet:?")) {
+          await showAlertModal(
+            "Lien magnet invalide",
+            "Collez un lien commençant par magnet:?xt=…",
+            { okText: "OK" },
+          );
+          return;
+        }
+        const r = await api("/api/admin/torrents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            magnet: m,
+            content_kind: getUploadContentKind(),
+          }),
+        });
+        if (!r.ok) {
+          await showAlertModal(
+            "Ajout impossible",
+            "Le magnet n’a pas pu être ajouté à la file.",
+            { okText: "Fermer" },
+          );
+          return;
+        }
+        refreshQueue();
+      });
 
-$('#users-search').addEventListener('input', () => {
-  syncUsersSearchClearBtn();
-  clearTimeout(window._us);
-  window._us = setTimeout(applyUsersFilterAndRender, 250);
-});
-$('#users-search-clear').addEventListener('click', () => {
-  const inp = $('#users-search');
-  inp.value = '';
-  syncUsersSearchClearBtn();
-  inp.focus();
-  clearTimeout(window._us);
-  applyUsersFilterAndRender();
-});
+      async function uploadTorrentFile(f) {
+        const fd = new FormData();
+        fd.append("torrent", f);
+        fd.append("content_kind", getUploadContentKind());
+        const r = await fetch("/api/admin/torrents/file", {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+        });
+        if (r.status === 401) window.location.href = "/login.html";
+        if (!r.ok) {
+          await showAlertModal(
+            "Envoi du .torrent impossible",
+            "Vérifiez le fichier ou réessayez.",
+            { okText: "Fermer" },
+          );
+          return;
+        }
+        refreshQueue();
+      }
 
-$('#btn-new-user').addEventListener('click', () => { $('#modal-user').classList.add('show'); });
-$('#nu-cancel').addEventListener('click', () => { $('#modal-user').classList.remove('show'); });
-$('#nu-save').addEventListener('click', async () => {
-  const body = {
-    username: $('#nu-user').value.trim(),
-    email: $('#nu-email').value.trim(),
-    password: $('#nu-pass').value,
-    role: $('#nu-role').value,
-  };
-  const r = await api('/api/admin/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) {
-    await showAlertModal('Création impossible', 'Vérifiez les données (identifiant ou e-mail déjà utilisé, etc.).', { okText: 'Fermer' });
-    return;
-  }
-  $('#modal-user').classList.remove('show');
-  loadUsers();
-});
+      const tdz = $("#torrent-drop");
+      tdz.addEventListener("click", () => $("#torrent-input").click());
+      $("#torrent-input").addEventListener("change", (e) => {
+        const f = e.target.files[0];
+        if (f) uploadTorrentFile(f);
+        e.target.value = "";
+      });
+      ["dragenter", "dragover"].forEach((ev) =>
+        tdz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }),
+      );
+      tdz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files[0];
+        if (!f) return;
+        uploadTorrentFile(f);
+      });
 
-const VIDEO_UPLOAD_EXT = new Set(['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m4v']);
-function getUploadContentKind() {
-  const el = document.querySelector('input[name="ingest-content-kind"]:checked');
-  return el && el.value === 'series_episode' ? 'series_episode' : 'film';
-}
-function isVideoUploadFile(f) {
-  const n = (f && f.name) ? f.name.toLowerCase() : '';
-  const dot = n.lastIndexOf('.');
-  return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
-}
-
-let uploadJobSeq = 0;
-
-function uploadProgressListEl() {
-  return $('#upload-progress-list');
-}
-
-function ensureUploadListVisible() {
-  const list = uploadProgressListEl();
-  list.classList.add('is-active');
-}
-
-function uploadWithProgress(file) {
-  ensureUploadListVisible();
-  const id = 'upload-job-' + (++uploadJobSeq);
-  const list = uploadProgressListEl();
-  const row = document.createElement('div');
-  row.className = 'upload-job';
-  row.id = id;
-  const head = document.createElement('div');
-  head.className = 'upload-job-head';
-  const nameEl = document.createElement('span');
-  nameEl.className = 'upload-job-name';
-  nameEl.title = file.name;
-  nameEl.textContent = file.name;
-  const pctEl = document.createElement('span');
-  pctEl.className = 'upload-job-pct';
-  pctEl.textContent = '0%';
-  head.appendChild(nameEl);
-  head.appendChild(pctEl);
-  const track = document.createElement('div');
-  track.className = 'upload-job-track';
-  const fill = document.createElement('div');
-  fill.className = 'upload-job-fill';
-  track.appendChild(fill);
-  const msgEl = document.createElement('div');
-  msgEl.className = 'upload-job-msg hidden';
-  row.appendChild(head);
-  row.appendChild(track);
-  row.appendChild(msgEl);
-  list.appendChild(row);
-
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/admin/upload');
-  xhr.withCredentials = true;
-  xhr.upload.onprogress = (e) => {
-    if (!e.lengthComputable) {
-      pctEl.textContent = '…';
-      return;
-    }
-    const p = Math.min(100, Math.round(100 * e.loaded / e.total));
-    fill.style.width = p + '%';
-    pctEl.textContent = p + '%';
-  };
-  xhr.onload = () => {
-    if (xhr.status >= 200 && xhr.status < 300) {
-      fill.style.width = '100%';
-      pctEl.textContent = '100%';
-      row.classList.add('upload-job-ok');
-      refreshQueue();
-      refreshStats();
-    } else {
-      row.classList.add('upload-job-err');
-      let msg = 'Échec upload (HTTP ' + xhr.status + ')';
-      try {
-        const j = JSON.parse(xhr.responseText || '{}');
-        if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
-      } catch (_) {}
-      msgEl.textContent = msg;
-      msgEl.classList.remove('hidden');
-      pctEl.textContent = '—';
-    }
-  };
-  xhr.onerror = () => {
-    row.classList.add('upload-job-err');
-    msgEl.textContent = 'Erreur réseau';
-    msgEl.classList.remove('hidden');
-    pctEl.textContent = '—';
-  };
-  const fd = new FormData();
-  fd.append('file', file, file.name);
-  fd.append('content_kind', getUploadContentKind());
-  xhr.send(fd);
-}
-
-function startVideoUploadsFromFileList(fileList) {
-  const all = Array.from(fileList || []);
-  const ok = all.filter(isVideoUploadFile);
-  const skip = all.length - ok.length;
-  ok.forEach(uploadWithProgress);
-  if (skip > 0) {
-    void showAlertModal(
-      'Fichiers ignorés',
-      skip + ' fichier(s) ignoré(s) : extension non prise en charge pour l’upload direct.',
-      { okText: 'OK' },
-    );
-  }
-}
-
-$('#btn-browse').addEventListener('click', () => $('#file-input').click());
-$('#file-input').addEventListener('change', (e) => {
-  startVideoUploadsFromFileList(e.target.files);
-  e.target.value = '';
-});
-
-const dz = $('#drop-zone');
-dz.addEventListener('click', () => $('#file-input').click());
-['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-dz.addEventListener('drop', (e) => {
-  e.preventDefault();
-  startVideoUploadsFromFileList(e.dataTransfer.files);
-});
-
-$('#btn-magnet').addEventListener('click', async () => {
-  const m = $('#magnet-input').value.trim();
-  if (!m.startsWith('magnet:?')) {
-    await showAlertModal('Lien magnet invalide', 'Collez un lien commençant par magnet:?xt=…', { okText: 'OK' });
-    return;
-  }
-  const r = await api('/api/admin/torrents', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ magnet: m, content_kind: getUploadContentKind() }),
-  });
-  if (!r.ok) {
-    await showAlertModal('Ajout impossible', 'Le magnet n’a pas pu être ajouté à la file.', { okText: 'Fermer' });
-    return;
-  }
-  refreshQueue();
-});
-
-async function uploadTorrentFile(f) {
-  const fd = new FormData();
-  fd.append('torrent', f);
-  fd.append('content_kind', getUploadContentKind());
-  const r = await fetch('/api/admin/torrents/file', { method: 'POST', body: fd, credentials: 'include' });
-  if (r.status === 401) window.location.href = '/login.html';
-  if (!r.ok) {
-    await showAlertModal('Envoi du .torrent impossible', 'Vérifiez le fichier ou réessayez.', { okText: 'Fermer' });
-    return;
-  }
-  refreshQueue();
-}
-
-const tdz = $('#torrent-drop');
-tdz.addEventListener('click', () => $('#torrent-input').click());
-$('#torrent-input').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) uploadTorrentFile(f);
-  e.target.value = '';
-});
-['dragenter','dragover'].forEach(ev => tdz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
-tdz.addEventListener('drop', (e) => {
-  e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (!f) return;
-  uploadTorrentFile(f);
-});
-
-boot().catch(() => { window.location.href = '/login.html'; });
-</script>
-</body>
+      boot().catch(() => {
+        window.location.href = "/login.html";
+      });
+    </script>
+  </body>
 </html>

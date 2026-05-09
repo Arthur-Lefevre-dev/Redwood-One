@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
@@ -15,6 +16,18 @@ from db.models import ContentKind, Film, FilmStatut
 _EPISODE_SUFFIX_RE = re.compile(
     r"(?i)[\s._-]*[Ss]\d{1,4}[\s._-]*[Ee]\d{1,4}[\s._-]*.*$"
 )
+
+
+def _normalize_title_string(raw: str) -> str:
+    """Case-fold, NFC, collapse spaces, strip trailing (YYYY) for stable comparisons."""
+    if not raw or not str(raw).strip():
+        return ""
+    s = unicodedata.normalize("NFC", str(raw).strip())
+    s = s.casefold()
+    s = re.sub(r"\s+", " ", s)
+    s = re.sub(r"\s*\((19|20)\d{2}\)\s*$", "", s)
+    s = re.sub(r"\s+(19|20)\d{2}\s*$", "", s)
+    return s.strip()
 
 
 def normalize_series_group_key(series_key: Optional[str]) -> str:
@@ -37,24 +50,32 @@ def normalize_series_group_key(series_key: Optional[str]) -> str:
     return sk
 
 
+def normalize_display_series_title(series_title: Optional[str]) -> str:
+    """Normalized form of the admin « titre affiché de la série » for catalog grouping."""
+    return _normalize_title_string((series_title or "").strip())
+
+
 def normalize_show_name(series_title: Optional[str], titre: Optional[str]) -> str:
     """
-    Human-facing show label for grouping episodes that share the same series title
-    even when ``series_key`` differs (e.g. duplicate TMDB ids or legacy keys).
-
-    Prefer ``series_title``; otherwise strip SxxEyy from ``titre``. Collapses whitespace,
-    lowercases, and drops a trailing ``(2005)`` or trailing year token.
+    Inferred show label when ``series_title`` is missing: strip SxxEyy from ``titre``,
+    then same folding as :func:`normalize_display_series_title`.
     """
     s = (series_title or "").strip()
     if not s:
         s = (titre or "").strip()
         s = _EPISODE_SUFFIX_RE.sub("", s)
         s = re.sub(r"[\._]+", " ", s)
-    s = s.lower()
-    s = re.sub(r"\s+", " ", s)
-    s = re.sub(r"\s*\((19|20)\d{2}\)\s*$", "", s)
-    s = re.sub(r"\s+(19|20)\d{2}\s*$", "", s)
-    return s.strip()
+    return _normalize_title_string(s)
+
+
+def series_catalog_group_key(series_title: Optional[str], titre: Optional[str]) -> str:
+    """
+    Viewer catalog bucket: same « titre affiché de la série » (``series_title``) → same group.
+    If ``series_title`` is empty, fall back to inferring from episode ``titre`` (legacy rows).
+    """
+    if (series_title or "").strip():
+        return normalize_display_series_title(series_title)
+    return normalize_show_name(None, titre)
 
 
 def name_to_series_keys_map(db: Session) -> Dict[str, Set[str]]:
@@ -72,7 +93,7 @@ def name_to_series_keys_map(db: Session) -> Dict[str, Set[str]]:
     for sk, st, tit in rows:
         if not sk:
             continue
-        nm = normalize_show_name(st, tit)
+        nm = series_catalog_group_key(st, tit)
         if nm:
             m[nm].add(sk)
     return dict(m)
@@ -114,7 +135,7 @@ def equivalent_series_keys(db: Session, series_key: str) -> List[str]:
     if not rep:
         return id_matches if id_matches else ([series_key] if series_key else [])
 
-    nm = normalize_show_name(rep.series_title, rep.titre)
+    nm = series_catalog_group_key(rep.series_title, rep.titre)
     if not nm:
         return id_matches if id_matches else ([series_key] if series_key else [])
 

@@ -8,7 +8,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
-from core.series_grouping import equivalent_series_keys, normalize_series_group_key, normalize_show_name
+from core.series_grouping import (
+    equivalent_series_keys,
+    normalize_series_group_key,
+    series_catalog_group_key,
+)
 from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
@@ -67,7 +71,7 @@ def list_series(
             )
             .scalar()
         )
-        merge_key = normalize_show_name(rep.series_title, rep.titre) or canon
+        merge_key = series_catalog_group_key(rep.series_title, rep.titre) or canon
         intermediate.append(
             {
                 "merge_key": merge_key,

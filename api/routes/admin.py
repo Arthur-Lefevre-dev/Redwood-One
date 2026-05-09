@@ -1,6 +1,7 @@
 """Admin-only routes: upload, queue, system, users, torrents."""
 
 import base64
+import re
 import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -127,6 +128,7 @@ class AdminFilmUpdateBody(BaseModel):
     resolution: Optional[str] = None
     langue_originale: Optional[str] = None
     tmdb_id: Optional[int] = None
+    imdb_title_id: Optional[str] = None
     content_kind: ContentKind = ContentKind.film
     series_key: Optional[str] = None
     series_title: Optional[str] = None
@@ -166,6 +168,14 @@ def admin_patch_film(
     if prev_tmdb_id != body.tmdb_id:
         f.trailers_tmdb_cache = None
         f.trailers_tmdb_cached_at = None
+    if "imdb_title_id" in body.model_fields_set:
+        imdb_s = (body.imdb_title_id or "").strip()
+        if imdb_s and not re.fullmatch(r"tt\d+", imdb_s, re.IGNORECASE):
+            raise HTTPException(
+                status_code=400,
+                detail="ID IMDb invalide (format attendu : tt1234567)",
+            )
+        f.imdb_title_id = imdb_s or None
     f.content_kind = body.content_kind
     if body.content_kind == ContentKind.film:
         f.series_key = None
