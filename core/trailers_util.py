@@ -5,6 +5,9 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+# Single trailer per film (watch UI, admin, and TMDB cache).
+MAX_FILM_TRAILERS = 1
+
 # YouTube video IDs are 11 chars (alphanumeric, _, -)
 _YT_ID = re.compile(r"^([a-zA-Z0-9_-]{11})$")
 _YT_PATTERNS = [
@@ -31,6 +34,13 @@ def extract_youtube_video_id(text: str) -> Optional[str]:
     return None
 
 
+def clamp_trailers(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Return at most MAX_FILM_TRAILERS entries (preserves order)."""
+    if not items:
+        return []
+    return items[:MAX_FILM_TRAILERS]
+
+
 def trailers_from_admin_lines(lines: List[str]) -> List[Dict[str, str]]:
     """
     Each line: optional title then URL or key, separated by | ; or a single URL/key.
@@ -53,6 +63,7 @@ def trailers_from_admin_lines(lines: List[str]) -> List[Dict[str, str]]:
         key = extract_youtube_video_id(rest)
         if key:
             out.append({"key": key, "name": name, "type": "Trailer"})
+            break
     return out
 
 
@@ -80,7 +91,7 @@ def trailers_from_json_column(raw: Any) -> List[Dict[str, str]]:
                 "type": str(x.get("type") or "Trailer"),
             }
         )
-    return out
+    return clamp_trailers(out)
 
 
 def merge_trailer_lists(manual: List[Dict[str, Any]], tmdb: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -99,13 +110,15 @@ def merge_trailer_lists(manual: List[Dict[str, Any]], tmdb: List[Dict[str, Any]]
                 "type": item.get("type") or "Trailer",
             }
         )
+        if len(out) >= MAX_FILM_TRAILERS:
+            break
     return out
 
 
 def trailers_to_watch_urls(items: List[Dict[str, Any]]) -> List[str]:
     """Lines for admin textarea (one full watch URL per entry, optional Title|url)."""
     lines: List[str] = []
-    for x in items:
+    for x in clamp_trailers(list(items)):
         k = x.get("key")
         if not k:
             continue

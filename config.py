@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     TMDB_API_KEY: str = ""
+    # Store /movie/{id}/videos in DB; refresh after N days (0 = fetch every film page view when API key set).
+    TMDB_TRAILERS_CACHE_DAYS: int = 7
 
     S3_ENDPOINT_URL: str = ""
     S3_ACCESS_KEY: str = ""

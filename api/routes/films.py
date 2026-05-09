@@ -10,6 +10,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, require_admin
+from config import get_settings
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import presigned_stream_url
 from core.tmdb import enrich_from_filename, movie_details, movie_trailers_youtube
@@ -68,6 +69,33 @@ def _genre_labels(genres_raw: Any) -> List[str]:
 
 def _film_genre_set(genres_raw: Any) -> set[str]:
     return {g.lower() for g in _genre_labels(genres_raw)}
+
+
+def _resolve_tmdb_trailers_cached(db: Session, f: Film) -> List[dict]:
+    """
+    Return TMDB YouTube trailer list from DB cache when fresh, else fetch videos API and persist.
+    Manual entries (trailers_manual) are merged separately; this is only the TMDB slice.
+    """
+    settings = get_settings()
+    days = max(0, settings.TMDB_TRAILERS_CACHE_DAYS)
+    need_fetch = days == 0
+    if not need_fetch:
+        if not f.trailers_tmdb_cache or not f.trailers_tmdb_cached_at:
+            need_fetch = True
+        else:
+            age_sec = (datetime.utcnow() - f.trailers_tmdb_cached_at).total_seconds()
+            if age_sec >= days * 86400:
+                need_fetch = True
+    has_key = bool((settings.TMDB_API_KEY or "").strip())
+    if need_fetch and has_key and f.tmdb_id:
+        fresh = movie_trailers_youtube(int(f.tmdb_id), limit=1)
+        f.trailers_tmdb_cache = fresh
+        f.trailers_tmdb_cached_at = datetime.utcnow()
+        db.add(f)
+        db.commit()
+        db.refresh(f)
+        return fresh
+    return trailers_from_json_column(f.trailers_tmdb_cache)
 
 
 @router.get("", response_model=List[FilmOut])
@@ -212,7 +240,7 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
     manual_trailers = trailers_from_json_column(f.trailers_manual)
     tmdb_trailers: List[dict] = []
     if f.content_kind == ContentKind.film and f.tmdb_id:
-        tmdb_trailers = movie_trailers_youtube(int(f.tmdb_id), limit=8)
+        tmdb_trailers = _resolve_tmdb_trailers_cached(db, f)
     trailers = merge_trailer_lists(manual_trailers, tmdb_trailers)
     return {
         "id": f.id,
@@ -270,5 +298,12 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
         for k, v in data.items():
             if hasattr(f, k) and v is not None:
                 setattr(f, k, v)
+    tid = f.tmdb_id
+    if tid and (get_settings().TMDB_API_KEY or "").strip():
+        f.trailers_tmdb_cache = movie_trailers_youtube(int(tid), limit=1)
+        f.trailers_tmdb_cached_at = datetime.utcnow()
+    else:
+        f.trailers_tmdb_cache = None
+        f.trailers_tmdb_cached_at = None
     db.commit()
     return {"ok": True}

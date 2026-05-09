@@ -100,7 +100,7 @@ def movie_trailers_youtube(tmdb_id: int, limit: int = 6) -> List[Dict[str, Any]]
 
     candidates.sort(key=sort_key)
     out: List[Dict[str, Any]] = []
-    lim = max(0, min(limit, 12))
+    lim = max(0, min(limit, 24))
     for v in candidates[:lim]:
         out.append(
             {

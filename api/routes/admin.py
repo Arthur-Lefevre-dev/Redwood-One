@@ -144,7 +144,11 @@ def admin_patch_film(
     f.resolution = (body.resolution or "").strip() or None
     lo = (body.langue_originale or "").strip()
     f.langue_originale = lo or None
+    prev_tmdb_id = f.tmdb_id
     f.tmdb_id = body.tmdb_id
+    if prev_tmdb_id != body.tmdb_id:
+        f.trailers_tmdb_cache = None
+        f.trailers_tmdb_cached_at = None
     f.content_kind = body.content_kind
     if body.content_kind == ContentKind.film:
         f.series_key = None

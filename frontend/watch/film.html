@@ -157,7 +157,7 @@
       </div>
     </div>
     <section class="trailers" id="trailers-block" hidden>
-      <h2 class="trailers-title">Bandes-annonces</h2>
+      <h2 class="trailers-title">Bande-annonce</h2>
       <div class="trailer-grid" id="trailers"></div>
     </section>
     <div class="player-wrap">
@@ -223,10 +223,11 @@
         const tile = document.createElement('div');
         tile.className = 'trailer-tile';
         const ifr = document.createElement('iframe');
-        ifr.loading = 'lazy';
-        ifr.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(t.key) + '?rel=0';
+        // No loading="lazy": multiple lazy iframes often stay blank until scroll; feels like "only one trailer".
+        ifr.src = 'https://www.youtube.com/embed/' + encodeURIComponent(t.key) + '?rel=0&modestbranding=1';
         ifr.title = t.name || 'Bande-annonce';
         ifr.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        ifr.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
         ifr.setAttribute('allowfullscreen', '');
         const cap = document.createElement('div');
         cap.className = 'trailer-cap';
