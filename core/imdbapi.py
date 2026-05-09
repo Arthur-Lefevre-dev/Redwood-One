@@ -180,6 +180,88 @@ def _spoken_lang(detail: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def parse_imdb_tt(raw: Optional[str]) -> Optional[str]:
+    """Return normalized ``tt123...`` or None if invalid."""
+    if raw is None or not str(raw).strip():
+        return None
+    s = str(raw).strip()
+    m = re.fullmatch(r"(tt)(\d+)", s, re.I)
+    if not m:
+        return None
+    return f"tt{m.group(2)}"
+
+
+def metadata_from_imdb_title_id(imdb_title_id: str) -> Optional[Dict[str, Any]]:
+    """Build Film field dict from ``GET /titles/{id}`` (+ credits), no search step."""
+    tid = parse_imdb_tt(imdb_title_id)
+    if not tid:
+        return None
+    detail = get_title(tid)
+    if not detail:
+        return None
+
+    cast = fetch_credits_cast(tid)
+    if len(cast) < 4:
+        for n in _stars_to_cast(detail):
+            if n not in cast:
+                cast.append(n)
+
+    g = detail.get("genres")
+    genres: List[Any] = list(g) if isinstance(g, list) else []
+
+    ay: Optional[int] = None
+    if detail.get("startYear") is not None:
+        try:
+            ay = int(detail["startYear"])
+        except (TypeError, ValueError):
+            pass
+
+    out: Dict[str, Any] = {
+        "tmdb_id": None,
+        "imdb_title_id": tid,
+        "titre": detail.get("primaryTitle"),
+        "titre_original": detail.get("originalTitle"),
+        "synopsis": detail.get("plot"),
+        "genres": genres,
+        "realisateur": _directors_line(detail),
+        "acteurs": cast,
+        "note_tmdb": _rating_value(detail),
+        "poster_path": _primary_image_url(detail),
+        "langue_originale": _spoken_lang(detail),
+        "annee": ay,
+    }
+
+    typ = (detail.get("type") or "").lower()
+    if typ == "tvepisode":
+        sn = detail.get("seasonNumber")
+        en = detail.get("episodeNumber")
+        if sn is not None:
+            try:
+                out["season_number"] = int(sn)
+            except (TypeError, ValueError):
+                pass
+        if en is not None:
+            try:
+                out["episode_number"] = int(en)
+            except (TypeError, ValueError):
+                pass
+        series_id: Optional[str] = None
+        parent = detail.get("series")
+        if isinstance(parent, dict):
+            pid = parent.get("id")
+            if pid:
+                series_id = str(pid)
+            pst = parent.get("primaryTitle") or parent.get("title")
+            if isinstance(pst, str) and pst.strip():
+                out["series_title"] = pst.strip()
+        if not series_id and detail.get("seriesId"):
+            series_id = str(detail["seriesId"])
+        if series_id and str(series_id).startswith("tt"):
+            out["series_key"] = f"imdb-{series_id}"
+
+    return out
+
+
 def enrich_movie_from_filename(filename: str) -> Dict[str, Any]:
     guess = _clean_title_guess(filename)
     m = re.search(r"\b(19|20)\d{2}\b", Path(filename).name)

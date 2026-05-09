@@ -573,6 +573,22 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
   </div>
 </div>
 
+<div class="modal-backdrop dlg-overlay" id="modal-dlg-imdbapi" aria-modal="true" role="dialog" aria-labelledby="dlg-imdbapi-title">
+  <div class="modal" role="document" style="max-width:420px">
+    <h3 id="dlg-imdbapi-title">Rafraîchir via IMDb API</h3>
+    <p id="dlg-imdbapi-film-label" style="font-size:12px;color:var(--color-text-tertiary);margin:0 0 12px"></p>
+    <label for="dlg-imdbapi-input">Identifiant IMDb</label>
+    <input id="dlg-imdbapi-input" type="text" placeholder="ex. tt1375666" autocomplete="off" style="width:100%;margin-bottom:8px" />
+    <p class="hint" style="font-size:12px;line-height:1.45;margin:0 0 16px;color:var(--color-text-secondary)">
+      Laisser vide pour une <strong>recherche automatique</strong> à partir du nom du fichier sur le stockage.
+    </p>
+    <div class="row" style="justify-content:flex-end;gap:8px">
+      <button class="btn" type="button" id="dlg-imdbapi-cancel">Annuler</button>
+      <button class="btn btn-primary" type="button" id="dlg-imdbapi-ok">Appliquer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const $ = (s) => document.querySelector(s);
 
@@ -647,6 +663,55 @@ function showConfirmModal(title, message, opts = {}) {
     document.addEventListener('keydown', onKey);
     backdrop.classList.add('show');
     btnNo.focus();
+  });
+}
+
+/**
+ * Ask for optional IMDb tt id before refresh-imdbapi. Resolves null if cancelled,
+ * or { imdbTitleId: string } (empty string = auto search from filename).
+ */
+function showImdbApiRefreshModal(filmLabel) {
+  return new Promise((resolve) => {
+    const backdrop = $('#modal-dlg-imdbapi');
+    const labelEl = $('#dlg-imdbapi-film-label');
+    const inp = $('#dlg-imdbapi-input');
+    const btnCancel = $('#dlg-imdbapi-cancel');
+    const btnOk = $('#dlg-imdbapi-ok');
+    labelEl.textContent = filmLabel ? `Fiche : ${filmLabel}` : '';
+    inp.value = '';
+    const cleanup = (value) => {
+      backdrop.classList.remove('show');
+      document.removeEventListener('keydown', onKey);
+      btnCancel.removeEventListener('click', onCancel);
+      btnOk.removeEventListener('click', onOk);
+      backdrop.removeEventListener('click', onBackdrop);
+      resolve(value);
+    };
+    const onCancel = () => cleanup(null);
+    const onOk = async () => {
+      const v = inp.value.trim();
+      if (v && !/^tt\d+$/i.test(v)) {
+        await showAlertModal(
+          'IMDb API',
+          'Format attendu : tt suivi de chiffres (ex. tt1375666).',
+        );
+        return;
+      }
+      cleanup({ imdbTitleId: v });
+    };
+    const onBackdrop = (e) => {
+      if (e.target === backdrop) cleanup(null);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') cleanup(null);
+      if (e.key === 'Enter') onOk();
+    };
+    btnCancel.addEventListener('click', onCancel);
+    btnOk.addEventListener('click', onOk);
+    backdrop.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+    backdrop.classList.add('show');
+    inp.focus();
   });
 }
 
@@ -1095,7 +1160,24 @@ async function loadLibrary() {
     b1b.textContent = 'IMDb API';
     b1b.title = 'Rafraîchir les métadonnées (imdbapi.dev)';
     b1b.onclick = async () => {
-      await api(`/api/admin/films/${f.id}/refresh-imdbapi`, { method: 'POST' });
+      const choice = await showImdbApiRefreshModal(f.titre || '');
+      if (choice == null) return;
+      const payload = {};
+      if (choice.imdbTitleId) payload.imdb_title_id = choice.imdbTitleId;
+      const r = await api(`/api/admin/films/${f.id}/refresh-imdbapi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        let msg = 'Échec du rafraîchissement IMDb API';
+        try {
+          const j = await r.json();
+          if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
+        } catch (_) {}
+        await showAlertModal('IMDb API', msg);
+        return;
+      }
       loadLibrary();
     };
     const b2 = document.createElement('button');

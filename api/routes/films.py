@@ -6,13 +6,14 @@ from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, require_admin
 from config import get_settings
+from core.imdbapi import metadata_from_imdb_title_id, parse_imdb_tt
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import delete_film_prefix, presigned_stream_url
 from core.tmdb import (
@@ -43,6 +44,12 @@ def _filename_for_enrich(f: Film) -> str:
     return f"{t}.mp4"
 
 logger = logging.getLogger(__name__)
+
+
+class RefreshImdbApiBody(BaseModel):
+    """Optional explicit IMDb id; if omitted, metadata is resolved from the file name (search)."""
+
+    imdb_title_id: Optional[str] = None
 
 
 class FilmOut(BaseModel):
@@ -381,16 +388,37 @@ def refresh_tmdb(film_id: int, db: Session = Depends(get_db), _: User = Depends(
 
 
 @router.post("/{film_id}/refresh-imdbapi")
-def refresh_imdbapi(film_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    """Re-fetch metadata from imdbapi.dev (search + title detail); ignores METADATA_PROVIDER."""
+def refresh_imdbapi(
+    film_id: int,
+    body: RefreshImdbApiBody = Body(default_factory=RefreshImdbApiBody),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Re-fetch metadata from imdbapi.dev: by ``imdb_title_id`` if sent, else search from file name."""
     f = db.get(Film, film_id)
     if not f:
         raise HTTPException(404, "Not found")
-    data = enrich_from_filename(
-        _filename_for_enrich(f),
-        f.content_kind,
-        metadata_provider="imdbapi",
-    )
+
+    raw_id = (body.imdb_title_id or "").strip()
+    if raw_id:
+        if not parse_imdb_tt(raw_id):
+            raise HTTPException(
+                status_code=400,
+                detail="Identifiant IMDb invalide (attendu : tt suivi de chiffres, ex. tt1375666).",
+            )
+        data = metadata_from_imdb_title_id(raw_id)
+        if not data:
+            raise HTTPException(
+                status_code=404,
+                detail="Titre IMDb introuvable sur imdbapi.dev pour cet identifiant.",
+            )
+    else:
+        data = enrich_from_filename(
+            _filename_for_enrich(f),
+            f.content_kind,
+            metadata_provider="imdbapi",
+        )
+
     for k, v in data.items():
         if hasattr(f, k) and v is not None:
             setattr(f, k, v)

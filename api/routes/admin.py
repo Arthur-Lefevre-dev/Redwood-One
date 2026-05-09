@@ -6,12 +6,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
+from api.routes.films import RefreshImdbApiBody, refresh_imdbapi as films_refresh_imdbapi
 from config import get_settings
 from core.catalog_sync import sync_s3_films_to_db
 from core.trailers_util import trailers_from_admin_lines, trailers_from_json_column, trailers_to_watch_urls
@@ -198,13 +199,12 @@ def admin_refresh_tmdb(
 @router.post("/films/{film_id}/refresh-imdbapi")
 def admin_refresh_imdbapi(
     film_id: int,
+    body: RefreshImdbApiBody = Body(default_factory=RefreshImdbApiBody),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     """Same as POST /api/films/{id}/refresh-imdbapi; exposed under /api/admin for the admin UI."""
-    from api.routes.films import refresh_imdbapi as films_refresh_imdbapi
-
-    return films_refresh_imdbapi(film_id, db, _)
+    return films_refresh_imdbapi(film_id, body, db, _)
 
 
 @router.post("/upload")
