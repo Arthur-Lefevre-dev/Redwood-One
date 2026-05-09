@@ -48,6 +48,16 @@ body{font-family:var(--font-sans);background:var(--color-background-tertiary);co
 .page-title{font-size:15px;font-weight:500;color:var(--color-text-primary)}
 .page-sub{font-size:12px;color:var(--color-text-tertiary);margin-top:1px}
 .topbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lib-search-wrap{position:relative;display:inline-block;vertical-align:middle}
+.lib-search-clear{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:22px;height:22px;border:none;border-radius:6px;padding:0;margin:0;
+  display:flex;align-items:center;justify-content:center;
+  background:transparent;color:var(--color-text-tertiary);
+  cursor:pointer;font-size:16px;line-height:1;font-family:var(--font-sans);
+}
+.lib-search-clear:hover{color:var(--color-text-primary);background:var(--color-background-tertiary)}
+.lib-search-clear[hidden]{display:none!important}
 .btn{font-size:12px;padding:6px 14px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
 .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-primary:hover{background:#712B13;border-color:#712B13}
@@ -295,7 +305,10 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
         </div>
         <div class="topbar-right">
           <button class="btn btn-refresh" type="button" id="btn-refresh-lib" title="Actualiser la liste"><span class="btn-refresh-glyph" aria-hidden="true">↻</span>Actualiser</button>
-          <input id="lib-search" style="font-size:12px;padding:5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:180px" placeholder="Rechercher…" />
+          <div class="lib-search-wrap">
+            <input id="lib-search" type="text" autocomplete="off" style="font-size:12px;padding:5px 28px 5px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-secondary);color:var(--color-text-primary);width:180px" placeholder="Rechercher…" />
+            <button type="button" class="lib-search-clear" id="lib-search-clear" hidden aria-label="Effacer la recherche" title="Effacer">×</button>
+          </div>
         </div>
       </header>
       <div class="content">
@@ -1012,7 +1025,26 @@ async function loadLibrary() {
   });
 }
 
-$('#lib-search').addEventListener('input', () => { clearTimeout(window._ls); window._ls = setTimeout(loadLibrary, 300); });
+function syncLibSearchClearBtn() {
+  const inp = $('#lib-search');
+  const btn = $('#lib-search-clear');
+  if (!inp || !btn) return;
+  btn.hidden = !inp.value.trim();
+}
+$('#lib-search').addEventListener('input', () => {
+  syncLibSearchClearBtn();
+  clearTimeout(window._ls);
+  window._ls = setTimeout(loadLibrary, 300);
+});
+$('#lib-search-clear').addEventListener('click', () => {
+  const inp = $('#lib-search');
+  inp.value = '';
+  syncLibSearchClearBtn();
+  inp.focus();
+  clearTimeout(window._ls);
+  loadLibrary();
+});
+syncLibSearchClearBtn();
 $('#btn-refresh-lib').addEventListener('click', async () => {
   const b = document.getElementById('btn-refresh-lib');
   b.classList.add('is-refreshing');
