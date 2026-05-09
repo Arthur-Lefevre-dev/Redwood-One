@@ -9,15 +9,27 @@
     :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; }
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
-    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;gap:16px;flex-wrap:wrap}
     .brand{font-weight:700;color:var(--accent);letter-spacing:0.02em}
+    .nav-mid{flex:1;display:flex;justify-content:center;min-width:200px;max-width:420px}
+    .nav-search{width:100%;padding:9px 14px;border-radius:999px;border:1px solid #333;background:#111;color:#fff;font-size:14px}
+    .nav-search::placeholder{color:#666}
     nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
     nav a:hover{color:#fff}
     .hero{margin:24px 28px;padding:48px;border-radius:16px;background:linear-gradient(120deg,#1a0a0a,#0a0a0a);border:1px solid #222;min-height:220px;display:flex;flex-direction:column;justify-content:flex-end}
     .hero h1{font-size:2rem;margin-bottom:8px}
     .hero p{color:var(--muted);max-width:560px;line-height:1.5}
-    .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px}
+    .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px;flex-wrap:wrap;gap:10px}
     .row-head h2{font-size:1rem;color:#ddd}
+    .row-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn-pick{padding:8px 14px;border-radius:999px;border:1px solid var(--accent);background:transparent;color:#fca5a5;font-size:13px;cursor:pointer;font-weight:600}
+    .btn-pick:hover{background:rgba(139,37,0,.2)}
+    .btn-save-tastes{padding:8px 14px;border-radius:999px;border:1px solid #444;background:#1a1a1a;color:#ccc;font-size:12px;cursor:pointer}
+    .tastes{margin:0 28px 20px;padding:16px;border-radius:12px;border:1px solid #2a2a2a;background:#111}
+    .tastes h3{font-size:13px;color:#888;margin-bottom:10px;font-weight:600}
+    .taste-grid{display:flex;flex-wrap:wrap;gap:8px}
+    .taste-grid label{font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #333;background:#161616}
+    .taste-grid input{accent-color:var(--accent)}
     .row-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 28px 28px;scroll-snap-type:x mandatory}
     .card{flex:0 0 160px;scroll-snap-align:start;background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer}
     .card img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:#222}
@@ -28,6 +40,9 @@
 <body>
   <nav>
     <div class="brand">Redwood Plus</div>
+    <div class="nav-mid">
+      <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher un film…" autocomplete="off" />
+    </div>
     <div>
       <a href="/watch/">Accueil</a>
       <a href="/watch/categories.html">Catégories</a>
@@ -38,6 +53,18 @@
     <h1 id="hero-title">Chargement…</h1>
     <p id="hero-desc"></p>
   </section>
+  <div class="row-head">
+    <h2 id="latest-head">Derniers ajouts</h2>
+    <div class="row-actions">
+      <button type="button" class="btn-pick" id="btn-surprise">Choisir pour moi</button>
+      <button type="button" class="btn-save-tastes" id="btn-save-tastes">Enregistrer mes goûts</button>
+    </div>
+  </div>
+  <div class="row-scroll" id="row-latest"></div>
+  <section class="tastes" id="tastes-wrap">
+    <h3>Mes genres préférés (pour « Choisir pour moi »)</h3>
+    <div class="taste-grid" id="taste-grid"></div>
+  </section>
   <div class="row-head"><h2>Tendances</h2></div>
   <div class="row-scroll" id="row-featured"></div>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
@@ -45,12 +72,85 @@
   <script>
     document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
 
+    function renderCards(container, list) {
+      container.innerHTML = '';
+      list.forEach(f => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.onclick = () => location.href = '/watch/film.html?id=' + f.id;
+        const img = f.poster_path ? posterUrl(f.poster_path) : '';
+        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
+        el.querySelector('.t').textContent = f.titre;
+        container.appendChild(el);
+      });
+    }
+
+    let searchTimer;
+    document.getElementById('nav-q').addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(async () => {
+        const q = document.getElementById('nav-q').value.trim();
+        const url = '/api/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
+        const r = await api(url);
+        const rows = await r.json();
+        const row = document.getElementById('row-latest');
+        document.getElementById('latest-head').textContent =
+          q ? ('Résultats : « ' + q + ' »') : 'Derniers ajouts';
+        renderCards(row, rows.slice(0, 24));
+      }, 280);
+    });
+
+    document.getElementById('btn-surprise').addEventListener('click', async () => {
+      try {
+        const r = await api('/api/films/surprise-me');
+        const f = await r.json();
+        location.href = '/watch/film.html?id=' + f.id;
+      } catch (_) {}
+    });
+
+    document.getElementById('btn-save-tastes').addEventListener('click', async () => {
+      const boxes = document.querySelectorAll('#taste-grid input:checked');
+      const genres = Array.from(boxes).map(b => b.value);
+      await api('/api/auth/me/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorite_genres: genres }),
+      });
+      document.getElementById('btn-save-tastes').textContent = 'Enregistré ✓';
+      setTimeout(() => { document.getElementById('btn-save-tastes').textContent = 'Enregistrer mes goûts'; }, 2000);
+    });
+
     async function boot() {
-      await api('/api/auth/me');
-      const fr = await api('/api/films/featured');
+      const meR = await api('/api/auth/me');
+      const me = await meR.json();
+      const prefs = (me.preferences && me.preferences.favorite_genres) ? me.preferences.favorite_genres : [];
+
+      const [fr, lr, gr] = await Promise.all([
+        api('/api/films/featured'),
+        api('/api/films/latest?limit=16'),
+        api('/api/films/genres-summary'),
+      ]);
       const featured = await fr.json();
-      const row = document.getElementById('row-featured');
-      row.innerHTML = '';
+      const latest = await lr.json();
+      const genres = await gr.json();
+
+      const gEl = document.getElementById('taste-grid');
+      gEl.innerHTML = '';
+      genres.slice(0, 18).forEach(g => {
+        const lab = document.createElement('label');
+        const inp = document.createElement('input');
+        inp.type = 'checkbox';
+        inp.value = g.name;
+        if (prefs.includes(g.name)) inp.checked = true;
+        lab.appendChild(inp);
+        lab.appendChild(document.createTextNode(' ' + g.name + ' '));
+        const sp = document.createElement('span');
+        sp.style.opacity = '0.5';
+        sp.textContent = '(' + g.count + ')';
+        lab.appendChild(sp);
+        gEl.appendChild(lab);
+      });
+
       if (featured.length) {
         const h = featured[0];
         document.getElementById('hero-title').textContent = h.titre;
@@ -59,17 +159,11 @@
         document.getElementById('hero').onclick = () => location.href = '/watch/film.html?id=' + h.id;
       } else {
         document.getElementById('hero-title').textContent = 'Bienvenue';
-        document.getElementById('hero-desc').textContent = 'Ajoutez des films depuis l’administration.';
+        document.getElementById('hero-desc').textContent = 'Découvrez le catalogue ou demandez un titre au hasard selon vos goûts.';
       }
-      featured.forEach(f => {
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.onclick = () => location.href = '/watch/film.html?id=' + f.id;
-        const img = f.poster_path ? posterUrl(f.poster_path) : '';
-        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
-        el.querySelector('.t').textContent = f.titre;
-        row.appendChild(el);
-      });
+
+      renderCards(document.getElementById('row-latest'), latest);
+      renderCards(document.getElementById('row-featured'), featured);
     }
     boot().catch(() => { location.href = '/login.html'; });
   </script>

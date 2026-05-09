@@ -60,8 +60,8 @@
 </head>
 <body>
   <div class="card">
-    <h1>Redwood Plus</h1>
-    <p class="sub">Connectez-vous pour continuer</p>
+    <h1>Espace spectateur</h1>
+    <p class="sub">Connexion pour regarder le catalogue</p>
     <form id="f">
       <label for="u">Identifiant</label>
       <input id="u" name="username" autocomplete="username" required />
@@ -70,7 +70,10 @@
       <button type="submit">Se connecter</button>
     </form>
     <p class="err" id="err"></p>
-    <p class="links"><a href="/watch/">Accéder au visionnage</a></p>
+    <p class="links">
+      <a href="/register.html">Créer un compte</a>
+      · <a href="/login-admin.html">Administration</a>
+    </p>
   </div>
   <script>
     document.getElementById('f').addEventListener('submit', async (e) => {
@@ -94,7 +97,7 @@
       }
       const j = await r.json();
       if (j.role === 'admin') {
-        window.location.href = '/admin/';
+        window.location.href = '/login-admin.html';
       } else {
         window.location.href = '/watch/';
       }

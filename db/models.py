@@ -56,6 +56,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     derniere_connexion: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Viewer tastes: { "favorite_genres": ["Drame", "Action"] } for "surprise me" picks
+    preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
@@ -110,3 +112,15 @@ class Film(Base):
     pipeline_progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # Live BitTorrent stats while aria2 downloads (seeders, leechers, bps, …)
     torrent_stats: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+
+
+class InvitationCode(Base):
+    __tablename__ = "invitation_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    max_uses: Mapped[int] = mapped_column(Integer, default=1)
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

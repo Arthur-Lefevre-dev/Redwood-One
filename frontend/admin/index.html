@@ -184,6 +184,16 @@ body{font-family:var(--font-sans);background:var(--color-background-tertiary)}
           <div class="stat"><div class="stat-label">Erreurs</div><div class="stat-val" id="st-err" style="color:var(--color-text-danger)">0</div><div class="stat-sub">à traiter</div></div>
         </div>
         <div class="card">
+          <div class="card-head">
+            <div class="card-title">Synchroniser le stockage S3</div>
+            <button class="btn btn-primary" type="button" id="btn-sync-s3">Importer les objets films/*</button>
+          </div>
+          <div class="card-body" style="font-size:12px;color:var(--color-text-secondary);line-height:1.55">
+            Parcourt le bucket (préfixe <code>films/&lt;id&gt;/</code>) et crée ou met à jour les fiches <strong>disponibles</strong> pour les spectateurs.
+            <span id="sync-s3-msg" style="display:block;margin-top:8px;color:var(--color-text-tertiary)"></span>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><div class="card-title">Ajouter un film</div></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -274,6 +284,26 @@ body{font-family:var(--font-sans);background:var(--color-background-tertiary)}
           <div class="stat"><div class="stat-label">Viewers</div><div class="stat-val" id="u-view">0</div></div>
         </div>
         <div class="card">
+          <div class="card-head">
+            <div class="card-title">Codes d’invitation</div>
+            <button class="btn btn-primary" type="button" id="btn-new-invite">+ Code</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th style="padding-left:16px">Code</th>
+                  <th>Utilisations</th>
+                  <th>Note</th>
+                  <th>Expire</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="invites-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
           <div class="card-head"><div class="card-title">Comptes</div></div>
           <div class="card-body" style="padding:0">
             <table class="users-table">
@@ -354,7 +384,7 @@ const $ = (s) => document.querySelector(s);
 async function api(path, opts = {}) {
   const r = await fetch(path, { credentials: 'include', ...opts });
   if (r.status === 401) {
-    window.location.href = '/login.html';
+    window.location.href = '/login-admin.html';
     throw new Error('401');
   }
   return r;
@@ -428,7 +458,7 @@ function goPage(p) {
   const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
   if (nav) nav.classList.add('active');
   if (p === 'films') loadLibrary();
-  if (p === 'users') loadUsers();
+  if (p === 'users') { loadUsers(); loadInvites(); }
   if (p === 'gpu') loadGpuOnce();
 }
 
@@ -456,7 +486,51 @@ async function boot() {
 
 $('#btn-logout').addEventListener('click', async () => {
   await api('/api/auth/logout', { method: 'POST' });
-  window.location.href = '/login.html';
+  window.location.href = '/login-admin.html';
+});
+
+$('#btn-sync-s3').addEventListener('click', async () => {
+  const msg = $('#sync-s3-msg');
+  msg.textContent = 'Synchronisation…';
+  try {
+    const r = await api('/api/admin/catalog/sync-s3', { method: 'POST' });
+    const j = await r.json();
+    msg.textContent = `Créés: ${j.created}, mis à jour: ${j.updated}, clés bucket: ${j.keys_in_bucket}`;
+    await refreshStats();
+  } catch (e) {
+    msg.textContent = 'Échec (S3 non configuré ou erreur réseau).';
+  }
+});
+
+async function loadInvites() {
+  const r = await api('/api/admin/invites');
+  const rows = await r.json();
+  const tb = $('#invites-body');
+  tb.innerHTML = '';
+  rows.forEach((x) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="padding-left:16px;font-family:var(--font-mono)">${x.code}</td><td>${x.uses} / ${x.max_uses}</td><td>${x.note || '—'}</td><td>${x.expires_at || '—'}</td><td><button type="button" class="action-btn danger" data-del="${x.id}">Suppr.</button></td>`;
+    tr.querySelector('button').onclick = async () => {
+      if (!confirm('Supprimer ce code ?')) return;
+      await api('/api/admin/invites/' + x.id, { method: 'DELETE' });
+      loadInvites();
+    };
+    tb.appendChild(tr);
+  });
+}
+
+$('#btn-new-invite').addEventListener('click', async () => {
+  const max = prompt('Nombre max d’utilisations (défaut 1)', '1');
+  const note = prompt('Note (optionnel)', '') || '';
+  const m = max ? parseInt(max, 10) : 1;
+  const r = await api('/api/admin/invites', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ max_uses: Number.isFinite(m) ? m : 1, note: note || null }),
+  });
+  const j = await r.json();
+  alert('Code créé : ' + j.code);
+  loadInvites();
 });
 
 async function refreshStats() {

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inscription — Redwood Plus</title>
+  <style>
+    :root { --bg:#0a0a0a; --card:#141414; --border:#2a2a2a; --text:#f5f5f5; --muted:#a3a3a3; --accent:#8B2500; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:grid; place-items:center; padding:24px; }
+    .card { width:min(420px,100%); background:var(--card); border:1px solid var(--border); border-radius:12px; padding:28px; }
+    h1 { font-size:1.25rem; margin-bottom:4px; }
+    .sub { color:var(--muted); font-size:.85rem; margin-bottom:22px; line-height:1.5; }
+    label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
+    input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:#0f0f0f; color:var(--text); margin-bottom:14px; }
+    button { width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; margin-top:6px; }
+    .err { color:#f87171; font-size:.85rem; margin-top:10px; display:none; }
+    .ok { color:#86efac; font-size:.85rem; margin-top:10px; display:none; }
+    .links { margin-top:18px; font-size:.85rem; color:var(--muted); text-align:center; }
+    a { color:#fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Créer un compte</h1>
+    <p class="sub">Un code d’invitation fourni par un administrateur est requis (sauf si l’instance est en mode ouvert).</p>
+    <form id="f">
+      <label for="code">Code d’invitation</label>
+      <input id="code" name="invite" autocomplete="off" placeholder="Ex. A1B2C3D4E5" />
+      <label for="u">Identifiant</label>
+      <input id="u" name="username" autocomplete="username" required minlength="2" />
+      <label for="e">E-mail</label>
+      <input id="e" name="email" type="email" autocomplete="email" required />
+      <label for="p">Mot de passe</label>
+      <input id="p" name="password" type="password" autocomplete="new-password" required minlength="6" />
+      <button type="submit">S’inscrire</button>
+    </form>
+    <p class="err" id="err"></p>
+    <p class="ok" id="ok">Compte créé. Redirection…</p>
+    <p class="links"><a href="/login.html">Déjà un compte ? Connexion</a></p>
+  </div>
+  <script>
+    document.getElementById('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      document.getElementById('err').style.display = 'none';
+      document.getElementById('ok').style.display = 'none';
+      const code = document.getElementById('code').value.trim();
+      const body = {
+        username: document.getElementById('u').value.trim(),
+        email: document.getElementById('e').value.trim(),
+        password: document.getElementById('p').value,
+        invite_code: code || null,
+      };
+      const r = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        let msg = 'Inscription refusée';
+        const d = j.detail;
+        if (typeof d === 'string') msg = d;
+        else if (Array.isArray(d)) msg = d.map((x) => x.msg || x).join(' ');
+        document.getElementById('err').textContent = msg;
+        document.getElementById('err').style.display = 'block';
+        return;
+      }
+      document.getElementById('ok').style.display = 'block';
+      setTimeout(() => { window.location.href = '/login.html'; }, 800);
+    });
+  </script>
+</body>
+</html>

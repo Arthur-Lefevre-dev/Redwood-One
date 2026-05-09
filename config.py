@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # GPU: auto | amd | nvidia | intel | cpu — "amd" forces VAAPI if /dev/dri + ffmpeg vaapi (see docker-compose /dev/dri)
     REDWOOD_GPU_VENDOR: str = ""
 
+    # If True, POST /api/auth/register accepts users without an invite code (dev only).
+    REGISTRATION_OPEN: bool = False
+
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@redwoodplus.local"

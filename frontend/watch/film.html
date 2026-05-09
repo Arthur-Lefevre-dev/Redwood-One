@@ -19,7 +19,13 @@
     .meta{color:var(--muted);font-size:13px;margin-bottom:12px}
     .syno{color:#ddd;line-height:1.55;font-size:14px;margin-bottom:20px}
     .tech{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;font-size:12px;color:var(--muted);margin-bottom:20px}
-    video{max-width:100%;border-radius:12px;background:#000}
+    .player-wrap{position:relative;max-width:100%;border-radius:12px;overflow:hidden;background:#000;min-height:200px}
+    .video-loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:linear-gradient(180deg,#141414,#0a0a0a);z-index:3;transition:opacity .35s ease, visibility .35s}
+    .video-loader.done{opacity:0;visibility:hidden;pointer-events:none}
+    .spinner{width:44px;height:44px;border-radius:50%;border:3px solid #333;border-top-color:var(--accent);animation:spin .75s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .video-loader span{font-size:13px;color:var(--muted)}
+    video{max-width:100%;border-radius:12px;background:#000;display:block;width:100%}
     .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
     .pill{padding:6px 10px;border-radius:999px;background:#1a1a1a;border:1px solid #333;font-size:12px}
     .similar{margin-top:32px}
@@ -47,8 +53,14 @@
     <div class="meta" id="meta"></div>
     <div class="syno" id="syno"></div>
     <div class="tech" id="tech"></div>
-    <!-- No crossorigin: presigned S3 URLs rarely send CORS headers; without it, cross-origin video still plays. -->
-    <video id="player" playsinline controls></video>
+    <div class="player-wrap">
+      <div class="video-loader" id="vloader">
+        <div class="spinner"></div>
+        <span>Chargement de la vidéo…</span>
+      </div>
+      <!-- No crossorigin: presigned S3 URLs rarely send CORS headers; without it, cross-origin video still plays. -->
+      <video id="player" playsinline controls></video>
+    </div>
     <div class="row" id="actors"></div>
     <section class="similar">
       <h2>Autres films</h2>
@@ -90,8 +102,16 @@
       const su = await api('/api/films/' + id + '/stream-url');
       const stream = await su.json();
       const video = document.getElementById('player');
+      const loader = document.getElementById('vloader');
+      const hideLoader = () => loader.classList.add('done');
+      video.addEventListener('loadeddata', hideLoader, { once: true });
+      video.addEventListener('canplay', hideLoader, { once: true });
+      video.addEventListener('error', () => {
+        loader.querySelector('span').textContent = 'Lecture impossible (réseau ou fichier).';
+      });
       video.src = stream.url;
       new Plyr(video);
+      setTimeout(() => { if (video.readyState >= 2) hideLoader(); }, 8000);
 
       const all = await api('/api/films');
       const films = await all.json();

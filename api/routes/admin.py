@@ -1,7 +1,8 @@
 """Admin-only routes: upload, queue, system, users, torrents."""
 
 import base64
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -12,10 +13,11 @@ from sqlalchemy.orm import Session
 
 from api.deps import require_admin
 from config import get_settings
+from core.catalog_sync import sync_s3_films_to_db
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
 from core.upload import save_upload_stream
-from db.models import Film, FilmSource, FilmStatut, User, UserRole
+from db.models import Film, FilmSource, FilmStatut, InvitationCode, User, UserRole
 from db.session import get_db
 from worker.tasks import download_torrent_task, process_film_task
 
@@ -121,6 +123,82 @@ async def admin_torrent_file(
     # Celery JSON serializer cannot carry raw bytes; use base64 for the worker.
     download_torrent_task.delay(film.id, None, base64.b64encode(data).decode("ascii"))
     return {"job_id": film.id}
+
+
+@router.post("/catalog/sync-s3")
+def admin_sync_s3(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    """Import or update Film rows from objects already stored under films/{id}/ in S3."""
+    try:
+        return sync_s3_films_to_db(db)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e)) from e
+
+
+class CreateInviteBody(BaseModel):
+    max_uses: int = 1
+    note: Optional[str] = None
+    code: Optional[str] = None
+    expires_days: Optional[int] = None
+
+
+@router.get("/invites")
+def list_invites(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    rows = db.query(InvitationCode).order_by(InvitationCode.created_at.desc()).all()
+    return [
+        {
+            "id": r.id,
+            "code": r.code,
+            "max_uses": r.max_uses,
+            "uses": r.uses,
+            "note": r.note,
+            "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/invites")
+def create_invite(
+    body: CreateInviteBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    raw = (body.code or "").strip().upper() or secrets.token_hex(5).upper()
+    if db.query(InvitationCode).filter(InvitationCode.code == raw).first():
+        raise HTTPException(400, "Code already exists")
+    exp = None
+    if body.expires_days and body.expires_days > 0:
+        exp = datetime.utcnow() + timedelta(days=body.expires_days)
+    inv = InvitationCode(
+        code=raw,
+        max_uses=max(1, body.max_uses),
+        note=(body.note or "")[:255] or None,
+        expires_at=exp,
+    )
+    db.add(inv)
+    db.commit()
+    db.refresh(inv)
+    return {
+        "id": inv.id,
+        "code": inv.code,
+        "max_uses": inv.max_uses,
+        "uses": inv.uses,
+        "expires_at": inv.expires_at.isoformat() if inv.expires_at else None,
+    }
+
+
+@router.delete("/invites/{invite_id}", status_code=204)
+def delete_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    inv = db.get(InvitationCode, invite_id)
+    if not inv:
+        raise HTTPException(404, "Not found")
+    db.delete(inv)
+    db.commit()
 
 
 @router.get("/queue")

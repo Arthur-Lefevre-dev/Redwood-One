@@ -1,6 +1,7 @@
 """Public / authenticated film catalog routes."""
 
-from typing import List, Optional
+import random
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -65,6 +66,60 @@ def featured(db: Session = Depends(get_db), user: User = Depends(get_current_use
         .all()
     )
     return films
+
+
+@router.get("/latest", response_model=List[FilmOut])
+def latest_films(
+    limit: int = 12,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    lim = max(1, min(48, limit))
+    return (
+        db.query(Film)
+        .filter(Film.statut == FilmStatut.disponible)
+        .order_by(Film.date_ajout.desc())
+        .limit(lim)
+        .all()
+    )
+
+
+@router.get("/genres-summary")
+def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    films = db.query(Film).filter(Film.statut == FilmStatut.disponible).all()
+    counts: dict[str, int] = {}
+    for f in films:
+        for g in f.genres or []:
+            if isinstance(g, str) and g.strip():
+                k = g.strip()
+                counts[k] = counts.get(k, 0) + 1
+    rows = [{"name": k, "count": v} for k, v in counts.items()]
+    rows.sort(key=lambda x: (-x["count"], x["name"].lower()))
+    return rows
+
+
+@router.get("/surprise-me", response_model=FilmOut)
+def surprise_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Pick a catalog title weighted by the viewer's favorite genres (preferences)."""
+    q = db.query(Film).filter(Film.statut == FilmStatut.disponible)
+    films = q.all()
+    if not films:
+        raise HTTPException(status_code=404, detail="Catalog empty")
+    prefs: List[Any] = []
+    if isinstance(user.preferences, dict):
+        prefs = user.preferences.get("favorite_genres") or []
+    if prefs and isinstance(prefs, list):
+        scored: List[tuple[float, Film]] = []
+        pl = [str(p).lower() for p in prefs]
+        for f in films:
+            gset = {str(x).lower() for x in (f.genres or []) if isinstance(x, str)}
+            overlap = sum(1 for p in pl if p in gset)
+            scored.append((overlap + random.random() * 0.01, f))
+        scored.sort(key=lambda x: -x[0])
+        top = [f for s, f in scored if s >= 1.0][: max(1, len(scored) // 3)]
+        pool = top if top else [f for _, f in scored]
+        return random.choice(pool)
+    return random.choice(films)
 
 
 @router.get("/by-genre")

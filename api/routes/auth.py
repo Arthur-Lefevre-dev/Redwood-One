@@ -1,9 +1,10 @@
 """Authentication routes (JWT in httpOnly cookies)."""
 
 from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
@@ -12,10 +13,11 @@ from config import get_settings
 from core.security import (
     create_access_token,
     create_refresh_token_jwt,
+    hash_password,
     hash_refresh_token,
     verify_password,
 )
-from db.models import RefreshToken, User
+from db.models import InvitationCode, RefreshToken, User, UserRole
 from db.session import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -24,6 +26,17 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 class LoginBody(BaseModel):
     username: str
     password: str
+
+
+class RegisterBody(BaseModel):
+    username: str = Field(min_length=2, max_length=80)
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=128)
+    invite_code: Optional[str] = None
+
+
+class PreferencesBody(BaseModel):
+    favorite_genres: List[str] = []
 
 
 def _cookie_kwargs():
@@ -76,6 +89,47 @@ def login(
         **ck,
     )
     return {"ok": True, "username": user.username, "role": user.role.value}
+
+
+@router.post("/register")
+@limiter.limit("10 per hour")
+def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)):
+    settings = get_settings()
+    code = (body.invite_code or "").strip() or None
+    if not settings.REGISTRATION_OPEN:
+        if not code:
+            raise HTTPException(status_code=400, detail="Invitation code required")
+        inv = db.query(InvitationCode).filter(InvitationCode.code == code).first()
+        if not inv or inv.uses >= inv.max_uses:
+            raise HTTPException(status_code=400, detail="Invalid invitation code")
+        if inv.expires_at and inv.expires_at < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="Invitation expired")
+    elif code:
+        inv = db.query(InvitationCode).filter(InvitationCode.code == code).first()
+        if not inv or inv.uses >= inv.max_uses:
+            inv = None
+        elif inv.expires_at and inv.expires_at < datetime.utcnow():
+            inv = None
+    else:
+        inv = None
+
+    if db.query(User).filter(User.username == body.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    if db.query(User).filter(User.email == body.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user = User(
+        username=body.username.strip(),
+        email=body.email.lower().strip(),
+        hashed_password=hash_password(body.password),
+        role=UserRole.viewer,
+        preferences={"favorite_genres": []},
+    )
+    db.add(user)
+    if inv:
+        inv.uses += 1
+    db.commit()
+    return {"ok": True, "username": user.username}
 
 
 @router.post("/refresh")
@@ -152,4 +206,19 @@ def me(user: User = Depends(get_current_user)):
         "username": user.username,
         "email": user.email,
         "role": user.role.value,
+        "preferences": user.preferences if isinstance(user.preferences, dict) else {},
     }
+
+
+@router.patch("/me/preferences")
+def patch_preferences(
+    body: PreferencesBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    prev = user.preferences if isinstance(user.preferences, dict) else {}
+    prev = dict(prev)
+    prev["favorite_genres"] = [str(g).strip() for g in body.favorite_genres if str(g).strip()]
+    user.preferences = prev
+    db.commit()
+    return {"ok": True, "preferences": user.preferences}
