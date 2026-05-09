@@ -67,3 +67,10 @@ async function logout() {
   await api('/api/auth/logout', { method: 'POST' });
   window.location.href = '/login.html';
 }
+
+// Expose on window (inline scripts rely on globals; absolute /watch/app.js avoids failed load when URL is /watch without trailing slash)
+window.api = api;
+window.apiJson = apiJson;
+window.readJsonSafe = readJsonSafe;
+window.posterUrl = posterUrl;
+window.logout = logout;
