@@ -1724,9 +1724,11 @@
           <option value="series_episode">Épisode de série</option>
         </select>
         <p class="hint">
-          Pour une série : le même <strong>titre affiché de la série</strong> sur
-          tous les épisodes les regroupe côté spectateurs (la
-          <strong>clé série</strong> peut différer si besoin). Numérotez saison et épisode.
+          Pour une série : le même <strong>titre affiché de la série</strong> et la
+          même <strong>clé série</strong> sur tous les épisodes (ex.
+          <code>tv-57243</code> ou <code>doctor-who</code>) — pas le titre d’un
+          seul épisode. Numérotez saison et épisode, puis cliquez
+          <strong>Enregistrer</strong>.
         </p>
         <div id="fm-series-box" class="hidden">
           <label for="fm-series-key">Clé série (identifiant unique)</label>
@@ -3084,14 +3086,18 @@
           return;
         }
         const kind = $("#fm-kind").value;
+        let seriesSeasonSaved = null;
+        let seriesEpisodeSaved = null;
         if (kind === "series_episode") {
           if (!$("#fm-series-key").value.trim()) {
             err.textContent = "La clé série est obligatoire pour un épisode";
             err.style.display = "block";
             return;
           }
-          const sn = parseInt($("#fm-season").value, 10);
-          const en = parseInt($("#fm-episode").value, 10);
+          const rawS = String($("#fm-season").value ?? "").trim();
+          const rawE = String($("#fm-episode").value ?? "").trim();
+          const sn = parseInt(rawS, 10);
+          const en = parseInt(rawE, 10);
           if (
             !Number.isFinite(sn) ||
             sn < 0 ||
@@ -3102,6 +3108,8 @@
             err.style.display = "block";
             return;
           }
+          seriesSeasonSaved = sn;
+          seriesEpisodeSaved = en;
         }
         const parseOptInt = (el) => {
           const v = el.value.trim();
@@ -3148,13 +3156,9 @@
               ? $("#fm-series-title").value.trim() || null
               : null,
           season_number:
-            kind === "series_episode"
-              ? parseInt($("#fm-season").value, 10)
-              : null,
+            kind === "series_episode" ? seriesSeasonSaved : null,
           episode_number:
-            kind === "series_episode"
-              ? parseInt($("#fm-episode").value, 10)
-              : null,
+            kind === "series_episode" ? seriesEpisodeSaved : null,
         };
         try {
           const r = await api("/api/admin/films/" + id, {

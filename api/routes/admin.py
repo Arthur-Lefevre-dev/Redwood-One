@@ -199,8 +199,23 @@ def admin_patch_film(
     else:
         f.series_key = (body.series_key or "").strip() or None
         f.series_title = (body.series_title or "").strip() or None
-        f.season_number = body.season_number
-        f.episode_number = body.episode_number
+        ssn = body.season_number
+        een = body.episode_number
+        if ssn is None or een is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Pour un épisode de série, la saison et le numéro d'épisode sont "
+                    "obligatoires (vérifiez qu'ils sont bien envoyés par l'interface admin)."
+                ),
+            )
+        if int(ssn) < 0 or int(een) < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Saison ≥ 0 et épisode ≥ 1 requis pour un épisode de série.",
+            )
+        f.season_number = int(ssn)
+        f.episode_number = int(een)
     if body.trailers_manual is not None:
         parsed = trailers_from_admin_lines(body.trailers_manual)
         f.trailers_manual = parsed if parsed else None
