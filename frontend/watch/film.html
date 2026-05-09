@@ -74,6 +74,7 @@
     .trailer-tile{background:#111;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden}
     .trailer-tile iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
     .trailer-cap{padding:8px 10px;font-size:12px;color:var(--muted);line-height:1.35}
+    .trailers-empty{margin:0;font-size:13px;color:var(--muted);line-height:1.5;max-width:52ch}
     .player-wrap{position:relative;max-width:100%;border-radius:12px;overflow:hidden;background:#0a0a0a;border:1px solid #2a2a2a;min-height:200px}
     .plyr--video{border-radius:12px}
     .plyr__control--overlaid{background:rgba(139,37,0,.92);color:#fff}
@@ -203,12 +204,22 @@
       const block = document.getElementById('trailers-block');
       const grid = document.getElementById('trailers');
       grid.innerHTML = '';
-      if (f.content_kind !== 'film' || !f.trailers || !f.trailers.length) {
+      if (f.content_kind !== 'film') {
         block.hidden = true;
         return;
       }
       block.hidden = false;
-      f.trailers.forEach((t) => {
+      const list = f.trailers && f.trailers.length ? f.trailers : [];
+      if (!list.length) {
+        const p = document.createElement('p');
+        p.className = 'trailers-empty';
+        p.textContent = f.tmdb_id == null
+          ? 'Aucune bande-annonce : renseignez un identifiant TMDB sur la fiche (administration) pour lier les vidéos TMDB.'
+          : 'Aucune vidéo YouTube répertoriée sur TMDB pour ce film pour l’instant, ou la clé API TMDB n’est pas configurée côté serveur.';
+        grid.appendChild(p);
+        return;
+      }
+      list.forEach((t) => {
         const tile = document.createElement('div');
         tile.className = 'trailer-tile';
         const ifr = document.createElement('iframe');

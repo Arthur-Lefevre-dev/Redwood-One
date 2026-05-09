@@ -101,6 +101,8 @@ class Film(Base):
     acteurs: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     note_tmdb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     poster_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    # Manual YouTube trailers [{ "key": "11chars", "name": "…", "type": "Trailer" }] merged with TMDB on film page
+    trailers_manual: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     langue_originale: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     duree_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     resolution: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)

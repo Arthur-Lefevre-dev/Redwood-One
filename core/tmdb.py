@@ -81,15 +81,20 @@ def movie_trailers_youtube(tmdb_id: int, limit: int = 6) -> List[Dict[str, Any]]
     except Exception as e:
         logger.exception("tmdb videos failed: %s", e)
         return []
-    candidates = [
-        v
-        for v in raw
-        if v.get("site") == "YouTube" and v.get("key") and v.get("type") in ("Trailer", "Teaser", "Clip", "Featurette")
-    ]
+    # Any YouTube key works in our iframe embed; prefer trailers/teasers first.
+    candidates = [v for v in raw if (v.get("site") or "").lower() == "youtube" and v.get("key")]
 
     def sort_key(v: Dict[str, Any]) -> tuple:
         t = v.get("type") or ""
-        order = {"Trailer": 0, "Teaser": 1, "Clip": 2, "Featurette": 3}.get(t, 9)
+        order = {
+            "Trailer": 0,
+            "Teaser": 1,
+            "Clip": 2,
+            "Featurette": 3,
+            "Behind the Scenes": 4,
+            "Blooper": 5,
+            "Opening Credit": 6,
+        }.get(t, 7)
         official = 0 if v.get("official") else 1
         return (order, official, v.get("name") or "")
 

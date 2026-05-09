@@ -13,6 +13,7 @@ from api.deps import get_current_user, require_admin
 from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import presigned_stream_url
 from core.tmdb import enrich_from_filename, movie_details, movie_trailers_youtube
+from core.trailers_util import merge_trailer_lists, trailers_from_json_column
 from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
@@ -208,11 +209,14 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
             "next_episode_id": next_episode_id(db, f),
             "prev_episode_id": prev_episode_id(db, f),
         }
-    trailers: List[dict] = []
+    manual_trailers = trailers_from_json_column(f.trailers_manual)
+    tmdb_trailers: List[dict] = []
     if f.content_kind == ContentKind.film and f.tmdb_id:
-        trailers = movie_trailers_youtube(int(f.tmdb_id), limit=6)
+        tmdb_trailers = movie_trailers_youtube(int(f.tmdb_id), limit=8)
+    trailers = merge_trailer_lists(manual_trailers, tmdb_trailers)
     return {
         "id": f.id,
+        "tmdb_id": f.tmdb_id,
         "titre": f.titre,
         "titre_original": f.titre_original,
         "annee": f.annee,

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from api.deps import require_admin
 from config import get_settings
 from core.catalog_sync import sync_s3_films_to_db
+from core.trailers_util import trailers_from_admin_lines, trailers_from_json_column, trailers_to_watch_urls
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
 from core.upload import save_upload_stream
@@ -79,6 +80,7 @@ def _film_to_admin_detail(f: Film) -> dict[str, Any]:
         "series_title": f.series_title,
         "season_number": f.season_number,
         "episode_number": f.episode_number,
+        "trailers_manual_lines": trailers_to_watch_urls(trailers_from_json_column(f.trailers_manual)),
     }
 
 
@@ -113,6 +115,8 @@ class AdminFilmUpdateBody(BaseModel):
     series_title: Optional[str] = None
     season_number: Optional[int] = None
     episode_number: Optional[int] = None
+    # One line per trailer: YouTube URL or 11-char key; optional "Title|url"
+    trailers_manual: Optional[List[str]] = None
 
 
 @router.patch("/films/{film_id}")
@@ -152,6 +156,9 @@ def admin_patch_film(
         f.series_title = (body.series_title or "").strip() or None
         f.season_number = body.season_number
         f.episode_number = body.episode_number
+    if body.trailers_manual is not None:
+        parsed = trailers_from_admin_lines(body.trailers_manual)
+        f.trailers_manual = parsed if parsed else None
     db.commit()
     db.refresh(f)
     return _film_to_admin_detail(f)
