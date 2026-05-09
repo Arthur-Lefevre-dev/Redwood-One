@@ -173,6 +173,43 @@ def _ensure_series_season_meta_table() -> None:
     logger.info("database schema: created series_season_meta (sqlite)")
 
 
+def _ensure_series_show_meta_table() -> None:
+    """Global series page poster + hero text; belt-and-suspenders if create_all skipped."""
+    insp = inspect(engine)
+    if "series_show_meta" in insp.get_table_names():
+        return
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE series_show_meta (
+                        id SERIAL PRIMARY KEY,
+                        series_key VARCHAR(160) NOT NULL UNIQUE,
+                        poster_path VARCHAR(512),
+                        hero_text TEXT
+                    )
+                    """
+                )
+            )
+        logger.info("database schema: created series_show_meta (postgresql)")
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE series_show_meta (
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    series_key VARCHAR(160) NOT NULL UNIQUE,
+                    poster_path VARCHAR(512),
+                    hero_text TEXT
+                )
+                """
+            )
+        )
+    logger.info("database schema: created series_show_meta (sqlite)")
+
+
 def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
@@ -181,6 +218,7 @@ def init_db() -> None:
     _ensure_user_invite_column()
     _ensure_invitation_created_by_column()
     _ensure_series_season_meta_table()
+    _ensure_series_show_meta_table()
 
 
 def get_db() -> Generator[Session, None, None]:

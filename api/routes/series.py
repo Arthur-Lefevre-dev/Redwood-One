@@ -13,7 +13,7 @@ from core.series_grouping import (
     normalize_series_group_key,
     series_catalog_group_key,
 )
-from db.models import ContentKind, Film, FilmStatut, SeriesSeasonMeta, User
+from db.models import ContentKind, Film, FilmStatut, SeriesSeasonMeta, SeriesShowMeta, User
 from db.session import get_db
 
 router = APIRouter(prefix="/api/series", tags=["series"])
@@ -56,6 +56,17 @@ def list_series(
         )
         if not rep:
             continue
+        show_meta = (
+            db.query(SeriesShowMeta)
+            .filter(SeriesShowMeta.series_key.in_(sk_list))
+            .first()
+        )
+        show_poster = (
+            (show_meta.poster_path or "").strip()
+            if show_meta and show_meta.poster_path
+            else ""
+        )
+        list_poster = show_poster or (rep.poster_path or "")
         title = rep.series_title or rep.titre
         if needle:
             t = (title or "").lower()
@@ -77,7 +88,7 @@ def list_series(
                 "merge_key": merge_key,
                 "series_key": canon,
                 "title": title,
-                "poster_path": rep.poster_path,
+                "poster_path": list_poster or None,
                 "episode_count": int(ep_count or 0),
             }
         )
@@ -153,10 +164,25 @@ def series_detail(
                 "poster_path": m.poster_path,
                 "note": m.note,
             }
+    show_row = (
+        db.query(SeriesShowMeta)
+        .filter(SeriesShowMeta.series_key.in_(sk_list))
+        .first()
+    )
+    show_poster = (
+        (show_row.poster_path or "").strip()
+        if show_row and show_row.poster_path
+        else ""
+    )
+    hero_text_val = None
+    if show_row and show_row.hero_text and str(show_row.hero_text).strip():
+        hero_text_val = str(show_row.hero_text).strip()
+    effective_poster = show_poster or rep.poster_path
     return {
         "series_key": normalize_series_group_key(series_key),
         "title": rep.series_title or rep.titre,
-        "poster_path": rep.poster_path,
+        "poster_path": effective_poster,
+        "hero_text": hero_text_val,
         "synopsis": rep.synopsis,
         "note_tmdb": rep.note_tmdb,
         "seasons": seasons,

@@ -29,6 +29,7 @@ from db.models import (
     FilmStatut,
     InvitationCode,
     SeriesSeasonMeta,
+    SeriesShowMeta,
     User,
     UserRole,
 )
@@ -647,6 +648,63 @@ def admin_delete_series_season(
         raise HTTPException(404, "Not found")
     db.delete(row)
     db.commit()
+
+
+class SeriesShowPageBody(BaseModel):
+    series_key: str = Field(..., min_length=1, max_length=160)
+    poster_path: Optional[str] = Field(None, max_length=512)
+    hero_text: Optional[str] = Field(None, max_length=16000)
+
+
+@router.get("/series-show")
+def admin_get_series_show(
+    series_key: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    sk = (series_key or "").strip()
+    if not sk:
+        raise HTTPException(status_code=400, detail="series_key requis")
+    row = db.query(SeriesShowMeta).filter(SeriesShowMeta.series_key == sk).first()
+    if not row:
+        return {"id": None, "series_key": sk, "poster_path": None, "hero_text": None}
+    return {
+        "id": row.id,
+        "series_key": row.series_key,
+        "poster_path": row.poster_path,
+        "hero_text": row.hero_text,
+    }
+
+
+@router.post("/series-show")
+def admin_upsert_series_show(
+    body: SeriesShowPageBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    sk = body.series_key.strip()
+    pp = (body.poster_path or "").strip() or None
+    ht = (body.hero_text or "").strip() or None
+    row = db.query(SeriesShowMeta).filter(SeriesShowMeta.series_key == sk).first()
+    if pp is None and ht is None:
+        if row:
+            db.delete(row)
+            db.commit()
+        return {"id": None, "series_key": sk, "poster_path": None, "hero_text": None}
+    if row:
+        row.poster_path = pp
+        row.hero_text = ht
+    else:
+        row = SeriesShowMeta(series_key=sk, poster_path=pp, hero_text=ht)
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "series_key": row.series_key,
+        "poster_path": row.poster_path,
+        "hero_text": row.hero_text,
+    }
 
 
 class ViewerAnnouncementUpdateBody(BaseModel):

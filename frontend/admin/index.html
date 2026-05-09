@@ -1861,12 +1861,13 @@
 
     <div class="modal-backdrop" id="modal-season-meta">
       <div class="modal" role="document" style="max-width: 520px">
-        <h3 id="sm-heading">Affiches des saisons</h3>
+        <h3 id="sm-heading">Fiche série et saisons</h3>
         <p class="err-msg" id="sm-err" style="display: none"></p>
         <p class="hint" id="sm-intro">
-          Une fiche par numéro de saison, pour la même
-          <strong>clé série</strong> que sur les épisodes (affiche TMDB / URL et
-          note optionnelle).
+          Même <strong>clé série</strong> que sur les épisodes. En haut : affiche
+          <strong>globale</strong> de la page série et texte sous le titre ; plus
+          bas : une <strong>affiche par saison</strong> (indépendante) et note
+          optionnelle.
         </p>
         <label for="sm-key-select">Clé série</label>
         <select id="sm-key-select"></select>
@@ -1886,6 +1887,44 @@
           saisissez la clé (la même que vous mettrez dans
           <strong>Modifier</strong> sur chaque épisode), puis enregistrez. Ce
           bandeau disparaît dès que le champ ci‑dessus est rempli.
+        </p>
+        <p style="font-size: 12px; font-weight: 600; margin: 12px 0 8px">
+          Page série (grand poster + texte sous le titre)
+        </p>
+        <label for="sm-global-poster">Affiche globale (TMDB / URL)</label>
+        <input
+          type="text"
+          id="sm-global-poster"
+          placeholder="/affiche-serie.jpg"
+          autocomplete="off"
+        />
+        <label for="sm-global-text">Texte sous le titre (entre titre et résumé)</label>
+        <textarea
+          id="sm-global-text"
+          rows="4"
+          placeholder="Résumé court, accroche, ou précision pour les spectateurs…"
+        ></textarea>
+        <button
+          class="btn btn-primary"
+          type="button"
+          id="sm-save-global"
+          style="margin-top: 8px; font-size: 12px"
+        >
+          Enregistrer la fiche globale
+        </button>
+        <p class="hint" style="margin-top: 8px">
+          Laissez les deux champs vides et enregistrez pour supprimer la fiche
+          globale. Les affiches par saison restent ci‑dessous.
+        </p>
+        <hr
+          style="
+            border: 0;
+            border-top: 1px solid var(--color-border-tertiary);
+            margin: 16px 0;
+          "
+        />
+        <p style="font-size: 12px; font-weight: 600; margin: 0 0 8px">
+          Affiches par saison
         </p>
         <div
           id="sm-list"
@@ -2980,14 +3019,14 @@
             btnArt.type = "button";
             btnArt.className = "btn btn-primary";
             btnArt.style.fontSize = "11px";
-            btnArt.textContent = "Affiches des saisons";
+            btnArt.textContent = "Fiche série / saisons";
             btnArt.onclick = () => openSeasonMetaModal(showName, keyOpts);
             toolRow.appendChild(btnArt);
             const th = document.createElement("span");
             th.style.fontSize = "11px";
             th.style.color = "var(--color-text-tertiary)";
             th.textContent =
-              "Définissez une image (poster TMDB) par saison pour l’espace spectateur — même clé série que les épisodes.";
+              "Affiche globale de la série, texte sous le titre, et affiches par saison — même clé série que les épisodes.";
             toolRow.appendChild(th);
             block.appendChild(toolRow);
             const seasonsSorted = seasonKeys.sort(compareLibrarySeasonKeys);
@@ -3072,6 +3111,30 @@
         const inp = $("#sm-key-input");
         if (!warn || !inp || inp.classList.contains("hidden")) return;
         warn.classList.toggle("hidden", !!(inp.value || "").trim());
+      }
+
+      async function refreshSeriesShowGlobal() {
+        const sk = smGetSeriesKey();
+        const gp = $("#sm-global-poster");
+        const gt = $("#sm-global-text");
+        if (!gp || !gt) return;
+        if (!sk) {
+          gp.value = "";
+          gt.value = "";
+          return;
+        }
+        let r;
+        try {
+          r = await api(
+            "/api/admin/series-show?series_key=" + encodeURIComponent(sk),
+          );
+        } catch (e) {
+          return;
+        }
+        if (!r.ok) return;
+        const d = await r.json();
+        gp.value = d.poster_path || "";
+        gt.value = d.hero_text || "";
       }
 
       async function refreshSeasonMetaList() {
@@ -3167,7 +3230,7 @@
         const h = $("#sm-heading");
         if (h)
           h.textContent =
-            "Affiches des saisons — " + (showName || "Série");
+            "Fiche série et saisons — " + (showName || "Série");
         const sel = $("#sm-key-select");
         const inp = $("#sm-key-input");
         const lbl = $("#sm-key-input-label");
@@ -3195,13 +3258,19 @@
             o.textContent = k;
             sel.appendChild(o);
           }
-          sel.onchange = () => refreshSeasonMetaList();
+          sel.onchange = () => {
+            refreshSeasonMetaList();
+            refreshSeriesShowGlobal();
+          };
         } else {
           if (sel) sel.classList.add("hidden");
           if (lbl) lbl.classList.remove("hidden");
           if (inp) {
             inp.classList.remove("hidden");
-            inp.onblur = () => refreshSeasonMetaList();
+            inp.onblur = () => {
+              refreshSeasonMetaList();
+              refreshSeriesShowGlobal();
+            };
             inp.oninput = () => smSyncManualKeyHint();
             smSyncManualKeyHint();
           }
@@ -3215,12 +3284,15 @@
         if (nt) nt.value = "";
         const backdrop = $("#modal-season-meta");
         if (backdrop) backdrop.classList.add("show");
-        if (opts.length) refreshSeasonMetaList();
-        else {
+        if (opts.length) {
+          refreshSeasonMetaList();
+          refreshSeriesShowGlobal();
+        } else {
           const list = $("#sm-list");
           if (list)
             list.innerHTML =
               '<p class="hint">Saisissez la clé série (la même que sur les épisodes), puis quittez le champ pour charger la liste.</p>';
+          refreshSeriesShowGlobal();
         }
       }
 
@@ -3354,6 +3426,30 @@
       $("#sm-close").addEventListener("click", () => closeSeasonMetaModal());
       $("#modal-season-meta").addEventListener("click", (e) => {
         if (e.target.id === "modal-season-meta") closeSeasonMetaModal();
+      });
+      $("#sm-save-global").addEventListener("click", async () => {
+        const sk = smGetSeriesKey();
+        if (!sk) {
+          smShowErr("Clé série requise.");
+          return;
+        }
+        smHideErr();
+        const r = await api("/api/admin/series-show", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            series_key: sk,
+            poster_path: ($("#sm-global-poster").value || "").trim() || null,
+            hero_text: ($("#sm-global-text").value || "").trim() || null,
+          }),
+        });
+        if (!r.ok) {
+          smShowErr(
+            "Fiche globale : échec. " + (await fastApiErrorDetail(r)),
+          );
+          return;
+        }
+        await refreshSeriesShowGlobal();
       });
       $("#sm-save").addEventListener("click", async () => {
         const sk = smGetSeriesKey();

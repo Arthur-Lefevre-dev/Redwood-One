@@ -36,8 +36,8 @@
     .serie-hero{display:flex;gap:20px;align-items:flex-start;margin-bottom:24px;flex-wrap:wrap}
     .poster-col{width:140px;flex-shrink:0}
     .hero-poster{width:100%;max-width:140px;height:auto;border-radius:10px;border:1px solid #333;display:block;margin:0}
-    .serie-hero .title-row{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 20px;margin-bottom:12px}
-    .serie-hero .title-row h1{margin:0;flex:1;min-width:min(100%,200px);font-size:1.35rem;line-height:1.25}
+    .serie-hero-main{flex:1;min-width:min(100%,200px);display:flex;flex-direction:column;align-items:stretch}
+    .serie-hero-main h1{margin:0 0 10px;font-size:1.35rem;line-height:1.25}
     .user-score-wrap{
       display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;
       padding:12px 14px;
@@ -64,8 +64,12 @@
       margin-left:1px;position:relative;top:-0.55em;
     }
     .user-score-label{font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;text-align:center}
-    .serie-hero-text{flex:1;min-width:200px}
-    .serie-hero-text .lead{margin-bottom:20px}
+    .serie-hero .user-score-wrap{align-self:flex-start}
+    .serie-hero-main .hero-text{
+      margin:0 0 12px;padding:12px 14px;font-size:14px;line-height:1.55;color:var(--text);
+      background:#141414;border:1px solid #2a2a2a;border-radius:10px;white-space:pre-wrap
+    }
+    .serie-hero-main .lead{margin:0;color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:0}
     .season{margin-bottom:28px;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#111}
     .season h2{font-size:14px;padding:12px 16px;margin:0;background:#1a1a1a;border-bottom:1px solid #2a2a2a;color:#ddd}
     .season-head{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;background:#1a1a1a;border-bottom:1px solid #2a2a2a}
@@ -119,24 +123,23 @@
       <div class="poster-col">
         <img class="hero-poster" id="d-poster" alt="" />
       </div>
-      <div class="serie-hero-text">
-        <div class="title-row">
-          <h1 id="d-title">…</h1>
-          <div class="user-score-wrap" id="serie-score-wrap" hidden>
-            <div class="user-score" id="serie-score-widget">
-              <svg viewBox="0 0 36 36" class="user-score-svg" aria-hidden="true">
-                <circle class="user-score-disc" cx="18" cy="18" r="13.35" />
-                <circle class="user-score-track" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" />
-                <circle id="serie-score-arc" class="user-score-fill" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" stroke-linecap="round" transform="rotate(-90 18 18)" stroke-dasharray="0 100" />
-              </svg>
-              <div class="user-score-inner">
-                <span class="score-value"><span id="serie-score-num"></span><span class="user-score-pct">%</span></span>
-              </div>
-            </div>
-            <span class="user-score-label">Score TMDB</span>
+      <div class="serie-hero-main">
+        <h1 id="d-title">…</h1>
+        <p class="hero-text" id="d-hero-text" hidden></p>
+        <p class="lead" id="d-syn"></p>
+      </div>
+      <div class="user-score-wrap" id="serie-score-wrap" hidden>
+        <div class="user-score" id="serie-score-widget">
+          <svg viewBox="0 0 36 36" class="user-score-svg" aria-hidden="true">
+            <circle class="user-score-disc" cx="18" cy="18" r="13.35" />
+            <circle class="user-score-track" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" />
+            <circle id="serie-score-arc" class="user-score-fill" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" stroke-linecap="round" transform="rotate(-90 18 18)" stroke-dasharray="0 100" />
+          </svg>
+          <div class="user-score-inner">
+            <span class="score-value"><span id="serie-score-num"></span><span class="user-score-pct">%</span></span>
           </div>
         </div>
-        <p class="lead" id="d-syn"></p>
+        <span class="user-score-label">Score TMDB</span>
       </div>
     </div>
     <div id="seasons"></div>
@@ -209,28 +212,20 @@
       document.getElementById('serie-score-widget').setAttribute('aria-label', 'Score TMDB ' + pct + ' pour cent');
     }
 
-    // Prefer admin season poster for the hero: newest season number that has season_art.poster_path.
-    function heroPosterPathForSerieDetail(d) {
-      const art = d.season_art;
-      if (!art || typeof art !== 'object') return d.poster_path || '';
-      const nums = Object.keys(art)
-        .map((k) => parseInt(k, 10))
-        .filter((n) => !Number.isNaN(n))
-        .sort((a, b) => b - a);
-      for (const n of nums) {
-        const row = art[String(n)];
-        const p = row && row.poster_path != null ? String(row.poster_path).trim() : '';
-        if (p) return p;
-      }
-      return d.poster_path || '';
-    }
-
     async function bootDetail(sk) {
       const d = await apiJson('/api/series/' + encodeURIComponent(sk) + '/detail');
       document.getElementById('d-title').textContent = d.title || sk;
+      const heroEl = document.getElementById('d-hero-text');
+      const heroRaw = (d.hero_text != null && String(d.hero_text).trim()) ? String(d.hero_text).trim() : '';
+      if (heroRaw) {
+        heroEl.hidden = false;
+        heroEl.textContent = heroRaw;
+      } else {
+        heroEl.hidden = true;
+        heroEl.textContent = '';
+      }
       document.getElementById('d-syn').textContent = (d.synopsis || '').slice(0, 400) + (d.synopsis && d.synopsis.length > 400 ? '…' : '');
-      const heroPath = heroPosterPathForSerieDetail(d);
-      const pu = heroPath ? posterUrl(heroPath) : '';
+      const pu = d.poster_path ? posterUrl(d.poster_path) : '';
       document.getElementById('d-poster').src = pu;
       applySerieTmdbScore(d.note_tmdb);
       const wrap = document.getElementById('seasons');

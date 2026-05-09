@@ -161,6 +161,17 @@ class SeriesSeasonMeta(Base):
     )
 
 
+class SeriesShowMeta(Base):
+    """Admin-defined global series page: hero poster and text between title and synopsis."""
+
+    __tablename__ = "series_show_meta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    series_key: Mapped[str] = mapped_column(String(160), nullable=False, unique=True, index=True)
+    poster_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    hero_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class InvitationCode(Base):
     __tablename__ = "invitation_codes"
 
