@@ -35,8 +35,10 @@ echo -e "  Setup serveur de production — Debian 12 / AMD GPU / HTTP\n"
 
 # ── Variables ───────────────────────────────────────────────────────
 GITHUB_REPO="${GITHUB_REPO:-}"
-GITHUB_BRANCH="${GITHUB_BRANCH:-main}"
+GITHUB_BRANCH="${GITHUB_BRANCH:-master}"
 PROJ_DIR="/opt/redwood"
+# Compose file and .env live under docker/ (see README)
+DOCKER_DIR="$PROJ_DIR/docker"
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
 # ── Vérifications root + OS ─────────────────────────────────────────
@@ -46,6 +48,7 @@ SERVER_IP=$(hostname -I | awk '{print $1}')
 
 INFO "IP serveur  : $SERVER_IP"
 INFO "Dossier     : $PROJ_DIR"
+INFO "Docker      : $DOCKER_DIR"
 INFO "Début       : $(date)"
 
 
@@ -149,7 +152,7 @@ OK "Docker Compose $(docker compose version --short) prêt"
 # ════════════════════════════════════════════════════════════════════
 STEP "5/9 — Préparation du dossier projet"
 mkdir -p "$PROJ_DIR"
-OK "Dossier $PROJ_DIR prêt"
+OK "Dossier $PROJ_DIR prêt (compose dans $DOCKER_DIR)"
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -190,22 +193,22 @@ cd "$PROJ_DIR"
 # ════════════════════════════════════════════════════════════════════
 STEP "7/9 — Configuration .env"
 
-if [ -f "$PROJ_DIR/.env" ]; then
-    WARN ".env déjà présent — non écrasé."
+if [ -f "$DOCKER_DIR/.env" ]; then
+    WARN "docker/.env déjà présent — non écrasé."
 else
-    if [ -f "$PROJ_DIR/.env.example" ]; then
-        cp "$PROJ_DIR/.env.example" "$PROJ_DIR/.env"
-        sed -i "s|VOTRE_IP|$SERVER_IP|g" "$PROJ_DIR/.env"
-        OK ".env créé depuis .env.example"
+    if [ -f "$DOCKER_DIR/env.example" ]; then
+        cp "$DOCKER_DIR/env.example" "$DOCKER_DIR/.env"
+        # CORS for browser API calls from this host (HTTP, IP only — see header comment)
+        sed -i "s|^ALLOWED_ORIGINS=.*|ALLOWED_ORIGINS=http://$SERVER_IP,http://localhost|" "$DOCKER_DIR/.env"
+        OK ".env créé depuis docker/env.example"
     else
-        WARN ".env.example introuvable dans le repo."
-        touch "$PROJ_DIR/.env"
+        FAIL "docker/env.example introuvable — vérifie le clone du repo."
     fi
 
     echo ""
     echo -e "  ${YLW}${BLD}⚠  Remplis le fichier .env avant de continuer.${NC}"
     echo ""
-    echo "  Ouvre-le avec :  nano $PROJ_DIR/.env"
+    echo "  Ouvre-le avec :  nano $DOCKER_DIR/.env"
     echo ""
     echo "  Valeurs obligatoires :"
     echo "    POSTGRES_PASSWORD   REDIS_PASSWORD   SECRET_KEY"
@@ -218,7 +221,7 @@ else
 fi
 
 # Vérification valeurs par défaut non remplacées
-if grep -q "CHANGE_MOI" "$PROJ_DIR/.env" 2>/dev/null; then
+if grep -q "CHANGE_MOI" "$DOCKER_DIR/.env" 2>/dev/null; then
     echo ""
     FAIL ".env contient encore des 'CHANGE_MOI'. Modifie-les et relance."
 fi
@@ -229,6 +232,8 @@ OK ".env validé"
 # 8 — Build + démarrage Docker
 # ════════════════════════════════════════════════════════════════════
 STEP "8/9 — Build et démarrage de la stack"
+
+cd "$DOCKER_DIR"
 
 echo "  → Build des images..."
 docker compose build --parallel
@@ -274,7 +279,7 @@ After=docker.service network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=$PROJ_DIR
+WorkingDirectory=$DOCKER_DIR
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=300
@@ -289,13 +294,14 @@ systemctl enable redwood.service
 OK "Service 'redwood' activé au démarrage"
 
 # Script de mise à jour rapide
-cat > "$PROJ_DIR/deploy.sh" << 'DEPLOY'
+cat > "$PROJ_DIR/deploy.sh" << DEPLOY
 #!/bin/bash
 # Redwood Plus — mise à jour depuis GitHub
 set -e
-cd /opt/redwood
+cd $PROJ_DIR
 echo "Pull GitHub..."
 git pull
+cd $DOCKER_DIR
 echo "Build..."
 docker compose build --parallel
 docker compose up -d
@@ -310,7 +316,7 @@ chmod +x "$PROJ_DIR/deploy.sh"
 # ════════════════════════════════════════════════════════════════════
 # Résumé final
 # ════════════════════════════════════════════════════════════════════
-ADMIN_USER=$(grep "^ADMIN_USERNAME=" "$PROJ_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "admin")
+ADMIN_USER=$(grep "^ADMIN_USERNAME=" "$DOCKER_DIR/.env" 2>/dev/null | cut -d= -f2 || echo "admin")
 
 echo ""
 echo -e "${RED}  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -327,10 +333,10 @@ echo    "   Repo       →  $GITHUB_REPO"
 echo ""
 echo -e "   ${BLD}Commandes utiles :${NC}"
 echo    "     bash /opt/redwood/deploy.sh          # mettre à jour"
-echo    "     docker compose logs -f worker        # logs transcodage"
+echo    "     cd $DOCKER_DIR && docker compose logs -f worker   # logs transcodage"
 echo    "     systemctl status redwood             # statut service"
 echo ""
 echo -e "   ${YLW}Vérification GPU AMD :${NC}"
-echo    "     docker compose exec worker vainfo --display drm --device /dev/dri/renderD128"
-echo    "     docker compose exec worker ffmpeg -hwaccels"
+echo    "     cd $DOCKER_DIR && docker compose exec worker vainfo --display drm --device /dev/dri/renderD128"
+echo    "     cd $DOCKER_DIR && docker compose exec worker ffmpeg -hwaccels"
 echo ""

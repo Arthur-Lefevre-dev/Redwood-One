@@ -834,6 +834,56 @@
         overflow-y: auto;
         overscroll-behavior: contain;
       }
+      .sm-season-meta-row-info {
+        cursor: pointer;
+        padding: 6px 8px;
+        margin: -4px 0;
+        border-radius: 8px;
+        transition: background 0.15s ease;
+      }
+      .sm-season-meta-row-info:hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .modal-season-meta-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        margin: -18px -18px 12px -18px;
+        padding: 14px 18px 12px;
+        background: var(--color-background-primary);
+        border-bottom: 1px solid var(--color-border-tertiary);
+      }
+      .modal-season-meta-header h3 {
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        padding-top: 2px;
+      }
+      .modal-season-meta-close {
+        flex-shrink: 0;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border-secondary);
+        background: #1a1a1a;
+        color: var(--color-text-primary);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        font-family: system-ui, sans-serif;
+      }
+      .modal-season-meta-close:hover {
+        border-color: var(--color-accent-primary, #8b2500);
+        color: #fca5a5;
+      }
       .modal textarea {
         width: 100%;
         min-height: 88px;
@@ -1867,7 +1917,17 @@
 
     <div class="modal-backdrop" id="modal-season-meta">
       <div class="modal modal-season-meta" role="document">
-        <h3 id="sm-heading">Fiche série et saisons</h3>
+        <div class="modal-season-meta-header">
+          <h3 id="sm-heading">Fiche série et saisons</h3>
+          <button
+            type="button"
+            class="modal-season-meta-close"
+            id="sm-close-header"
+            aria-label="Fermer la fenêtre"
+          >
+            ×
+          </button>
+        </div>
         <p class="err-msg" id="sm-err" style="display: none"></p>
         <p class="hint" id="sm-intro">
           Même <strong>clé série</strong> que sur les épisodes. En haut : affiche
@@ -3033,7 +3093,7 @@
             btnArt.className = "btn btn-primary";
             btnArt.style.fontSize = "11px";
             btnArt.textContent = "Fiche série / saisons";
-            btnArt.onclick = () => openSeasonMetaModal(showName, keyOpts);
+            btnArt.onclick = () => void openSeasonMetaModal(showName, keyOpts);
             toolRow.appendChild(btnArt);
             const th = document.createElement("span");
             th.style.fontSize = "11px";
@@ -3150,7 +3210,31 @@
         gt.value = d.hero_text || "";
       }
 
-      async function refreshSeasonMetaList() {
+      /** Push one season meta row from the API into the edit form (or clear if row is null). */
+      function smFillSeasonFormFromRow(row) {
+        const sn = $("#sm-season-num");
+        const pp = $("#sm-poster");
+        const nt = $("#sm-note");
+        const sy = $("#sm-synopsis");
+        if (!row) {
+          if (sn) sn.value = "";
+          if (pp) pp.value = "";
+          if (nt) nt.value = "";
+          if (sy) sy.value = "";
+          return;
+        }
+        if (sn) sn.value =
+          row.season_number != null ? String(row.season_number) : "";
+        if (pp) pp.value = row.poster_path || "";
+        if (nt) nt.value = row.note || "";
+        if (sy) sy.value = row.synopsis || "";
+      }
+
+      /**
+       * Reload season meta rows from DB into the list and sync the form.
+       * @param {number|string|undefined} preferredSeasonNumber  After save, keep this season in the form.
+       */
+      async function refreshSeasonMetaList(preferredSeasonNumber) {
         smHideErr();
         const list = $("#sm-list");
         if (!list) return;
@@ -3158,6 +3242,7 @@
         if (!sk) {
           list.innerHTML =
             '<p class="hint">Choisissez ou saisissez une clé série pour afficher les fiches.</p>';
+          smFillSeasonFormFromRow(null);
           return;
         }
         let r;
@@ -3184,6 +3269,7 @@
           p.textContent =
             "Aucune fiche pour cette clé. Utilisez le formulaire ci-dessous pour en ajouter une.";
           list.appendChild(p);
+          smFillSeasonFormFromRow(null);
           return;
         }
         for (const row of rows) {
@@ -3191,8 +3277,12 @@
           div.style.cssText =
             "display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--color-border-tertiary)";
           const info = document.createElement("div");
+          info.className = "sm-season-meta-row-info";
           info.style.flex = "1";
           info.style.minWidth = "120px";
+          info.title =
+            "Cliquer pour charger cette fiche dans le formulaire ci-dessous";
+          info.onclick = () => smFillSeasonFormFromRow(row);
           const title = document.createElement("strong");
           title.textContent = "Saison " + row.season_number;
           info.appendChild(title);
@@ -3223,7 +3313,8 @@
           btn.type = "button";
           btn.className = "action-btn danger";
           btn.textContent = "Suppr.";
-          btn.onclick = async () => {
+          btn.onclick = async (ev) => {
+            ev.stopPropagation();
             const ok = await showConfirmModal(
               "Supprimer cette fiche saison ?",
               "L’affiche et la note ne s’afficheront plus pour cette saison côté spectateur.",
@@ -3239,15 +3330,35 @@
               );
               return;
             }
-            refreshSeasonMetaList();
+            await refreshSeasonMetaList();
           };
           div.appendChild(info);
           div.appendChild(btn);
           list.appendChild(div);
         }
+        let pick = null;
+        if (
+          preferredSeasonNumber != null &&
+          preferredSeasonNumber !== ""
+        ) {
+          const pn = parseInt(String(preferredSeasonNumber), 10);
+          if (!Number.isNaN(pn)) {
+            pick = rows.find((x) => x.season_number === pn) || null;
+          }
+        }
+        if (!pick) {
+          const curRaw = ($("#sm-season-num").value || "").trim();
+          const curN =
+            curRaw === "" ? NaN : parseInt(curRaw, 10);
+          if (!Number.isNaN(curN)) {
+            pick = rows.find((x) => x.season_number === curN) || null;
+          }
+        }
+        if (!pick) pick = rows[rows.length - 1];
+        smFillSeasonFormFromRow(pick);
       }
 
-      function openSeasonMetaModal(showName, keyOpts) {
+      async function openSeasonMetaModal(showName, keyOpts) {
         smHideErr();
         const h = $("#sm-heading");
         if (h)
@@ -3280,18 +3391,18 @@
             o.textContent = k;
             sel.appendChild(o);
           }
-          sel.onchange = () => {
-            refreshSeasonMetaList();
-            refreshSeriesShowGlobal();
+          sel.onchange = async () => {
+            await refreshSeasonMetaList();
+            await refreshSeriesShowGlobal();
           };
         } else {
           if (sel) sel.classList.add("hidden");
           if (lbl) lbl.classList.remove("hidden");
           if (inp) {
             inp.classList.remove("hidden");
-            inp.onblur = () => {
-              refreshSeasonMetaList();
-              refreshSeriesShowGlobal();
+            inp.onblur = async () => {
+              await refreshSeasonMetaList();
+              await refreshSeriesShowGlobal();
             };
             inp.oninput = () => smSyncManualKeyHint();
             smSyncManualKeyHint();
@@ -3309,14 +3420,15 @@
         const backdrop = $("#modal-season-meta");
         if (backdrop) backdrop.classList.add("show");
         if (opts.length) {
-          refreshSeasonMetaList();
-          refreshSeriesShowGlobal();
+          await refreshSeasonMetaList();
+          await refreshSeriesShowGlobal();
         } else {
           const list = $("#sm-list");
           if (list)
             list.innerHTML =
               '<p class="hint">Saisissez la clé série (la même que sur les épisodes), puis quittez le champ pour charger la liste.</p>';
-          refreshSeriesShowGlobal();
+          smFillSeasonFormFromRow(null);
+          await refreshSeriesShowGlobal();
         }
       }
 
@@ -3448,6 +3560,9 @@
       });
 
       $("#sm-close").addEventListener("click", () => closeSeasonMetaModal());
+      $("#sm-close-header").addEventListener("click", () =>
+        closeSeasonMetaModal(),
+      );
       $("#modal-season-meta").addEventListener("click", (e) => {
         if (e.target.id === "modal-season-meta") closeSeasonMetaModal();
       });
@@ -3506,7 +3621,8 @@
           );
           return;
         }
-        await refreshSeasonMetaList();
+        const saved = await r.json();
+        await refreshSeasonMetaList(saved.season_number);
       });
       const smKeyInp = $("#sm-key-input");
       if (smKeyInp)
