@@ -9,7 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.limits import limiter
-from api.routes import admin, auth, films
+from api.routes import admin, auth, films, series
 from config import get_settings
 from core.gpu_detect import refresh_encoder_cache
 from db.session import init_db
@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(series.router)
 app.include_router(films.router)
 app.include_router(admin.router)
 

@@ -45,6 +45,7 @@
     </div>
     <div>
       <a href="/watch/">Accueil</a>
+      <a href="/watch/serie.html">Séries</a>
       <a href="/watch/categories.html">Catégories</a>
       <a href="#" id="nav-logout">Déconnexion</a>
     </div>
@@ -65,6 +66,8 @@
     <h3>Mes genres préférés (pour « Choisir pour moi »)</h3>
     <div class="taste-grid" id="taste-grid"></div>
   </section>
+  <div class="row-head"><h2>Séries</h2></div>
+  <div class="row-scroll" id="row-series"></div>
   <div class="row-head"><h2>Tendances</h2></div>
   <div class="row-scroll" id="row-featured"></div>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
@@ -164,6 +167,22 @@
 
       renderCards(document.getElementById('row-latest'), latest);
       renderCards(document.getElementById('row-featured'), featured);
+
+      try {
+        const sr = await api('/api/series');
+        const series = await sr.json();
+        const rs = document.getElementById('row-series');
+        rs.innerHTML = '';
+        series.slice(0, 16).forEach((s) => {
+          const el = document.createElement('div');
+          el.className = 'card';
+          el.onclick = () => { location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key); };
+          const img = s.poster_path ? posterUrl(s.poster_path) : '';
+          el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /><div class="t"></div>`;
+          el.querySelector('.t').textContent = s.title + ' · ' + s.episode_count + ' ép.';
+          rs.appendChild(el);
+        });
+      } catch (_) {}
     }
     boot().catch(() => { location.href = '/login.html'; });
   </script>

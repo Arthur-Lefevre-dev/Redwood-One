@@ -416,6 +416,22 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
     <h3>Modifier le film</h3>
     <p class="err-msg" id="fm-err" style="display:none"></p>
     <input type="hidden" id="fm-id" />
+    <label for="fm-kind">Type de contenu</label>
+    <select id="fm-kind">
+      <option value="film">Film</option>
+      <option value="series_episode">Épisode de série</option>
+    </select>
+    <p class="hint">Pour une série : même <strong>clé série</strong> et titre de série sur tous les épisodes ; numérotez saison et épisode.</p>
+    <div id="fm-series-box" class="hidden">
+      <label for="fm-series-key">Clé série (identifiant unique)</label>
+      <input id="fm-series-key" type="text" placeholder="ex. mon-show-2024" autocomplete="off" />
+      <label for="fm-series-title">Titre affiché de la série</label>
+      <input id="fm-series-title" type="text" placeholder="ex. Mon Show" autocomplete="off" />
+      <label for="fm-season">Saison</label>
+      <input id="fm-season" type="number" min="0" placeholder="1" />
+      <label for="fm-episode">Épisode</label>
+      <input id="fm-episode" type="number" min="0" placeholder="1" />
+    </div>
     <label for="fm-titre">Titre</label>
     <input id="fm-titre" type="text" autocomplete="off" />
     <label for="fm-titre-orig">Titre original</label>
@@ -885,6 +901,12 @@ async function openFilmModal(filmId) {
     $('#fm-tmdb-id').value = d.tmdb_id != null ? String(d.tmdb_id) : '';
     $('#fm-note').value = d.note_tmdb != null ? String(d.note_tmdb) : '';
     $('#fm-poster').value = d.poster_path || '';
+    $('#fm-kind').value = d.content_kind === 'series_episode' ? 'series_episode' : 'film';
+    $('#fm-series-key').value = d.series_key || '';
+    $('#fm-series-title').value = d.series_title || '';
+    $('#fm-season').value = d.season_number != null ? String(d.season_number) : '';
+    $('#fm-episode').value = d.episode_number != null ? String(d.episode_number) : '';
+    $('#fm-series-box').classList.toggle('hidden', $('#fm-kind').value !== 'series_episode');
     $('#fm-titre').focus();
   } catch (e) {
     if (e && e.message === '403-admin') return;
@@ -899,6 +921,10 @@ $('#modal-film').addEventListener('click', (e) => {
   if (e.target.id === 'modal-film') closeFilmModal();
 });
 
+$('#fm-kind').addEventListener('change', () => {
+  $('#fm-series-box').classList.toggle('hidden', $('#fm-kind').value !== 'series_episode');
+});
+
 $('#fm-save').addEventListener('click', async () => {
   const err = $('#fm-err');
   err.style.display = 'none';
@@ -908,6 +934,21 @@ $('#fm-save').addEventListener('click', async () => {
     err.textContent = 'Le titre est obligatoire';
     err.style.display = 'block';
     return;
+  }
+  const kind = $('#fm-kind').value;
+  if (kind === 'series_episode') {
+    if (!$('#fm-series-key').value.trim()) {
+      err.textContent = 'La clé série est obligatoire pour un épisode';
+      err.style.display = 'block';
+      return;
+    }
+    const sn = parseInt($('#fm-season').value, 10);
+    const en = parseInt($('#fm-episode').value, 10);
+    if (!Number.isFinite(sn) || sn < 0 || !Number.isFinite(en) || en < 1) {
+      err.textContent = 'Saison ≥ 0 et épisode ≥ 1 requis';
+      err.style.display = 'block';
+      return;
+    }
   }
   const parseOptInt = (el) => {
     const v = el.value.trim();
@@ -940,6 +981,11 @@ $('#fm-save').addEventListener('click', async () => {
     resolution: $('#fm-resolution').value.trim() || null,
     langue_originale: $('#fm-langue').value.trim() || null,
     tmdb_id: parseOptInt($('#fm-tmdb-id')),
+    content_kind: kind,
+    series_key: kind === 'series_episode' ? $('#fm-series-key').value.trim() : null,
+    series_title: kind === 'series_episode' ? ($('#fm-series-title').value.trim() || null) : null,
+    season_number: kind === 'series_episode' ? parseInt($('#fm-season').value, 10) : null,
+    episode_number: kind === 'series_episode' ? parseInt($('#fm-episode').value, 10) : null,
   };
   try {
     const r = await api('/api/admin/films/' + id, {

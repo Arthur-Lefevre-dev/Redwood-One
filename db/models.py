@@ -6,15 +6,16 @@ from typing import Any, List, Optional
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     DateTime,
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
-    BigInteger,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -43,6 +44,11 @@ class FilmStatut(str, enum.Enum):
     en_cours = "en_cours"
     disponible = "disponible"
     erreur = "erreur"
+
+
+class ContentKind(str, enum.Enum):
+    film = "film"
+    series_episode = "series_episode"
 
 
 class User(Base):
@@ -116,6 +122,17 @@ class Film(Base):
     pipeline_progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # Live BitTorrent stats while aria2 downloads (seeders, leechers, bps, …)
     torrent_stats: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    # Series: one row per episode; films keep content_kind=film and null series_* fields
+    content_kind: Mapped[ContentKind] = mapped_column(
+        Enum(ContentKind, values_callable=lambda x: [e.value for e in x]),
+        default=ContentKind.film,
+    )
+    series_key: Mapped[Optional[str]] = mapped_column(String(160), nullable=True, index=True)
+    series_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    season_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    episode_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (Index("ix_films_series_season_ep", "series_key", "season_number", "episode_number"),)
 
 
 class InvitationCode(Base):

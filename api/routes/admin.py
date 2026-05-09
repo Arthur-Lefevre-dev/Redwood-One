@@ -17,7 +17,7 @@ from core.catalog_sync import sync_s3_films_to_db
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
 from core.upload import save_upload_stream
-from db.models import Film, FilmSource, FilmStatut, InvitationCode, User, UserRole
+from db.models import ContentKind, Film, FilmSource, FilmStatut, InvitationCode, User, UserRole
 from db.session import get_db
 from worker.tasks import download_torrent_task, process_film_task
 
@@ -74,6 +74,11 @@ def _film_to_admin_detail(f: Film) -> dict[str, Any]:
         "statut": f.statut.value,
         "codec_video": f.codec_video,
         "taille_octets": f.taille_octets,
+        "content_kind": f.content_kind.value,
+        "series_key": f.series_key,
+        "series_title": f.series_title,
+        "season_number": f.season_number,
+        "episode_number": f.episode_number,
     }
 
 
@@ -103,6 +108,11 @@ class AdminFilmUpdateBody(BaseModel):
     resolution: Optional[str] = None
     langue_originale: Optional[str] = None
     tmdb_id: Optional[int] = None
+    content_kind: ContentKind = ContentKind.film
+    series_key: Optional[str] = None
+    series_title: Optional[str] = None
+    season_number: Optional[int] = None
+    episode_number: Optional[int] = None
 
 
 @router.patch("/films/{film_id}")
@@ -131,6 +141,17 @@ def admin_patch_film(
     lo = (body.langue_originale or "").strip()
     f.langue_originale = lo or None
     f.tmdb_id = body.tmdb_id
+    f.content_kind = body.content_kind
+    if body.content_kind == ContentKind.film:
+        f.series_key = None
+        f.series_title = None
+        f.season_number = None
+        f.episode_number = None
+    else:
+        f.series_key = (body.series_key or "").strip() or None
+        f.series_title = (body.series_title or "").strip() or None
+        f.season_number = body.season_number
+        f.episode_number = body.episode_number
     db.commit()
     db.refresh(f)
     return _film_to_admin_detail(f)

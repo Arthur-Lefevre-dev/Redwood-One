@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Séries — Redwood Plus</title>
+  <style>
+    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
+    .brand{font-weight:700;color:var(--accent)}
+    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
+    nav a:hover{color:#fff}
+    main{padding:24px 28px 48px;max-width:960px;margin:0 auto}
+    h1{font-size:1.35rem;margin-bottom:8px}
+    .lead{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.5}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+    .card{background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer}
+    .card img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#222;display:block}
+    .card .t{padding:10px;font-size:12px;line-height:1.35}
+    .back{display:inline-block;margin-bottom:20px;color:#fca5a5;font-size:14px;text-decoration:none}
+    .back:hover{text-decoration:underline}
+    .hero-poster{width:140px;border-radius:10px;border:1px solid #333;float:left;margin:0 20px 16px 0}
+    .season{margin-bottom:28px;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#111}
+    .season h2{font-size:14px;padding:12px 16px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;color:#ddd}
+    .ep-list{display:flex;flex-direction:column}
+    .ep{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #222;cursor:pointer;font-size:13px}
+    .ep:last-child{border-bottom:none}
+    .ep:hover{background:#1a1010}
+    .ep-num{flex:0 0 52px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+    .ep-title{flex:1;color:#e5e5e5}
+    .empty{color:var(--muted);padding:40px;text-align:center}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand">Redwood Plus</div>
+    <div>
+      <a href="/watch/">Accueil</a>
+      <a href="/watch/serie.html">Séries</a>
+      <a href="/watch/categories.html">Catégories</a>
+      <a href="#" id="nav-logout">Déconnexion</a>
+    </div>
+  </nav>
+  <main id="main-list">
+    <h1>Séries</h1>
+    <p class="lead">Chaque épisode est un enregistrement dans la bibliothèque, regroupé par clé série (configurable dans l’admin).</p>
+    <div class="grid" id="series-grid"></div>
+    <p class="empty" id="empty-list" style="display:none">Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.</p>
+  </main>
+  <main id="main-detail" style="display:none">
+    <a class="back" href="/watch/serie.html">← Toutes les séries</a>
+    <img class="hero-poster" id="d-poster" alt="" />
+    <h1 id="d-title">…</h1>
+    <p class="lead" id="d-syn"></p>
+    <div id="seasons"></div>
+  </main>
+  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="./app.js"></script>
+  <script>
+    document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+
+    const params = new URLSearchParams(location.search);
+    const key = params.get('key');
+
+    function showList() {
+      document.getElementById('main-list').style.display = 'block';
+      document.getElementById('main-detail').style.display = 'none';
+    }
+    function showDetail() {
+      document.getElementById('main-list').style.display = 'none';
+      document.getElementById('main-detail').style.display = 'block';
+    }
+
+    async function bootList() {
+      const r = await api('/api/series');
+      const rows = await r.json();
+      const g = document.getElementById('series-grid');
+      const empty = document.getElementById('empty-list');
+      g.innerHTML = '';
+      if (!rows.length) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      rows.forEach((s) => {
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.onclick = () => {
+          location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key);
+        };
+        const img = s.poster_path ? posterUrl(s.poster_path) : '';
+        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
+        el.querySelector('.t').textContent = s.title + ' · ' + s.episode_count + ' ép.';
+        g.appendChild(el);
+      });
+    }
+
+    async function bootDetail(sk) {
+      const r = await api('/api/series/' + encodeURIComponent(sk) + '/detail');
+      const d = await r.json();
+      document.getElementById('d-title').textContent = d.title || sk;
+      document.getElementById('d-syn').textContent = (d.synopsis || '').slice(0, 400) + (d.synopsis && d.synopsis.length > 400 ? '…' : '');
+      const pu = d.poster_path ? posterUrl(d.poster_path) : '';
+      document.getElementById('d-poster').src = pu;
+      const wrap = document.getElementById('seasons');
+      wrap.innerHTML = '';
+      const seasonNums = Object.keys(d.seasons || {}).map((k) => parseInt(k, 10)).sort((a, b) => a - b);
+      seasonNums.forEach((sn) => {
+        const k = String(sn);
+        const eps = d.seasons[k] || [];
+        const sec = document.createElement('section');
+        sec.className = 'season';
+        sec.innerHTML = '<h2>Saison ' + k + '</h2><div class="ep-list"></div>';
+        const list = sec.querySelector('.ep-list');
+        eps.forEach((ep) => {
+          const row = document.createElement('div');
+          row.className = 'ep';
+          row.onclick = () => { location.href = '/watch/film.html?id=' + ep.id; };
+          const en = ep.episode_number != null ? ep.episode_number : '—';
+          row.innerHTML = '<span class="ep-num">E' + String(en).padStart(2, '0') + '</span><span class="ep-title"></span>';
+          row.querySelector('.ep-title').textContent = ep.titre || ('Épisode ' + en);
+          list.appendChild(row);
+        });
+        wrap.appendChild(sec);
+      });
+    }
+
+    async function boot() {
+      await api('/api/auth/me');
+      if (key) {
+        showDetail();
+        await bootDetail(key);
+      } else {
+        showList();
+        await bootList();
+      }
+    }
+    boot().catch(() => { location.href = '/login.html'; });
+  </script>
+</body>
+</html>

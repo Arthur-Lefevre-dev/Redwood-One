@@ -9,9 +9,10 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, require_admin
+from core.series_playback import next_episode_id, prev_episode_id
 from core.s3 import presigned_stream_url
 from core.tmdb import enrich_from_filename, movie_details
-from db.models import Film, FilmStatut, User
+from db.models import ContentKind, Film, FilmStatut, User
 from db.session import get_db
 
 router = APIRouter(prefix="/api/films", tags=["films"])
@@ -48,7 +49,10 @@ def list_films(
     user: User = Depends(get_current_user),
     q: Optional[str] = None,
 ):
-    query = db.query(Film).filter(Film.statut == FilmStatut.disponible)
+    query = db.query(Film).filter(
+        Film.statut == FilmStatut.disponible,
+        Film.content_kind == ContentKind.film,
+    )
     if q:
         like = f"%{q}%"
         query = query.filter(or_(Film.titre.ilike(like), Film.realisateur.ilike(like)))
@@ -60,7 +64,7 @@ def list_films(
 def featured(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     films = (
         db.query(Film)
-        .filter(Film.statut == FilmStatut.disponible)
+        .filter(Film.statut == FilmStatut.disponible, Film.content_kind == ContentKind.film)
         .order_by(Film.note_tmdb.desc().nulls_last(), Film.date_ajout.desc())
         .limit(12)
         .all()
@@ -77,7 +81,7 @@ def latest_films(
     lim = max(1, min(48, limit))
     return (
         db.query(Film)
-        .filter(Film.statut == FilmStatut.disponible)
+        .filter(Film.statut == FilmStatut.disponible, Film.content_kind == ContentKind.film)
         .order_by(Film.date_ajout.desc())
         .limit(lim)
         .all()
@@ -86,7 +90,11 @@ def latest_films(
 
 @router.get("/genres-summary")
 def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    films = db.query(Film).filter(Film.statut == FilmStatut.disponible).all()
+    films = (
+        db.query(Film)
+        .filter(Film.statut == FilmStatut.disponible, Film.content_kind == ContentKind.film)
+        .all()
+    )
     counts: dict[str, int] = {}
     for f in films:
         for g in f.genres or []:
@@ -101,7 +109,10 @@ def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_curre
 @router.get("/surprise-me", response_model=FilmOut)
 def surprise_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Pick a catalog title weighted by the viewer's favorite genres (preferences)."""
-    q = db.query(Film).filter(Film.statut == FilmStatut.disponible)
+    q = db.query(Film).filter(
+        Film.statut == FilmStatut.disponible,
+        Film.content_kind == ContentKind.film,
+    )
     films = q.all()
     if not films:
         raise HTTPException(status_code=404, detail="Catalog empty")
@@ -126,7 +137,7 @@ def surprise_me(db: Session = Depends(get_db), user: User = Depends(get_current_
 def by_genre(genre: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     films = (
         db.query(Film)
-        .filter(Film.statut == FilmStatut.disponible)
+        .filter(Film.statut == FilmStatut.disponible, Film.content_kind == ContentKind.film)
         .order_by(Film.date_ajout.desc())
         .all()
     )
@@ -153,6 +164,16 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
     f = db.get(Film, film_id)
     if not f:
         raise HTTPException(404, "Not found")
+    playback = None
+    if f.content_kind == ContentKind.series_episode and f.series_key:
+        playback = {
+            "series_key": f.series_key,
+            "series_title": f.series_title,
+            "season_number": f.season_number,
+            "episode_number": f.episode_number,
+            "next_episode_id": next_episode_id(db, f),
+            "prev_episode_id": prev_episode_id(db, f),
+        }
     return {
         "id": f.id,
         "titre": f.titre,
@@ -169,6 +190,8 @@ def film_detail(film_id: int, db: Session = Depends(get_db), user: User = Depend
         "resolution": f.resolution,
         "codec_video": f.codec_video,
         "statut": f.statut.value,
+        "content_kind": f.content_kind.value,
+        "playback": playback,
     }
 
 
