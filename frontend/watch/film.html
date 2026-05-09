@@ -305,10 +305,13 @@
       block.hidden = false;
       const list = f.trailers && f.trailers.length ? f.trailers : [];
       if (!list.length) {
+        if (f.tmdb_id == null) {
+          block.hidden = true;
+          return;
+        }
         empty.hidden = false;
-        empty.textContent = f.tmdb_id == null
-          ? 'Aucune bande-annonce : renseignez un identifiant TMDB sur la fiche (administration) pour lier les vidéos TMDB.'
-          : 'Aucune vidéo YouTube répertoriée sur TMDB pour ce film pour l’instant, ou la clé API TMDB n’est pas configurée côté serveur.';
+        empty.textContent =
+          'Aucune vidéo YouTube répertoriée sur TMDB pour ce film pour l’instant, ou la clé API TMDB n’est pas configurée côté serveur.';
         return;
       }
       const t = list[0];
