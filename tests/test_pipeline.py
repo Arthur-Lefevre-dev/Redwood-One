@@ -1,6 +1,6 @@
 """Tests for pipeline decisions."""
 
-from core.pipeline import THREE_GB, _ffmpeg_time_to_sec, decide_processing
+from core.pipeline import _ffmpeg_time_to_sec, decide_processing
 
 
 def test_non_mp4_transcodes():
@@ -13,9 +13,10 @@ def test_small_mp4_direct():
     assert tx is False
 
 
-def test_large_mp4_optimize():
-    t, tx = decide_processing("/tmp/x.mp4", {"size_bytes": THREE_GB + 1})
-    assert tx is True
+def test_large_mp4_direct():
+    """MP4 uploads as-is regardless of size (no 3 GiB optimisation threshold)."""
+    t, tx = decide_processing("/tmp/x.mp4", {"size_bytes": 20 * 1024 * 1024 * 1024})
+    assert tx is False
 
 
 def test_ffmpeg_stderr_time_parse():

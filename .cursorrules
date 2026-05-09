@@ -99,11 +99,9 @@ Source "upload" :
   1. Admin uploade un fichier → /tmp/redwood/uploads/
 
 Étapes communes (à partir du fichier local) :
-  3. Analyse ffprobe : format .mp4 ? taille < 3 GB ?
+  3. Analyse ffprobe : format .mp4 ?
   4. Arbre de décision :
      - Pas .mp4            → Transcodage complet (GPU local détecté)
-     - .mp4 ET size ≥ 3 GB → Optimisation bitrate (GPU local détecté)
-     - .mp4 ET size < 3 GB → Upload direct S3, pas de transcodage
   5. Enrichissement TMDB
   6. Sauvegarde métadonnées PostgreSQL
   7. Upload S3 + pre-signed URL

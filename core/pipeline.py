@@ -20,8 +20,6 @@ from db.models import Film, FilmStatut, FilmTraitement
 
 logger = logging.getLogger(__name__)
 
-THREE_GB = 3 * 1024 * 1024 * 1024
-
 
 def decide_processing(path: str, meta: Dict[str, Any]) -> Tuple[FilmTraitement, bool]:
     """
@@ -29,11 +27,8 @@ def decide_processing(path: str, meta: Dict[str, Any]) -> Tuple[FilmTraitement, 
     needs_transcode False means upload source file as-is.
     """
     suf = Path(path).suffix.lower()
-    size = int(meta.get("size_bytes") or 0)
     if suf != ".mp4":
         return FilmTraitement.transcode, True
-    if size >= THREE_GB:
-        return FilmTraitement.optimise, True
     return FilmTraitement.direct, False
 
 
