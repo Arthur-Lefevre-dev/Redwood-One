@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from typing import List
+from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,7 +15,13 @@ class Settings(BaseSettings):
     )
 
     DATABASE_URL: str = "postgresql://redwood:redwood@localhost:5432/redwood"
-    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Celery broker: build URL with URL-encoded password so special chars (@ : # / …)
+    # never break kombu's parser (avoid ValueError on broker URL).
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str = ""
 
     SECRET_KEY: str = "dev-secret-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
@@ -53,6 +60,15 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> List[str]:
         return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def redis_url(self) -> str:
+        """Redis URL for Celery broker/backend (password always percent-encoded)."""
+        host = (self.REDIS_HOST or "localhost").strip()
+        if not self.REDIS_PASSWORD:
+            return f"redis://{host}:{self.REDIS_PORT}/{self.REDIS_DB}"
+        pw = quote(self.REDIS_PASSWORD, safe="")
+        return f"redis://:{pw}@{host}:{self.REDIS_PORT}/{self.REDIS_DB}"
 
 
 @lru_cache

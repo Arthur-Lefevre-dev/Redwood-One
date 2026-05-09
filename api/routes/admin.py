@@ -74,15 +74,14 @@ def _enqueue_process_film_or_raise(film_id: int, local_path: str, db: Session) -
             row.statut = FilmStatut.erreur
             row.erreur_message = (
                 "File d'attente indisponible : impossible de joindre Redis/Celery. "
-                "Vérifiez REDIS_URL et que les conteneurs redis et worker sont actifs."
+                "Vérifiez REDIS_PASSWORD, REDIS_HOST et que les conteneurs redis et worker sont actifs."
             )[:8000]
             db.commit()
         raise HTTPException(
             status_code=503,
             detail=(
                 "Le traitement vidéo n'a pas pu être mis en file d'attente (Redis). "
-                "Vérifiez docker compose (services redis, worker), et que REDIS_URL / "
-                "REDIS_PASSWORD dans docker/.env sont cohérents."
+                "Vérifiez docker compose (services redis, worker), REDIS_PASSWORD et REDIS_HOST dans docker/.env."
             ),
         )
 
@@ -112,7 +111,7 @@ def _enqueue_download_torrent_or_raise(
             status_code=503,
             detail=(
                 "La file d'attente (Redis) est injoignable. "
-                "Vérifiez les conteneurs redis et worker et la variable REDIS_URL."
+                "Vérifiez les conteneurs redis et worker, REDIS_PASSWORD et REDIS_HOST."
             ),
         )
 

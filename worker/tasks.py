@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 app = Celery(
     "redwood",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL,
+    broker=settings.redis_url,
+    backend=settings.redis_url,
 )
 app.conf.update(
     task_serializer="json",
