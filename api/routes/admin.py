@@ -569,7 +569,7 @@ def delete_user(
 class SeriesSeasonMetaBody(BaseModel):
     series_key: str = Field(..., min_length=1, max_length=160)
     season_number: int = Field(..., ge=0)
-    poster_path: Optional[str] = Field(None, max_length=512)
+    poster_path: Optional[str] = Field(None, max_length=2048)
     note: Optional[str] = Field(None, max_length=512)
 
 
@@ -652,7 +652,7 @@ def admin_delete_series_season(
 
 class SeriesShowPageBody(BaseModel):
     series_key: str = Field(..., min_length=1, max_length=160)
-    poster_path: Optional[str] = Field(None, max_length=512)
+    poster_path: Optional[str] = Field(None, max_length=2048)
     hero_text: Optional[str] = Field(None, max_length=16000)
 
 

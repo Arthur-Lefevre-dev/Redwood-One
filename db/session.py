@@ -134,7 +134,7 @@ def _ensure_series_season_meta_table() -> None:
                         id SERIAL PRIMARY KEY,
                         series_key VARCHAR(160) NOT NULL,
                         season_number INTEGER NOT NULL,
-                        poster_path VARCHAR(512),
+                        poster_path VARCHAR(2048),
                         note VARCHAR(512),
                         CONSTRAINT uq_series_season_meta_key_sn UNIQUE (series_key, season_number)
                     )
@@ -157,7 +157,7 @@ def _ensure_series_season_meta_table() -> None:
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     series_key VARCHAR(160) NOT NULL,
                     season_number INTEGER NOT NULL,
-                    poster_path VARCHAR(512),
+                    poster_path VARCHAR(2048),
                     note VARCHAR(512),
                     UNIQUE (series_key, season_number)
                 )
@@ -186,7 +186,7 @@ def _ensure_series_show_meta_table() -> None:
                     CREATE TABLE series_show_meta (
                         id SERIAL PRIMARY KEY,
                         series_key VARCHAR(160) NOT NULL UNIQUE,
-                        poster_path VARCHAR(512),
+                        poster_path VARCHAR(2048),
                         hero_text TEXT
                     )
                     """
@@ -201,13 +201,37 @@ def _ensure_series_show_meta_table() -> None:
                 CREATE TABLE series_show_meta (
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     series_key VARCHAR(160) NOT NULL UNIQUE,
-                    poster_path VARCHAR(512),
+                    poster_path VARCHAR(2048),
                     hero_text TEXT
                 )
                 """
             )
         )
     logger.info("database schema: created series_show_meta (sqlite)")
+
+
+def _widen_series_meta_poster_columns() -> None:
+    """Allow full TMDB/CDN URLs in poster_path (existing DBs may still be VARCHAR(512))."""
+    if engine.dialect.name != "postgresql":
+        return
+    insp = inspect(engine)
+    for table in ("series_show_meta", "series_season_meta"):
+        if table not in insp.get_table_names():
+            continue
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        f"ALTER TABLE {table} ALTER COLUMN poster_path TYPE VARCHAR(2048)"
+                    )
+                )
+            logger.info("database schema: widened %s.poster_path to 2048", table)
+        except Exception as exc:
+            logger.warning(
+                "database schema: could not widen %s.poster_path (%s)",
+                table,
+                exc,
+            )
 
 
 def init_db() -> None:
@@ -219,6 +243,7 @@ def init_db() -> None:
     _ensure_invitation_created_by_column()
     _ensure_series_season_meta_table()
     _ensure_series_show_meta_table()
+    _widen_series_meta_poster_columns()
 
 
 def get_db() -> Generator[Session, None, None]:

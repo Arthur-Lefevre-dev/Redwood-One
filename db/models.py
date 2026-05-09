@@ -153,7 +153,7 @@ class SeriesSeasonMeta(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     series_key: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
     season_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    poster_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    poster_path: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     note: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     __table_args__ = (
@@ -168,7 +168,7 @@ class SeriesShowMeta(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     series_key: Mapped[str] = mapped_column(String(160), nullable=False, unique=True, index=True)
-    poster_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    poster_path: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     hero_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 

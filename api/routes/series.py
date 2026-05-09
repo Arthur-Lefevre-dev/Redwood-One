@@ -19,6 +19,24 @@ from db.session import get_db
 router = APIRouter(prefix="/api/series", tags=["series"])
 
 
+def _merge_show_meta_rows(rows: List[SeriesShowMeta]) -> tuple[Optional[str], Optional[str]]:
+    """First non-empty poster_path and hero_text across equivalent series_key rows."""
+    poster: Optional[str] = None
+    hero: Optional[str] = None
+    for r in rows:
+        if poster is None and r.poster_path:
+            s = str(r.poster_path).strip()
+            if s:
+                poster = s
+        if hero is None and r.hero_text:
+            t = str(r.hero_text).strip()
+            if t:
+                hero = t
+        if poster is not None and hero is not None:
+            break
+    return poster, hero
+
+
 @router.get("")
 def list_series(
     db: Session = Depends(get_db),
@@ -56,16 +74,13 @@ def list_series(
         )
         if not rep:
             continue
-        show_meta = (
+        show_rows = (
             db.query(SeriesShowMeta)
             .filter(SeriesShowMeta.series_key.in_(sk_list))
-            .first()
+            .all()
         )
-        show_poster = (
-            (show_meta.poster_path or "").strip()
-            if show_meta and show_meta.poster_path
-            else ""
-        )
+        show_poster, _ = _merge_show_meta_rows(show_rows)
+        show_poster = show_poster or ""
         list_poster = show_poster or (rep.poster_path or "")
         title = rep.series_title or rep.titre
         if needle:
@@ -159,24 +174,26 @@ def series_detail(
     season_art: dict[str, dict[str, Any]] = {}
     for m in meta_rows:
         key = str(int(m.season_number))
+        p = m.poster_path
+        n = m.note
         if key not in season_art:
             season_art[key] = {
-                "poster_path": m.poster_path,
-                "note": m.note,
+                "poster_path": p,
+                "note": n,
             }
-    show_row = (
+        else:
+            cur = season_art[key]
+            if not (cur.get("poster_path") or "").strip() and (p or "").strip():
+                cur["poster_path"] = p
+            if not (cur.get("note") or "").strip() and (n or "").strip():
+                cur["note"] = n
+    show_rows = (
         db.query(SeriesShowMeta)
         .filter(SeriesShowMeta.series_key.in_(sk_list))
-        .first()
+        .all()
     )
-    show_poster = (
-        (show_row.poster_path or "").strip()
-        if show_row and show_row.poster_path
-        else ""
-    )
-    hero_text_val = None
-    if show_row and show_row.hero_text and str(show_row.hero_text).strip():
-        hero_text_val = str(show_row.hero_text).strip()
+    show_poster, hero_text_val = _merge_show_meta_rows(show_rows)
+    show_poster = show_poster or ""
     effective_poster = show_poster or rep.poster_path
     return {
         "series_key": normalize_series_group_key(series_key),
