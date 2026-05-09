@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -180,6 +180,24 @@ def _spoken_lang(detail: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def _imdb_episode_titre_and_original(
+    series_name: str,
+    season: int,
+    episode: int,
+    episode_name: Optional[str],
+) -> Tuple[str, Optional[str]]:
+    """titre = series + episode name; titre_original = series + SxxExy + episode name."""
+    s = (series_name or "").strip()
+    ep = (episode_name or "").strip()
+    se = f"S{int(season):02d}E{int(episode):02d}"
+    if not ep:
+        single = f"{s} {se}".strip() if s else se
+        return single, single if s else None
+    if s:
+        return f"{s} {ep}", f"{s} {se} {ep}"
+    return ep, f"{se} {ep}"
+
+
 def parse_imdb_tt(raw: Optional[str]) -> Optional[str]:
     """Return normalized ``tt123...`` or None if invalid."""
     if raw is None or not str(raw).strip():
@@ -258,6 +276,15 @@ def metadata_from_imdb_title_id(imdb_title_id: str) -> Optional[Dict[str, Any]]:
             series_id = str(detail["seriesId"])
         if series_id and str(series_id).startswith("tt"):
             out["series_key"] = f"imdb-{series_id}"
+
+        st = (out.get("series_title") or "").strip()
+        ep_name = (detail.get("primaryTitle") or "").strip()
+        sn = out.get("season_number")
+        en = out.get("episode_number")
+        if sn is not None and en is not None:
+            t, to = _imdb_episode_titre_and_original(st, int(sn), int(en), ep_name or None)
+            out["titre"] = t
+            out["titre_original"] = to
 
     return out
 
@@ -377,10 +404,12 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
     ) or show_q
 
     if not ep_row:
+        t_ep, t_orig = _imdb_episode_titre_and_original(stitle, season, episode, None)
         return {
             "tmdb_id": None,
             "imdb_title_id": None,
-            "titre": f"{stitle} S{season:02d}E{episode:02d}",
+            "titre": t_ep,
+            "titre_original": t_orig,
             "synopsis": show_detail.get("plot") if isinstance(show_detail, dict) else None,
             "genres": list(show_detail.get("genres") or []) if isinstance(show_detail, dict) else [],
             "realisateur": None,
@@ -426,11 +455,14 @@ def enrich_series_episode_from_filename(filename: str) -> Dict[str, Any]:
 
     genres = list(show_detail.get("genres") or []) if isinstance(show_detail, dict) else []
 
+    ep_name = (ep_title or "").strip() or None
+    disp_titre, disp_orig = _imdb_episode_titre_and_original(stitle, season, episode, ep_name)
+
     return {
         "tmdb_id": None,
         "imdb_title_id": str(ep_id) if ep_id else None,
-        "titre": ep_title or f"{stitle} S{season:02d}E{episode:02d}",
-        "titre_original": ep_use.get("originalTitle") if isinstance(ep_use, dict) else None,
+        "titre": disp_titre,
+        "titre_original": disp_orig,
         "synopsis": overview,
         "genres": genres,
         "realisateur": director,
