@@ -49,10 +49,65 @@ def _ensure_films_trailer_columns() -> None:
     logger.info("database schema: ensured films trailer columns (sqlite)")
 
 
+def _ensure_user_invite_column() -> None:
+    """Add last_invite_at for monthly user-generated invitation codes."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_invite_at TIMESTAMP"))
+        logger.info("database schema: ensured users.last_invite_at (postgresql)")
+        return
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    if "last_invite_at" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN last_invite_at DATETIME"))
+    logger.info("database schema: ensured users.last_invite_at (sqlite)")
+
+
+def _ensure_invitation_created_by_column() -> None:
+    """Link member-generated invite codes to users for history UI."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE invitation_codes ADD COLUMN IF NOT EXISTS "
+                    "created_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_invitation_codes_created_by_user_id "
+                    "ON invitation_codes(created_by_user_id)"
+                )
+            )
+        logger.info("database schema: ensured invitation_codes.created_by_user_id (postgresql)")
+        return
+    insp = inspect(engine)
+    if "invitation_codes" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("invitation_codes")}
+    if "created_by_user_id" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE invitation_codes ADD COLUMN created_by_user_id INTEGER"))
+        logger.info("database schema: added invitation_codes.created_by_user_id (sqlite)")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_invitation_codes_created_by_user_id "
+                "ON invitation_codes(created_by_user_id)"
+            )
+        )
+
+
 def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
     _ensure_films_trailer_columns()
+    _ensure_user_invite_column()
+    _ensure_invitation_created_by_column()
 
 
 def get_db() -> Generator[Session, None, None]:

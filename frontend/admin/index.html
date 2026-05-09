@@ -147,8 +147,17 @@ body{font-family:var(--font-sans);background:var(--color-background-tertiary);co
 .gpu-val{font-size:13px;font-weight:500;color:var(--color-text-primary)}
 .gpu-bar{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin-top:8px}
 .gpu-fill{height:100%;border-radius:3px}
-#upload-progress{height:6px;background:var(--color-border-tertiary);border-radius:3px;margin:8px 0;display:none}
-#upload-progress .fill{height:100%;width:0;background:var(--accent);border-radius:3px}
+.upload-progress-list{display:none;flex-direction:column;gap:10px;margin:12px 0}
+.upload-progress-list.is-active{display:flex}
+.upload-job{padding:10px 12px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary)}
+.upload-job-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.upload-job-name{font-size:12px;font-weight:500;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.upload-job-pct{font-size:11px;font-weight:600;color:var(--color-text-secondary);flex-shrink:0;font-variant-numeric:tabular-nums}
+.upload-job-track{height:6px;background:var(--color-border-tertiary);border-radius:3px;overflow:hidden}
+.upload-job-fill{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .1s linear}
+.upload-job.upload-job-ok .upload-job-fill{background:#22c55e}
+.upload-job.upload-job-err .upload-job-fill{background:#ef4444}
+.upload-job-msg{font-size:11px;color:#fca5a5;margin-top:6px;line-height:1.35}
 .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:50}
 .modal-backdrop.show{display:flex}
 .modal{background:var(--color-background-primary);border-radius:12px;padding:18px;width:min(420px,92vw);border:1px solid var(--color-border-tertiary);color:var(--color-text-primary)}
@@ -244,11 +253,11 @@ a.btn-viewer-site:hover{color:var(--color-text-primary);border-color:var(--accen
                 <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px;font-weight:500">Upload direct</div>
                 <div class="upload-zone" id="drop-zone">
                   <div class="upload-icon">↑</div>
-                  <div class="upload-title">Glisser un fichier ici</div>
-                  <div class="upload-sub">MP4, MKV, AVI, MOV, WMV, M4V — max 50 GB</div>
+                  <div class="upload-title">Glisser des fichiers ici</div>
+                  <div class="upload-sub">MP4, MKV, AVI, MOV, WMV, M4V — plusieurs fichiers possibles — max 50 GB chacun</div>
                 </div>
-                <input type="file" id="file-input" class="hidden" accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v" />
-                <div id="upload-progress"><div class="fill" id="upload-fill"></div></div>
+                <input type="file" id="file-input" class="hidden" multiple accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v" />
+                <div id="upload-progress-list" class="upload-progress-list" aria-live="polite"></div>
                 <button class="btn btn-primary" style="width:100%" id="btn-browse" type="button">Parcourir les fichiers</button>
               </div>
               <div>
@@ -1142,37 +1151,110 @@ $('#nu-save').addEventListener('click', async () => {
   loadUsers();
 });
 
+const VIDEO_UPLOAD_EXT = new Set(['.mp4', '.avi', '.mov', '.wmv', '.m4v']);
+function isVideoUploadFile(f) {
+  const n = (f && f.name) ? f.name.toLowerCase() : '';
+  const dot = n.lastIndexOf('.');
+  return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
+}
+
+let uploadJobSeq = 0;
+
+function uploadProgressListEl() {
+  return $('#upload-progress-list');
+}
+
+function ensureUploadListVisible() {
+  const list = uploadProgressListEl();
+  list.classList.add('is-active');
+}
+
 function uploadWithProgress(file) {
-  const bar = $('#upload-progress');
-  const fill = $('#upload-fill');
-  bar.style.display = 'block';
-  fill.style.width = '0%';
+  ensureUploadListVisible();
+  const id = 'upload-job-' + (++uploadJobSeq);
+  const list = uploadProgressListEl();
+  const row = document.createElement('div');
+  row.className = 'upload-job';
+  row.id = id;
+  const head = document.createElement('div');
+  head.className = 'upload-job-head';
+  const nameEl = document.createElement('span');
+  nameEl.className = 'upload-job-name';
+  nameEl.title = file.name;
+  nameEl.textContent = file.name;
+  const pctEl = document.createElement('span');
+  pctEl.className = 'upload-job-pct';
+  pctEl.textContent = '0%';
+  head.appendChild(nameEl);
+  head.appendChild(pctEl);
+  const track = document.createElement('div');
+  track.className = 'upload-job-track';
+  const fill = document.createElement('div');
+  fill.className = 'upload-job-fill';
+  track.appendChild(fill);
+  const msgEl = document.createElement('div');
+  msgEl.className = 'upload-job-msg hidden';
+  row.appendChild(head);
+  row.appendChild(track);
+  row.appendChild(msgEl);
+  list.appendChild(row);
+
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/admin/upload');
   xhr.withCredentials = true;
   xhr.upload.onprogress = (e) => {
-    if (!e.lengthComputable) return;
-    const p = Math.round(100 * e.loaded / e.total);
+    if (!e.lengthComputable) {
+      pctEl.textContent = '…';
+      return;
+    }
+    const p = Math.min(100, Math.round(100 * e.loaded / e.total));
     fill.style.width = p + '%';
+    pctEl.textContent = p + '%';
   };
   xhr.onload = () => {
-    bar.style.display = 'none';
     if (xhr.status >= 200 && xhr.status < 300) {
+      fill.style.width = '100%';
+      pctEl.textContent = '100%';
+      row.classList.add('upload-job-ok');
       refreshQueue();
       refreshStats();
     } else {
-      alert('Upload échoué');
+      row.classList.add('upload-job-err');
+      let msg = 'Échec upload (HTTP ' + xhr.status + ')';
+      try {
+        const j = JSON.parse(xhr.responseText || '{}');
+        if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
+      } catch (_) {}
+      msgEl.textContent = msg;
+      msgEl.classList.remove('hidden');
+      pctEl.textContent = '—';
     }
+  };
+  xhr.onerror = () => {
+    row.classList.add('upload-job-err');
+    msgEl.textContent = 'Erreur réseau';
+    msgEl.classList.remove('hidden');
+    pctEl.textContent = '—';
   };
   const fd = new FormData();
   fd.append('file', file, file.name);
   xhr.send(fd);
 }
 
+function startVideoUploadsFromFileList(fileList) {
+  const all = Array.from(fileList || []);
+  const ok = all.filter(isVideoUploadFile);
+  const skip = all.length - ok.length;
+  ok.forEach(uploadWithProgress);
+  if (skip > 0) {
+    alert(skip + ' fichier(s) ignoré(s) : extension non supportée pour l’upload direct.');
+  }
+}
+
 $('#btn-browse').addEventListener('click', () => $('#file-input').click());
 $('#file-input').addEventListener('change', (e) => {
-  const f = e.target.files[0];
-  if (f) uploadWithProgress(f);
+  startVideoUploadsFromFileList(e.target.files);
+  e.target.value = '';
 });
 
 const dz = $('#drop-zone');
@@ -1180,8 +1262,7 @@ dz.addEventListener('click', () => $('#file-input').click());
 ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
 dz.addEventListener('drop', (e) => {
   e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (f) uploadWithProgress(f);
+  startVideoUploadsFromFileList(e.dataTransfer.files);
 });
 
 $('#btn-magnet').addEventListener('click', async () => {

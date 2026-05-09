@@ -66,6 +66,8 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     derniere_connexion: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Last time this user generated a guest invite code (one per calendar month, UTC).
+    last_invite_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Viewer tastes: { "favorite_genres": ["Drame", "Action"] } for "surprise me" picks
     preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
@@ -147,6 +149,10 @@ class InvitationCode(Base):
     code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     max_uses: Mapped[int] = mapped_column(Integer, default=1)
     uses: Mapped[int] = mapped_column(Integer, default=0)
+    # Set when a member generates a code via POST /api/auth/member-invite; admin codes stay null.
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     note: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paramètres — Redwood Plus</title>
+  <style>
+    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; --card:#111; --border:#2a2a2a; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
+    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem)}
+    a.brand:hover{color:#fca5a5}
+    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
+    nav a:hover{color:#fff}
+    main{max-width:720px;margin:0 auto;padding:28px 24px 48px}
+    h1{font-size:1.35rem;margin-bottom:8px}
+    .lead{color:var(--muted);font-size:14px;margin-bottom:28px;line-height:1.5}
+    section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px}
+    section h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:var(--text);font-size:14px;margin-bottom:12px}
+    input:focus{outline:2px solid rgba(139,37,0,.45);outline-offset:1px}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:8px;
+      border:1px solid var(--accent);background:rgba(139,37,0,.25);color:#fecaca;font-size:14px;font-weight:600;
+      cursor:pointer;font-family:inherit;margin-top:4px;
+    }
+    .btn:hover{background:rgba(139,37,0,.4);color:#fff}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn-secondary{border-color:#444;background:#1a1a1a;color:#ddd}
+    .btn-secondary:hover{border-color:#666;color:#fff;background:#222}
+    .msg{font-size:13px;margin-top:10px;line-height:1.45;display:none}
+    .msg.err{color:#f87171}
+    .msg.ok{color:#86efac}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
+    .code-box{
+      margin-top:12px;padding:12px 14px;border-radius:10px;background:#0a0a0a;border:1px dashed #444;
+      font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.06em;word-break:break-all;color:#fecaca;
+    }
+    .row-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center}
+    .identity{font-size:14px;color:#ccc;margin-bottom:6px}
+    .identity strong{color:#fff}
+    .invite-history-title{font-size:13px;color:#aaa;margin:22px 0 10px;font-weight:600}
+    .invite-table-wrap{overflow-x:auto;margin-top:8px;border-radius:10px;border:1px solid #333;background:#0d0d0d}
+    .invite-table{width:100%;border-collapse:collapse;font-size:13px}
+    .invite-table th,.invite-table td{padding:10px 12px;text-align:left;border-bottom:1px solid #2a2a2a;vertical-align:middle}
+    .invite-table tr:last-child td{border-bottom:none}
+    .invite-table th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .invite-table td.mono{font-family:ui-monospace,monospace;color:#fecaca;word-break:break-all}
+    .invite-table .btn-tiny{padding:6px 10px;font-size:12px;margin:0}
+    .badge{font-size:11px;padding:3px 8px;border-radius:999px;font-weight:600;white-space:nowrap}
+    .badge-ok{background:rgba(34,197,94,.15);color:#86efac}
+    .badge-warn{background:rgba(234,179,8,.12);color:#facc15}
+    .badge-off{background:#2a2a2a;color:#888}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/watch/">Redwood Plus</a>
+    <div>
+      <a href="/watch/">Accueil</a>
+      <a href="/watch/serie.html">Séries</a>
+      <a href="/watch/categories.html">Catégories</a>
+      <a href="/watch/settings.html">Paramètres</a>
+      <a href="#" id="nav-logout">Déconnexion</a>
+    </div>
+  </nav>
+  <main>
+    <h1>Paramètres du compte</h1>
+    <p class="lead">Modifiez votre e-mail ou votre mot de passe. Vous pouvez générer <strong>une invitation par mois</strong> (fuseau UTC) pour permettre à quelqu’un de s’inscrire.</p>
+
+    <p class="identity" id="identity-line" hidden>Connecté en tant que <strong id="id-user"></strong></p>
+
+    <section>
+      <h2>Adresse e-mail</h2>
+      <form id="form-email">
+        <label for="email-new">Nouvelle adresse e-mail</label>
+        <input id="email-new" type="email" autocomplete="email" required />
+        <label for="email-pw">Mot de passe actuel</label>
+        <input id="email-pw" type="password" autocomplete="current-password" required />
+        <button type="submit" class="btn">Enregistrer l’e-mail</button>
+        <p class="msg" id="msg-email"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Mot de passe</h2>
+      <form id="form-password">
+        <label for="pw-new">Nouveau mot de passe</label>
+        <input id="pw-new" type="password" autocomplete="new-password" required minlength="6" />
+        <label for="pw-confirm">Confirmer le mot de passe</label>
+        <input id="pw-confirm" type="password" autocomplete="new-password" required minlength="6" />
+        <label for="pw-current">Mot de passe actuel</label>
+        <input id="pw-current" type="password" autocomplete="current-password" required />
+        <button type="submit" class="btn">Changer le mot de passe</button>
+        <p class="msg" id="msg-pw"></p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Inviter quelqu’un</h2>
+      <p class="hint" id="invite-hint"></p>
+      <button type="button" class="btn" id="btn-invite" hidden>Générer un code d’invitation</button>
+      <div id="invite-result" hidden>
+        <p class="hint">Transmettez ce code à la personne invitée. Elle pourra l’utiliser sur la page d’inscription.</p>
+        <div class="code-box" id="invite-code-display"></div>
+        <div class="row-actions">
+          <button type="button" class="btn btn-secondary" id="btn-copy">Copier le code</button>
+        </div>
+      </div>
+      <h3 class="invite-history-title">Vos codes d’invitation</h3>
+      <p class="hint" id="invite-history-empty">Aucun code généré pour l’instant.</p>
+      <div class="invite-table-wrap" id="invite-history-wrap" hidden>
+        <table class="invite-table" aria-label="Historique des codes d’invitation">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Créé le</th>
+              <th>Utilisations</th>
+              <th>Statut</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="invite-history-body"></tbody>
+        </table>
+      </div>
+      <p class="msg err" id="msg-invite"></p>
+    </section>
+  </main>
+  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="/watch/app.js"></script>
+  <script>
+    document.getElementById('nav-logout').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+
+    function showMsg(el, text, ok) {
+      el.textContent = text;
+      el.classList.remove('err', 'ok');
+      el.classList.add(ok ? 'ok' : 'err');
+      el.style.display = 'block';
+    }
+
+    function hideMsg(el) {
+      el.style.display = 'none';
+      el.textContent = '';
+    }
+
+    function formatNextInvite(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'UTC' }) + ' (UTC)';
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    function applyInviteUi(inv) {
+      const hint = document.getElementById('invite-hint');
+      const btn = document.getElementById('btn-invite');
+      const res = document.getElementById('invite-result');
+      if (!inv || typeof inv.can_invite_this_month === 'undefined') {
+        hint.textContent = '';
+        btn.hidden = true;
+        return;
+      }
+      if (inv.can_invite_this_month) {
+        hint.textContent = 'Vous pouvez créer une nouvelle invitation ce mois-ci.';
+        btn.hidden = false;
+      } else {
+        const when = formatNextInvite(inv.next_invite_at);
+        hint.textContent = when
+          ? 'Limite atteinte pour ce mois. Prochain créneau à partir du : ' + when
+          : 'Limite atteinte pour ce mois.';
+        btn.hidden = true;
+      }
+      if (!inv.can_invite_this_month) res.hidden = true;
+    }
+
+    let lastCode = '';
+
+    function formatInviteDate(iso) {
+      if (!iso) return '—';
+      try {
+        return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    function inviteStatusLabel(row) {
+      if (row.usable) return { text: 'Utilisable', cls: 'badge-ok' };
+      if (row.expires_at) {
+        try {
+          if (new Date(row.expires_at) <= new Date()) return { text: 'Expiré', cls: 'badge-off' };
+        } catch (_) {}
+      }
+      if (row.uses >= row.max_uses) return { text: 'Utilisé', cls: 'badge-warn' };
+      return { text: 'Inutilisable', cls: 'badge-off' };
+    }
+
+    async function copyCode(code) {
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+
+    function renderInviteHistory(me) {
+      const list = Array.isArray(me.my_invites) ? me.my_invites : [];
+      const emptyEl = document.getElementById('invite-history-empty');
+      const wrap = document.getElementById('invite-history-wrap');
+      const body = document.getElementById('invite-history-body');
+      body.innerHTML = '';
+      if (!list.length) {
+        emptyEl.hidden = false;
+        wrap.hidden = true;
+        return;
+      }
+      emptyEl.hidden = true;
+      wrap.hidden = false;
+      list.forEach((row) => {
+        const st = inviteStatusLabel(row);
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">' +
+          escapeHtml(row.code) +
+          '</td><td>' +
+          escapeHtml(formatInviteDate(row.created_at)) +
+          '</td><td>' +
+          escapeHtml(String(row.uses) + ' / ' + String(row.max_uses)) +
+          '</td><td><span class="badge ' +
+          st.cls +
+          '">' +
+          escapeHtml(st.text) +
+          '</span></td><td></td>';
+        const tdBtn = tr.querySelector('td:last-child');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-secondary btn-tiny';
+        b.textContent = 'Copier';
+        b.addEventListener('click', () => copyCode(row.code));
+        tdBtn.appendChild(b);
+        body.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    async function loadMe() {
+      const me = await apiJson('/api/auth/me');
+      document.getElementById('id-user').textContent = me.username;
+      document.getElementById('identity-line').hidden = false;
+      document.getElementById('email-new').value = me.email || '';
+      applyInviteUi(me.invite);
+      renderInviteHistory(me);
+      return me;
+    }
+
+    document.getElementById('form-email').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg-email');
+      hideMsg(msg);
+      const email = document.getElementById('email-new').value.trim();
+      const current_password = document.getElementById('email-pw').value;
+      try {
+        await apiJson('/api/auth/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, current_password }),
+        });
+        document.getElementById('email-pw').value = '';
+        showMsg(msg, 'E-mail mis à jour.', true);
+        await loadMe();
+      } catch (err) {
+        showMsg(msg, err.message || String(err), false);
+      }
+    });
+
+    document.getElementById('form-password').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = document.getElementById('msg-pw');
+      hideMsg(msg);
+      const new_password = document.getElementById('pw-new').value;
+      const confirm = document.getElementById('pw-confirm').value;
+      if (new_password !== confirm) {
+        showMsg(msg, 'Les mots de passe ne correspondent pas.', false);
+        return;
+      }
+      const current_password = document.getElementById('pw-current').value;
+      try {
+        await apiJson('/api/auth/me', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_password, current_password }),
+        });
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-confirm').value = '';
+        document.getElementById('pw-current').value = '';
+        showMsg(msg, 'Mot de passe mis à jour.', true);
+      } catch (err) {
+        showMsg(msg, err.message || String(err), false);
+      }
+    });
+
+    document.getElementById('btn-invite').addEventListener('click', async () => {
+      const errEl = document.getElementById('msg-invite');
+      errEl.style.display = 'none';
+      try {
+        const data = await apiJson('/api/auth/member-invite', { method: 'POST' });
+        lastCode = data.code || '';
+        document.getElementById('invite-code-display').textContent = lastCode;
+        document.getElementById('invite-result').hidden = false;
+        applyInviteUi(data.invite);
+        if (Array.isArray(data.my_invites)) renderInviteHistory({ my_invites: data.my_invites });
+        else await loadMe();
+      } catch (err) {
+        errEl.textContent = err.message || String(err);
+        errEl.style.display = 'block';
+      }
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', async () => {
+      if (!lastCode) return;
+      try {
+        await navigator.clipboard.writeText(lastCode);
+      } catch (_) {
+        /* fallback */
+        const ta = document.createElement('textarea');
+        ta.value = lastCode;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      const b = document.getElementById('btn-copy');
+      const prev = b.textContent;
+      b.textContent = 'Copié !';
+      setTimeout(() => { b.textContent = prev; }, 1600);
+    });
+
+    loadMe().catch((e) => {
+      if (e && e.message === '401') { window.location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Impossible de charger le profil : ' + (e.message || e));
+      window.location.href = '/watch/';
+    });
+  </script>
+</body>
+</html>

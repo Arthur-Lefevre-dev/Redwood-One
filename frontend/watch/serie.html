@@ -40,13 +40,12 @@
     .serie-hero .title-row h1{margin:0;flex:1;min-width:min(100%,200px);font-size:1.35rem;line-height:1.25}
     .user-score-wrap{
       display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;
-      padding:12px 14px 10px;
+      padding:12px 14px;
       background:linear-gradient(165deg,#1a1818 0%,#111 55%,#0d0d0d 100%);
       border:1px solid #2a2422;
       border-radius:14px;
       box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04);
     }
-    .serie-hero .title-score{padding-top:1px}
     .user-score{position:relative;width:54px;height:54px;flex-shrink:0}
     .user-score-svg{width:54px;height:54px;display:block}
     .user-score-disc{fill:#0f1513;stroke:none}
@@ -87,6 +86,7 @@
       <a href="/watch/">Accueil</a>
       <a href="/watch/serie.html">Séries</a>
       <a href="/watch/categories.html">Catégories</a>
+      <a href="/watch/settings.html">Paramètres</a>
       <a href="#" id="nav-logout">Déconnexion</a>
     </div>
   </nav>
@@ -105,7 +105,7 @@
       <div class="serie-hero-text">
         <div class="title-row">
           <h1 id="d-title">…</h1>
-          <div class="user-score-wrap title-score" id="serie-score-wrap" hidden>
+          <div class="user-score-wrap" id="serie-score-wrap" hidden>
             <div class="user-score" id="serie-score-widget">
               <svg viewBox="0 0 36 36" class="user-score-svg" aria-hidden="true">
                 <circle class="user-score-disc" cx="18" cy="18" r="13.35" />

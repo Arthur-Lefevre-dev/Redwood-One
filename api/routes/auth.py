@@ -1,10 +1,12 @@
 """Authentication routes (JWT in httpOnly cookies)."""
 
+import secrets
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
@@ -40,6 +42,70 @@ class RegisterBody(BaseModel):
 
 class PreferencesBody(BaseModel):
     favorite_genres: List[str] = []
+
+
+class PatchMeBody(BaseModel):
+    email: Optional[EmailStr] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = Field(None, min_length=6, max_length=128)
+
+
+def _utc_aware(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _serialize_member_invite(row: InvitationCode) -> Dict[str, Any]:
+    now = datetime.utcnow()
+    expired = bool(row.expires_at and row.expires_at < now)
+    exhausted = row.uses >= row.max_uses
+    return {
+        "code": row.code,
+        "max_uses": row.max_uses,
+        "uses": row.uses,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+        "usable": not exhausted and not expired,
+    }
+
+
+def _list_member_invites(db: Session, user: User) -> List[Dict[str, Any]]:
+    """Codes created by this member (FK or legacy note match before FK existed)."""
+    note_legacy = f"Invité par {user.username}"
+    rows = (
+        db.query(InvitationCode)
+        .filter(
+            or_(
+                InvitationCode.created_by_user_id == user.id,
+                and_(
+                    InvitationCode.created_by_user_id.is_(None),
+                    InvitationCode.note == note_legacy,
+                ),
+            )
+        )
+        .order_by(InvitationCode.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [_serialize_member_invite(r) for r in rows]
+
+
+def _invite_month_status(user: User) -> Dict[str, Any]:
+    """One user-generated invite per calendar month (UTC)."""
+    now = datetime.now(timezone.utc)
+    last = user.last_invite_at
+    if not last:
+        return {"can_invite_this_month": True, "next_invite_at": None}
+    last_u = _utc_aware(last)
+    if last_u.year == now.year and last_u.month == now.month:
+        if now.month == 12:
+            y, m = now.year + 1, 1
+        else:
+            y, m = now.year, now.month + 1
+        next_start = datetime(y, m, 1, tzinfo=timezone.utc)
+        return {"can_invite_this_month": False, "next_invite_at": next_start.isoformat()}
+    return {"can_invite_this_month": True, "next_invite_at": None}
 
 
 def _cookie_kwargs():
@@ -202,17 +268,7 @@ def logout(
     return {"ok": True}
 
 
-@router.get("/me")
-def me(user: User = Depends(get_current_user)):
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "role": user.role.value,
-        "preferences": user.preferences if isinstance(user.preferences, dict) else {},
-    }
-
-
+# Register longer /me/* paths before /me so routers never treat them as missing (defensive ordering).
 @router.patch("/me/preferences")
 def patch_preferences(
     body: PreferencesBody,
@@ -225,3 +281,96 @@ def patch_preferences(
     user.preferences = prev
     db.commit()
     return {"ok": True, "preferences": user.preferences}
+
+
+@router.post("/member-invite")
+@router.post("/me/invite")
+@limiter.limit("30 per hour")
+def create_user_invite(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if not _invite_month_status(user)["can_invite_this_month"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Vous avez déjà généré une invitation ce mois-ci (limite : une par mois, UTC).",
+        )
+    raw = None
+    for _ in range(12):
+        cand = secrets.token_hex(5).upper()
+        if not db.query(InvitationCode).filter(InvitationCode.code == cand).first():
+            raw = cand
+            break
+    if not raw:
+        raise HTTPException(status_code=500, detail="Impossible de générer un code unique")
+    note = f"Invité par {user.username}"[:255]
+    inv = InvitationCode(
+        code=raw,
+        max_uses=1,
+        uses=0,
+        note=note,
+        expires_at=None,
+        created_by_user_id=user.id,
+    )
+    db.add(inv)
+    user.last_invite_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {
+        "code": inv.code,
+        "max_uses": inv.max_uses,
+        "uses": inv.uses,
+        "invite": _invite_month_status(user),
+        "my_invites": _list_member_invites(db, user),
+    }
+
+
+@router.get("/me")
+def me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role.value,
+        "preferences": user.preferences if isinstance(user.preferences, dict) else {},
+        "invite": _invite_month_status(user),
+        "my_invites": _list_member_invites(db, user),
+    }
+
+
+@router.patch("/me")
+def patch_me(
+    body: PatchMeBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    new_email = str(body.email).lower().strip() if body.email is not None else None
+    email_change = new_email is not None and new_email != (user.email or "").lower()
+    pw_change = body.new_password is not None
+    if not email_change and not pw_change:
+        raise HTTPException(status_code=400, detail="Aucune modification demandée")
+    if not body.current_password:
+        raise HTTPException(status_code=400, detail="Mot de passe actuel requis")
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
+    if email_change:
+        taken = db.query(User).filter(User.email == new_email, User.id != user.id).first()
+        if taken:
+            raise HTTPException(status_code=400, detail="Cette adresse e-mail est déjà utilisée")
+        user.email = new_email
+    if pw_change:
+        user.hashed_password = hash_password(body.new_password)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role.value,
+        "preferences": user.preferences if isinstance(user.preferences, dict) else {},
+        "invite": _invite_month_status(user),
+        "my_invites": _list_member_invites(db, user),
+    }
