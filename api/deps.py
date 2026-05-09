@@ -25,7 +25,17 @@ def get_current_user(
     return user
 
 
+def _user_is_admin(user: User) -> bool:
+    """Robust admin check (ORM enum, str Enum edge cases, string from raw drivers)."""
+    r = user.role
+    if r is None:
+        return False
+    if isinstance(r, UserRole):
+        return r == UserRole.admin
+    return str(r).lower() in ("admin", UserRole.admin.value)
+
+
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != UserRole.admin:
+    if not _user_is_admin(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return user

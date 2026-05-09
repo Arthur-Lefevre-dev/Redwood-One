@@ -91,7 +91,16 @@
         body: JSON.stringify(body),
       });
       if (!r.ok) {
-        err.textContent = 'Identifiants invalides';
+        if (r.status === 429) {
+          err.textContent = 'Trop de tentatives. Patientez une minute puis réessayez.';
+        } else {
+          let msg = 'Identifiants invalides';
+          try {
+            const j = await r.json();
+            if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
+          } catch (_) {}
+          err.textContent = msg;
+        }
         err.style.display = 'block';
         return;
       }

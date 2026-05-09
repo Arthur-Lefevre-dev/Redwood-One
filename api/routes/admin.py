@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,89 @@ def admin_list_films(
         }
         for f in rows
     ]
+
+
+def _film_to_admin_detail(f: Film) -> dict[str, Any]:
+    genres = f.genres if isinstance(f.genres, list) else []
+    acteurs = f.acteurs if isinstance(f.acteurs, list) else []
+    return {
+        "id": f.id,
+        "titre": f.titre,
+        "titre_original": f.titre_original,
+        "annee": f.annee,
+        "synopsis": f.synopsis,
+        "genres": [str(x) for x in genres],
+        "realisateur": f.realisateur,
+        "acteurs": [str(x) for x in acteurs],
+        "note_tmdb": f.note_tmdb,
+        "poster_path": f.poster_path,
+        "duree_min": f.duree_min,
+        "resolution": f.resolution,
+        "langue_originale": f.langue_originale,
+        "tmdb_id": f.tmdb_id,
+        "statut": f.statut.value,
+        "codec_video": f.codec_video,
+        "taille_octets": f.taille_octets,
+    }
+
+
+@router.get("/films/{film_id}")
+def admin_get_film(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film not found")
+    return _film_to_admin_detail(f)
+
+
+class AdminFilmUpdateBody(BaseModel):
+    titre: str = Field(..., min_length=1, max_length=512)
+    titre_original: Optional[str] = None
+    annee: Optional[int] = None
+    synopsis: Optional[str] = None
+    genres: List[str] = []
+    realisateur: Optional[str] = None
+    acteurs: List[str] = []
+    note_tmdb: Optional[float] = None
+    poster_path: Optional[str] = None
+    duree_min: Optional[int] = None
+    resolution: Optional[str] = None
+    langue_originale: Optional[str] = None
+    tmdb_id: Optional[int] = None
+
+
+@router.patch("/films/{film_id}")
+def admin_patch_film(
+    film_id: int,
+    body: AdminFilmUpdateBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film not found")
+    f.titre = body.titre.strip()
+    f.titre_original = (body.titre_original or "").strip() or None
+    f.annee = body.annee
+    syn = (body.synopsis or "").strip()
+    f.synopsis = syn or None
+    f.genres = [g.strip() for g in body.genres if g and str(g).strip()] or None
+    f.realisateur = (body.realisateur or "").strip() or None
+    f.acteurs = [a.strip() for a in body.acteurs if a and str(a).strip()] or None
+    f.note_tmdb = body.note_tmdb
+    pp = (body.poster_path or "").strip()
+    f.poster_path = pp or None
+    f.duree_min = body.duree_min
+    f.resolution = (body.resolution or "").strip() or None
+    lo = (body.langue_originale or "").strip()
+    f.langue_originale = lo or None
+    f.tmdb_id = body.tmdb_id
+    db.commit()
+    db.refresh(f)
+    return _film_to_admin_detail(f)
 
 
 @router.post("/upload")

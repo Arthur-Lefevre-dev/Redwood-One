@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # If True, POST /api/auth/register accepts users without an invite code (dev only).
     REGISTRATION_OPEN: bool = False
 
+    # slowapi limit for POST /api/auth/login (e.g. "60/minute", "20/minute").
+    AUTH_LOGIN_RATE_LIMIT: str = "60/minute"
+
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@redwoodplus.local"

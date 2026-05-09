@@ -22,6 +22,9 @@ from db.session import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# Applied at import time; override via AUTH_LOGIN_RATE_LIMIT in env.
+_LOGIN_LIMIT = get_settings().AUTH_LOGIN_RATE_LIMIT
+
 
 class LoginBody(BaseModel):
     username: str
@@ -49,7 +52,7 @@ def _cookie_kwargs():
 
 
 @router.post("/login")
-@limiter.limit("5 per 15 minutes")
+@limiter.limit(_LOGIN_LIMIT)
 def login(
     request: Request,
     body: LoginBody,
