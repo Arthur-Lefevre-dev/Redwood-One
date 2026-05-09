@@ -188,7 +188,6 @@
               <a class="pill" id="series-page-link" href="#">Série</a>
               <a class="pill ep-nav" id="prev-ep-link" href="#" hidden aria-label="Épisode précédent">← Épisode précédent</a>
               <a class="pill ep-nav" id="next-ep-link" href="#" hidden aria-label="Épisode suivant">Épisode suivant →</a>
-              <span class="pill" id="next-ep-hint" style="color:var(--muted);border-style:dashed"></span>
             </div>
           </div>
           <div class="user-score-wrap" id="score-wrap" hidden>
@@ -364,9 +363,6 @@
           nextL.hidden = true;
           nextL.removeAttribute('href');
         }
-        document.getElementById('next-ep-hint').textContent = pb.next_episode_id
-          ? 'Fin → lecture de l’épisode suivant'
-          : 'Dernier épisode de la saison / série';
       } else {
         sbar.style.display = 'none';
       }
