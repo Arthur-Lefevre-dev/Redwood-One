@@ -131,7 +131,10 @@
     .pill{padding:6px 10px;border-radius:999px;background:#1a1a1a;border:1px solid #333;font-size:12px}
     a.pill{color:inherit;text-decoration:none}
     a.pill:hover{border-color:var(--accent);color:#fca5a5}
-    .series-bar{display:none;flex-wrap:wrap;gap:10px;margin:0}
+    .series-bar{display:none;flex-wrap:wrap;gap:10px;margin:0;align-items:center}
+    a.pill.ep-nav{font-weight:600;border-color:rgba(139,37,0,.45)}
+    a.pill.ep-nav:hover{border-color:var(--accent);color:#fca5a5}
+    a.pill.ep-nav[hidden]{display:none!important}
     .similar{margin-top:32px}
     .similar h2{font-size:1rem;margin-bottom:12px}
     .cards{display:flex;gap:10px;overflow-x:auto}
@@ -183,6 +186,8 @@
             <h1 id="title">…</h1>
             <div class="series-bar" id="series-bar">
               <a class="pill" id="series-page-link" href="#">Série</a>
+              <a class="pill ep-nav" id="prev-ep-link" href="#" hidden aria-label="Épisode précédent">← Épisode précédent</a>
+              <a class="pill ep-nav" id="next-ep-link" href="#" hidden aria-label="Épisode suivant">Épisode suivant →</a>
               <span class="pill" id="next-ep-hint" style="color:var(--muted);border-style:dashed"></span>
             </div>
           </div>
@@ -343,6 +348,22 @@
         const sn = pb.season_number != null ? pb.season_number : '?';
         const en = pb.episode_number != null ? pb.episode_number : '?';
         sl.textContent = (pb.series_title || 'Série') + ' — S' + sn + 'E' + String(en).padStart(2, '0');
+        const prevL = document.getElementById('prev-ep-link');
+        const nextL = document.getElementById('next-ep-link');
+        if (pb.prev_episode_id) {
+          prevL.hidden = false;
+          prevL.href = '/watch/film.html?id=' + pb.prev_episode_id;
+        } else {
+          prevL.hidden = true;
+          prevL.removeAttribute('href');
+        }
+        if (pb.next_episode_id) {
+          nextL.hidden = false;
+          nextL.href = '/watch/film.html?id=' + pb.next_episode_id;
+        } else {
+          nextL.hidden = true;
+          nextL.removeAttribute('href');
+        }
         document.getElementById('next-ep-hint').textContent = pb.next_episode_id
           ? 'Fin → lecture de l’épisode suivant'
           : 'Dernier épisode de la saison / série';
