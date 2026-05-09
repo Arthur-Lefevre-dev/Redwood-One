@@ -564,6 +564,15 @@
         background: var(--color-background-secondary);
         border-bottom: 0.5px solid var(--color-border-tertiary);
       }
+      .lib-series-show-meta {
+        margin: 0;
+        padding: 0 16px 10px;
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--color-text-tertiary);
+        background: var(--color-background-secondary);
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+      }
       .lib-series-season {
         background: var(--color-background-tertiary);
         border-bottom: 0.5px solid var(--color-border-tertiary);
@@ -2623,11 +2632,91 @@
         return "s-waiting";
       }
 
+      /** Season/episode from API or form may be number or string; Number.isFinite("7") is false. */
+      function toFiniteNumber(v) {
+        if (v == null || v === "") return null;
+        const n = typeof v === "number" ? v : Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      const LIB_SEASON_UNASSIGNED = "__unassigned__";
+
+      /** S07E01 in titre, chemin S3, etc., when DB season/episode missing. */
+      function parseSxEyFromStrings(...texts) {
+        const patterns = [
+          /[\/._-]S(\d{1,2})[._-]?E(\d{1,3})(?=[\/._-]|$)/i,
+          /\bS(\d{1,2})\s*[_\-.]?\s*E(\d{1,3})\b/i,
+          /\b(\d{1,2})\s*x\s*(\d{1,3})\b/i,
+          /season[\s._-]?(\d{1,2})[\s._-]?e(?:p(?:isode)?)?[\s._-]?(\d{1,3})\b/i,
+        ];
+        for (const raw of texts) {
+          if (!raw || typeof raw !== "string") continue;
+          const s = raw;
+          for (const re of patterns) {
+            const m = s.match(re);
+            if (m) {
+              const ss = toFiniteNumber(m[1]);
+              const ee = toFiniteNumber(m[2]);
+              if (ss != null && ee != null) return { s: ss, e: ee };
+            }
+          }
+        }
+        return { s: null, e: null };
+      }
+
+      function seasonEpisodeForLibraryRow(ep) {
+        let sN = toFiniteNumber(ep.season_number);
+        let eN = toFiniteNumber(ep.episode_number);
+        if (sN == null || eN == null) {
+          const p = parseSxEyFromStrings(
+            ep.titre,
+            ep.titre_original,
+            ep.s3_key,
+          );
+          if (sN == null) sN = p.s;
+          if (eN == null) eN = p.e;
+        }
+        return { sN, eN };
+      }
+
+      function compareLibrarySeasonKeys(a, b) {
+        if (a === LIB_SEASON_UNASSIGNED && b !== LIB_SEASON_UNASSIGNED) return 1;
+        if (a !== LIB_SEASON_UNASSIGNED && b === LIB_SEASON_UNASSIGNED) return -1;
+        return a - b;
+      }
+
+      /**
+       * "Doctor Who: Asylum of the Daleks" → "Doctor Who" (épisodes importés comme films).
+       */
+      function extractShowFromColonTitre(titre) {
+        if (!titre || typeof titre !== "string") return "";
+        const m = titre
+          .trim()
+          .match(/^([^:\n]{2,80}):\s+(.{1,400})$/);
+        if (!m) return "";
+        const show = m[1].trim();
+        const epPart = m[2].trim();
+        if (!show || !epPart) return "";
+        return show;
+      }
+
+      function libraryRowIsSeriesEpisode(row) {
+        if (row.content_kind === "series_episode") return true;
+        if ((row.series_key || "").trim()) return true;
+        if ((row.series_title || "").trim()) return true;
+        const { sN: sn, eN: en } = seasonEpisodeForLibraryRow(row);
+        if (sn != null && en != null) return true;
+        if (extractShowFromColonTitre(row.titre)) return true;
+        return false;
+      }
+
       function adminSeriesShowLabel(ep) {
         const t = (ep.series_title || "").trim();
         if (t) return t;
         const k = (ep.series_key || "").trim();
         if (k) return k;
+        const fromTitre = extractShowFromColonTitre(ep.titre);
+        if (fromTitre) return fromTitre;
         return "Sans titre de série";
       }
 
@@ -2704,7 +2793,7 @@
         b2.className = "action-btn danger";
         b2.textContent = "Suppr.";
         b2.onclick = async () => {
-          const isEp = f.content_kind === "series_episode";
+          const isEp = libraryRowIsSeriesEpisode(f);
           const ok = await showConfirmModal(
             isEp ? "Supprimer cet épisode ?" : "Supprimer ce film ?",
             isEp
@@ -2730,8 +2819,8 @@
           "/api/admin/films" + (q ? "?q=" + encodeURIComponent(q) : "");
         const r = await api(url);
         const rows = await r.json();
-        const films = rows.filter((x) => x.content_kind !== "series_episode");
-        const episodes = rows.filter((x) => x.content_kind === "series_episode");
+        const episodes = rows.filter((x) => libraryRowIsSeriesEpisode(x));
+        const films = rows.filter((x) => !libraryRowIsSeriesEpisode(x));
         const showLabels = episodes.map(adminSeriesShowLabel);
         const nShows = new Set(showLabels).size;
         $("#lib-sub").textContent =
@@ -2764,10 +2853,9 @@
             const label = adminSeriesShowLabel(ep);
             if (!byShow.has(label)) byShow.set(label, new Map());
             const seasonMap = byShow.get(label);
+            const { sN: bucketS } = seasonEpisodeForLibraryRow(ep);
             const sn =
-              ep.season_number != null && Number.isFinite(ep.season_number)
-                ? ep.season_number
-                : 0;
+              bucketS != null ? bucketS : LIB_SEASON_UNASSIGNED;
             if (!seasonMap.has(sn)) seasonMap.set(sn, []);
             seasonMap.get(sn).push(ep);
           }
@@ -2782,27 +2870,42 @@
             h.className = "lib-series-show-title";
             h.textContent = showName;
             block.appendChild(h);
-            const seasonsSorted = Array.from(seasonMap.keys()).sort(
-              (a, b) => a - b,
-            );
+            const seasonKeys = Array.from(seasonMap.keys());
+            const numericSeasons = seasonKeys
+              .filter((k) => k !== LIB_SEASON_UNASSIGNED)
+              .sort((a, b) => a - b);
+            const hasUnassigned = seasonKeys.includes(LIB_SEASON_UNASSIGNED);
+            const meta = document.createElement("p");
+            meta.className = "lib-series-show-meta";
+            if (numericSeasons.length && hasUnassigned) {
+              meta.textContent =
+                "Saisons : " +
+                numericSeasons.join(", ") +
+                " · et épisodes sans saison en base (voir bloc ci-dessous).";
+            } else if (numericSeasons.length) {
+              meta.textContent =
+                "Saisons : " + numericSeasons.join(", ");
+            } else if (hasUnassigned) {
+              meta.textContent =
+                "Aucune saison en base pour ces épisodes — ouvrez Modifier, type « Épisode de série », puis renseignez Saison et Épisode (sinon tout reste regroupé ici).";
+            }
+            if (meta.textContent) block.appendChild(meta);
+            const seasonsSorted = seasonKeys.sort(compareLibrarySeasonKeys);
             for (const sn of seasonsSorted) {
               const eps = seasonMap.get(sn);
               eps.sort((a, b) => {
-                const ea =
-                  a.episode_number != null && Number.isFinite(a.episode_number)
-                    ? a.episode_number
-                    : 99999;
-                const eb =
-                  b.episode_number != null && Number.isFinite(b.episode_number)
-                    ? b.episode_number
-                    : 99999;
+                const ea = seasonEpisodeForLibraryRow(a).eN ?? 99999;
+                const eb = seasonEpisodeForLibraryRow(b).eN ?? 99999;
                 return ea - eb;
               });
               const seasonEl = document.createElement("div");
               seasonEl.className = "lib-series-season";
               const lab = document.createElement("div");
               lab.className = "lib-series-season-label";
-              lab.textContent = `Saison ${sn}`;
+              lab.textContent =
+                sn === LIB_SEASON_UNASSIGNED
+                  ? "Saison non renseignée (base de données)"
+                  : `Saison ${sn}`;
               seasonEl.appendChild(lab);
               const table = document.createElement("table");
               table.className = "film-table";
@@ -2817,16 +2920,19 @@
       </tr></thead>`;
               const tbody = document.createElement("tbody");
               for (const ep of eps) {
-                const snRaw = ep.season_number;
-                const epRaw = ep.episode_number;
-                const sPart =
-                  snRaw != null && Number.isFinite(snRaw) ? String(snRaw) : "?";
-                const ePart =
-                  epRaw != null && Number.isFinite(epRaw)
-                    ? String(epRaw).padStart(2, "0")
-                    : "?";
-                const primary = `S${sPart}E${ePart} · ${ep.titre || "—"}`;
-                const sub = ep.series_key ? `Clé : ${ep.series_key}` : "";
+                const { sN, eN } = seasonEpisodeForLibraryRow(ep);
+                const t = ep.titre || "—";
+                const primary =
+                  sN != null && eN != null
+                    ? `S${sN}E${String(eN).padStart(2, "0")} · ${t}`
+                    : t;
+                const subParts = [];
+                if (ep.series_key) subParts.push(`Clé : ${ep.series_key}`);
+                if (sN == null || eN == null)
+                  subParts.push(
+                    "Saison / épisode : à renseigner dans Modifier",
+                  );
+                const sub = subParts.join(" · ");
                 appendLibraryRow(tbody, ep, primary, sub);
               }
               table.appendChild(tbody);

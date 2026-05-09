@@ -64,6 +64,7 @@ def admin_list_films(
         {
             "id": f.id,
             "titre": f.titre,
+            "titre_original": f.titre_original,
             "realisateur": f.realisateur,
             "annee": f.annee,
             "taille_octets": f.taille_octets,
@@ -78,6 +79,7 @@ def admin_list_films(
             "series_key": f.series_key,
             "season_number": f.season_number,
             "episode_number": f.episode_number,
+            "s3_key": f.s3_key,
         }
         for f in rows
     ]
