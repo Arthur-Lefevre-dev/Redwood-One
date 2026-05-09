@@ -16,6 +16,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -142,6 +143,22 @@ class Film(Base):
     episode_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (Index("ix_films_series_season_ep", "series_key", "season_number", "episode_number"),)
+
+
+class SeriesSeasonMeta(Base):
+    """Admin-defined season poster / note per series_key (matches Film.series_key)."""
+
+    __tablename__ = "series_season_meta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    series_key: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    season_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    poster_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("series_key", "season_number", name="uq_series_season_meta_key_sn"),
+    )
 
 
 class InvitationCode(Base):

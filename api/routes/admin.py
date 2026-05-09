@@ -22,7 +22,16 @@ from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
-from db.models import ContentKind, Film, FilmSource, FilmStatut, InvitationCode, User, UserRole
+from db.models import (
+    ContentKind,
+    Film,
+    FilmSource,
+    FilmStatut,
+    InvitationCode,
+    SeriesSeasonMeta,
+    User,
+    UserRole,
+)
 from db.session import get_db
 from worker.tasks import download_torrent_task, process_film_task
 
@@ -553,6 +562,90 @@ def delete_user(
     if not u:
         raise HTTPException(404, "Not found")
     db.delete(u)
+    db.commit()
+
+
+class SeriesSeasonMetaBody(BaseModel):
+    series_key: str = Field(..., min_length=1, max_length=160)
+    season_number: int = Field(..., ge=0)
+    poster_path: Optional[str] = Field(None, max_length=512)
+    note: Optional[str] = Field(None, max_length=512)
+
+
+@router.get("/series-seasons")
+def admin_list_series_seasons(
+    series_key: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    sk = (series_key or "").strip()
+    if not sk:
+        raise HTTPException(status_code=400, detail="series_key requis")
+    rows = (
+        db.query(SeriesSeasonMeta)
+        .filter(SeriesSeasonMeta.series_key == sk)
+        .order_by(SeriesSeasonMeta.season_number.asc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "series_key": r.series_key,
+            "season_number": r.season_number,
+            "poster_path": r.poster_path,
+            "note": r.note,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/series-seasons")
+def admin_upsert_series_season(
+    body: SeriesSeasonMetaBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    sk = body.series_key.strip()
+    sn = int(body.season_number)
+    pp = (body.poster_path or "").strip() or None
+    nt = (body.note or "").strip() or None
+    row = (
+        db.query(SeriesSeasonMeta)
+        .filter(SeriesSeasonMeta.series_key == sk, SeriesSeasonMeta.season_number == sn)
+        .first()
+    )
+    if row:
+        row.poster_path = pp
+        row.note = nt
+    else:
+        row = SeriesSeasonMeta(
+            series_key=sk,
+            season_number=sn,
+            poster_path=pp,
+            note=nt,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "series_key": row.series_key,
+        "season_number": row.season_number,
+        "poster_path": row.poster_path,
+        "note": row.note,
+    }
+
+
+@router.delete("/series-seasons/{meta_id}", status_code=204)
+def admin_delete_series_season(
+    meta_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = db.get(SeriesSeasonMeta, meta_id)
+    if not row:
+        raise HTTPException(404, "Not found")
+    db.delete(row)
     db.commit()
 
 

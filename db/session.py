@@ -120,6 +120,59 @@ def _ensure_invitation_created_by_column() -> None:
         )
 
 
+def _ensure_series_season_meta_table() -> None:
+    """Season poster/note per (series_key, season); belt-and-suspenders if create_all skipped."""
+    insp = inspect(engine)
+    if "series_season_meta" in insp.get_table_names():
+        return
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE series_season_meta (
+                        id SERIAL PRIMARY KEY,
+                        series_key VARCHAR(160) NOT NULL,
+                        season_number INTEGER NOT NULL,
+                        poster_path VARCHAR(512),
+                        note VARCHAR(512),
+                        CONSTRAINT uq_series_season_meta_key_sn UNIQUE (series_key, season_number)
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_series_season_meta_series_key "
+                    "ON series_season_meta (series_key)"
+                )
+            )
+        logger.info("database schema: created series_season_meta (postgresql)")
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE series_season_meta (
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    series_key VARCHAR(160) NOT NULL,
+                    season_number INTEGER NOT NULL,
+                    poster_path VARCHAR(512),
+                    note VARCHAR(512),
+                    UNIQUE (series_key, season_number)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_series_season_meta_series_key "
+                "ON series_season_meta (series_key)"
+            )
+        )
+    logger.info("database schema: created series_season_meta (sqlite)")
+
+
 def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
@@ -127,6 +180,7 @@ def init_db() -> None:
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
     _ensure_invitation_created_by_column()
+    _ensure_series_season_meta_table()
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -1724,11 +1724,17 @@
           <option value="series_episode">Épisode de série</option>
         </select>
         <p class="hint">
-          Pour une série : le même <strong>titre affiché de la série</strong> et la
-          même <strong>clé série</strong> sur tous les épisodes (ex.
-          <code>tv-57243</code> ou <code>doctor-who</code>) — pas le titre d’un
-          seul épisode. Numérotez saison et épisode, puis cliquez
-          <strong>Enregistrer</strong>.
+          <strong>Si vous éditez un épisode de série :</strong> les champs série
+          ci‑dessous doivent être <strong>strictement identiques</strong> sur
+          <em>chaque</em> épisode de cette série dans le catalogue.<br /><br />
+          <strong>Titre affiché de la série</strong> — le nom de la série telle
+          qu’elle apparaît pour les spectateurs (ex. le titre de la série entière),
+          <em>pas</em> le titre de cet épisode seul.<br /><br />
+          <strong>Clé série</strong> — un identifiant technique unique pour toute
+          la série, le même sur tous les épisodes (ex.
+          <code>tv-57243</code>, <code>doctor-who</code>).<br /><br />
+          <strong>Saison</strong> et <strong>épisode</strong> changent à chaque
+          épisode ; une fois renseignés, cliquez <strong>Enregistrer</strong>.
         </p>
         <div id="fm-series-box" class="hidden">
           <label for="fm-series-key">Clé série (identifiant unique)</label>
@@ -1848,6 +1854,81 @@
           <button class="btn" type="button" id="fm-cancel">Annuler</button>
           <button class="btn btn-primary" type="button" id="fm-save">
             Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop" id="modal-season-meta">
+      <div class="modal" role="document" style="max-width: 520px">
+        <h3 id="sm-heading">Affiches des saisons</h3>
+        <p class="err-msg" id="sm-err" style="display: none"></p>
+        <p class="hint" id="sm-intro">
+          Une fiche par numéro de saison, pour la même
+          <strong>clé série</strong> que sur les épisodes (affiche TMDB / URL et
+          note optionnelle).
+        </p>
+        <label for="sm-key-select">Clé série</label>
+        <select id="sm-key-select"></select>
+        <label for="sm-key-input" class="hidden" id="sm-key-input-label"
+          >Clé série (saisie manuelle)</label
+        >
+        <input
+          type="text"
+          id="sm-key-input"
+          class="hidden"
+          placeholder="ex. tv-57243"
+          autocomplete="off"
+        />
+        <p id="sm-key-warn" class="hint hidden">
+          Aucune <strong>clé série</strong> n’est encore enregistrée sur les
+          épisodes de ce bloc. Vous pouvez quand même définir une affiche :
+          saisissez la clé (la même que vous mettrez dans
+          <strong>Modifier</strong> sur chaque épisode), puis enregistrez. Ce
+          bandeau disparaît dès que le champ ci‑dessus est rempli.
+        </p>
+        <div
+          id="sm-list"
+          style="
+            margin: 14px 0;
+            max-height: 220px;
+            overflow: auto;
+            font-size: 12px;
+          "
+        ></div>
+        <hr
+          style="
+            border: 0;
+            border-top: 1px solid var(--color-border-tertiary);
+            margin: 14px 0;
+          "
+        />
+        <label for="sm-season-num">Numéro de saison</label>
+        <input
+          type="number"
+          id="sm-season-num"
+          min="0"
+          step="1"
+          placeholder="1"
+        />
+        <label for="sm-poster">Chemin affiche (poster_path TMDB ou URL)</label>
+        <input
+          type="text"
+          id="sm-poster"
+          placeholder="/abc.jpg"
+          autocomplete="off"
+        />
+        <label for="sm-note">Note (sous le titre de saison, optionnel)</label>
+        <input
+          type="text"
+          id="sm-note"
+          placeholder="ex. 8.2"
+          autocomplete="off"
+        />
+        <div class="row" style="margin-top: 12px">
+          <button class="btn" type="button" id="sm-close">Fermer</button>
+          <button class="btn btn-primary" type="button" id="sm-save">
+            Enregistrer / mettre à jour
           </button>
         </div>
       </div>
@@ -2101,6 +2182,24 @@
           }
         }
         return r;
+      }
+
+      /** Best-effort message from FastAPI { detail: string | array } after a failed request. */
+      async function fastApiErrorDetail(r) {
+        try {
+          const j = await r.json();
+          if (typeof j.detail === "string") return j.detail;
+          if (Array.isArray(j.detail)) {
+            const parts = j.detail.map((e) => {
+              if (!e || typeof e !== "object") return "";
+              if (typeof e.msg === "string") return e.msg;
+              return "";
+            });
+            const s = parts.filter(Boolean).join(" ");
+            if (s) return s;
+          }
+        } catch (_) {}
+        return r.status ? "Erreur HTTP " + r.status + "." : "Erreur réseau.";
       }
 
       function initials(name) {
@@ -2643,42 +2742,12 @@
 
       const LIB_SEASON_UNASSIGNED = "__unassigned__";
 
-      /** S07E01 in titre, chemin S3, etc., when DB season/episode missing. */
-      function parseSxEyFromStrings(...texts) {
-        const patterns = [
-          /[\/._-]S(\d{1,2})[._-]?E(\d{1,3})(?=[\/._-]|$)/i,
-          /\bS(\d{1,2})\s*[_\-.]?\s*E(\d{1,3})\b/i,
-          /\b(\d{1,2})\s*x\s*(\d{1,3})\b/i,
-          /season[\s._-]?(\d{1,2})[\s._-]?e(?:p(?:isode)?)?[\s._-]?(\d{1,3})\b/i,
-        ];
-        for (const raw of texts) {
-          if (!raw || typeof raw !== "string") continue;
-          const s = raw;
-          for (const re of patterns) {
-            const m = s.match(re);
-            if (m) {
-              const ss = toFiniteNumber(m[1]);
-              const ee = toFiniteNumber(m[2]);
-              if (ss != null && ee != null) return { s: ss, e: ee };
-            }
-          }
-        }
-        return { s: null, e: null };
-      }
-
-      function seasonEpisodeForLibraryRow(ep) {
-        let sN = toFiniteNumber(ep.season_number);
-        let eN = toFiniteNumber(ep.episode_number);
-        if (sN == null || eN == null) {
-          const p = parseSxEyFromStrings(
-            ep.titre,
-            ep.titre_original,
-            ep.s3_key,
-          );
-          if (sN == null) sN = p.s;
-          if (eN == null) eN = p.e;
-        }
-        return { sN, eN };
+      /** Saison / épisode : uniquement les champs base (l’admin les renseigne dans Modifier). */
+      function dbSeasonEpisode(ep) {
+        return {
+          sN: toFiniteNumber(ep.season_number),
+          eN: toFiniteNumber(ep.episode_number),
+        };
       }
 
       function compareLibrarySeasonKeys(a, b) {
@@ -2706,7 +2775,7 @@
         if (row.content_kind === "series_episode") return true;
         if ((row.series_key || "").trim()) return true;
         if ((row.series_title || "").trim()) return true;
-        const { sN: sn, eN: en } = seasonEpisodeForLibraryRow(row);
+        const { sN: sn, eN: en } = dbSeasonEpisode(row);
         if (sn != null && en != null) return true;
         if (extractShowFromColonTitre(row.titre)) return true;
         return false;
@@ -2855,7 +2924,7 @@
             const label = adminSeriesShowLabel(ep);
             if (!byShow.has(label)) byShow.set(label, new Map());
             const seasonMap = byShow.get(label);
-            const { sN: bucketS } = seasonEpisodeForLibraryRow(ep);
+            const { sN: bucketS } = dbSeasonEpisode(ep);
             const sn =
               bucketS != null ? bucketS : LIB_SEASON_UNASSIGNED;
             if (!seasonMap.has(sn)) seasonMap.set(sn, []);
@@ -2892,12 +2961,41 @@
                 "Aucune saison en base pour ces épisodes — ouvrez Modifier, type « Épisode de série », puis renseignez Saison et Épisode (sinon tout reste regroupé ici).";
             }
             if (meta.textContent) block.appendChild(meta);
+            const allEpsForKeys = [];
+            for (const sk0 of seasonKeys) {
+              allEpsForKeys.push(...(seasonMap.get(sk0) || []));
+            }
+            const keyOpts = [
+              ...new Set(
+                allEpsForKeys
+                  .map((e) => (e.series_key || "").trim())
+                  .filter(Boolean),
+              ),
+            ].sort();
+            const toolRow = document.createElement("div");
+            toolRow.className = "lib-series-show-tools";
+            toolRow.style.cssText =
+              "display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 16px 12px;background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);";
+            const btnArt = document.createElement("button");
+            btnArt.type = "button";
+            btnArt.className = "btn btn-primary";
+            btnArt.style.fontSize = "11px";
+            btnArt.textContent = "Affiches des saisons";
+            btnArt.onclick = () => openSeasonMetaModal(showName, keyOpts);
+            toolRow.appendChild(btnArt);
+            const th = document.createElement("span");
+            th.style.fontSize = "11px";
+            th.style.color = "var(--color-text-tertiary)";
+            th.textContent =
+              "Définissez une image (poster TMDB) par saison pour l’espace spectateur — même clé série que les épisodes.";
+            toolRow.appendChild(th);
+            block.appendChild(toolRow);
             const seasonsSorted = seasonKeys.sort(compareLibrarySeasonKeys);
             for (const sn of seasonsSorted) {
               const eps = seasonMap.get(sn);
               eps.sort((a, b) => {
-                const ea = seasonEpisodeForLibraryRow(a).eN ?? 99999;
-                const eb = seasonEpisodeForLibraryRow(b).eN ?? 99999;
+                const ea = dbSeasonEpisode(a).eN ?? 99999;
+                const eb = dbSeasonEpisode(b).eN ?? 99999;
                 return ea - eb;
               });
               const seasonEl = document.createElement("div");
@@ -2922,7 +3020,7 @@
       </tr></thead>`;
               const tbody = document.createElement("tbody");
               for (const ep of eps) {
-                const { sN, eN } = seasonEpisodeForLibraryRow(ep);
+                const { sN, eN } = dbSeasonEpisode(ep);
                 const t = ep.titre || "—";
                 const primary =
                   sN != null && eN != null
@@ -2944,6 +3042,191 @@
             root.appendChild(block);
           }
         }
+      }
+
+      function smGetSeriesKey() {
+        const sel = $("#sm-key-select");
+        const inp = $("#sm-key-input");
+        if (sel && !sel.classList.contains("hidden"))
+          return (sel.value || "").trim();
+        return inp ? (inp.value || "").trim() : "";
+      }
+
+      function smHideErr() {
+        const err = $("#sm-err");
+        if (!err) return;
+        err.style.display = "none";
+        err.textContent = "";
+      }
+
+      function smShowErr(msg) {
+        const err = $("#sm-err");
+        if (!err) return;
+        err.textContent = msg;
+        err.style.display = "block";
+      }
+
+      /** Hide manual-key hint once the admin typed a series key (not an error). */
+      function smSyncManualKeyHint() {
+        const warn = $("#sm-key-warn");
+        const inp = $("#sm-key-input");
+        if (!warn || !inp || inp.classList.contains("hidden")) return;
+        warn.classList.toggle("hidden", !!(inp.value || "").trim());
+      }
+
+      async function refreshSeasonMetaList() {
+        smHideErr();
+        const list = $("#sm-list");
+        if (!list) return;
+        const sk = smGetSeriesKey();
+        if (!sk) {
+          list.innerHTML =
+            '<p class="hint">Choisissez ou saisissez une clé série pour afficher les fiches.</p>';
+          return;
+        }
+        let r;
+        try {
+          r = await api(
+            "/api/admin/series-seasons?series_key=" + encodeURIComponent(sk),
+          );
+        } catch (e) {
+          return;
+        }
+        if (!r.ok) {
+          smShowErr(
+            "Impossible de charger les fiches saison. " +
+              (await fastApiErrorDetail(r)),
+          );
+          list.innerHTML = "";
+          return;
+        }
+        const rows = await r.json();
+        list.innerHTML = "";
+        if (!rows.length) {
+          const p = document.createElement("p");
+          p.className = "hint";
+          p.textContent =
+            "Aucune fiche pour cette clé. Utilisez le formulaire ci-dessous pour en ajouter une.";
+          list.appendChild(p);
+          return;
+        }
+        for (const row of rows) {
+          const div = document.createElement("div");
+          div.style.cssText =
+            "display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--color-border-tertiary)";
+          const info = document.createElement("div");
+          info.style.flex = "1";
+          info.style.minWidth = "120px";
+          const title = document.createElement("strong");
+          title.textContent = "Saison " + row.season_number;
+          info.appendChild(title);
+          if (row.poster_path) {
+            const pp = document.createElement("div");
+            pp.style.cssText =
+              "color:var(--color-text-tertiary);word-break:break-all;font-size:11px;margin-top:4px";
+            pp.textContent = row.poster_path;
+            info.appendChild(pp);
+          }
+          if (row.note) {
+            const nt = document.createElement("div");
+            nt.style.cssText =
+              "color:var(--color-text-tertiary);font-size:11px;margin-top:4px";
+            nt.textContent = row.note;
+            info.appendChild(nt);
+          }
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "action-btn danger";
+          btn.textContent = "Suppr.";
+          btn.onclick = async () => {
+            const ok = await showConfirmModal(
+              "Supprimer cette fiche saison ?",
+              "L’affiche et la note ne s’afficheront plus pour cette saison côté spectateur.",
+              { confirmText: "Supprimer", cancelText: "Annuler" },
+            );
+            if (!ok) return;
+            const dr = await api("/api/admin/series-seasons/" + row.id, {
+              method: "DELETE",
+            });
+            if (!dr.ok) {
+              smShowErr(
+                "Suppression impossible. " + (await fastApiErrorDetail(dr)),
+              );
+              return;
+            }
+            refreshSeasonMetaList();
+          };
+          div.appendChild(info);
+          div.appendChild(btn);
+          list.appendChild(div);
+        }
+      }
+
+      function openSeasonMetaModal(showName, keyOpts) {
+        smHideErr();
+        const h = $("#sm-heading");
+        if (h)
+          h.textContent =
+            "Affiches des saisons — " + (showName || "Série");
+        const sel = $("#sm-key-select");
+        const inp = $("#sm-key-input");
+        const lbl = $("#sm-key-input-label");
+        const warn = $("#sm-key-warn");
+        if (sel) {
+          sel.innerHTML = "";
+          sel.onchange = null;
+        }
+        if (inp) {
+          inp.value = "";
+          inp.onblur = null;
+        }
+        const opts = Array.isArray(keyOpts) ? keyOpts : [];
+        if (opts.length && sel) {
+          sel.classList.remove("hidden");
+          if (lbl) lbl.classList.add("hidden");
+          if (inp) {
+            inp.classList.add("hidden");
+            inp.oninput = null;
+          }
+          if (warn) warn.classList.add("hidden");
+          for (const k of opts) {
+            const o = document.createElement("option");
+            o.value = k;
+            o.textContent = k;
+            sel.appendChild(o);
+          }
+          sel.onchange = () => refreshSeasonMetaList();
+        } else {
+          if (sel) sel.classList.add("hidden");
+          if (lbl) lbl.classList.remove("hidden");
+          if (inp) {
+            inp.classList.remove("hidden");
+            inp.onblur = () => refreshSeasonMetaList();
+            inp.oninput = () => smSyncManualKeyHint();
+            smSyncManualKeyHint();
+          }
+          if (warn) warn.classList.remove("hidden");
+        }
+        const sn = $("#sm-season-num");
+        const pp = $("#sm-poster");
+        const nt = $("#sm-note");
+        if (sn) sn.value = "";
+        if (pp) pp.value = "";
+        if (nt) nt.value = "";
+        const backdrop = $("#modal-season-meta");
+        if (backdrop) backdrop.classList.add("show");
+        if (opts.length) refreshSeasonMetaList();
+        else {
+          const list = $("#sm-list");
+          if (list)
+            list.innerHTML =
+              '<p class="hint">Saisissez la clé série (la même que sur les épisodes), puis quittez le champ pour charger la liste.</p>';
+        }
+      }
+
+      function closeSeasonMetaModal() {
+        const backdrop = $("#modal-season-meta");
+        if (backdrop) backdrop.classList.remove("show");
       }
 
       function syncLibSearchClearBtn() {
@@ -3067,6 +3350,46 @@
       $("#modal-film").addEventListener("click", (e) => {
         if (e.target.id === "modal-film") closeFilmModal();
       });
+
+      $("#sm-close").addEventListener("click", () => closeSeasonMetaModal());
+      $("#modal-season-meta").addEventListener("click", (e) => {
+        if (e.target.id === "modal-season-meta") closeSeasonMetaModal();
+      });
+      $("#sm-save").addEventListener("click", async () => {
+        const sk = smGetSeriesKey();
+        if (!sk) {
+          smShowErr("Clé série requise.");
+          return;
+        }
+        const snRaw = ($("#sm-season-num").value || "").trim();
+        const sn = parseInt(snRaw, 10);
+        if (snRaw === "" || Number.isNaN(sn) || sn < 0) {
+          smShowErr("Numéro de saison invalide (entier ≥ 0).");
+          return;
+        }
+        smHideErr();
+        const body = {
+          series_key: sk,
+          season_number: sn,
+          poster_path: ($("#sm-poster").value || "").trim() || null,
+          note: ($("#sm-note").value || "").trim() || null,
+        };
+        const r = await api("/api/admin/series-seasons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!r.ok) {
+          smShowErr(
+            "Enregistrement impossible. " + (await fastApiErrorDetail(r)),
+          );
+          return;
+        }
+        await refreshSeasonMetaList();
+      });
+      const smKeyInp = $("#sm-key-input");
+      if (smKeyInp)
+        smKeyInp.addEventListener("input", () => smSyncManualKeyHint());
 
       $("#fm-kind").addEventListener("change", () => {
         $("#fm-series-box").classList.toggle(

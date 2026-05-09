@@ -67,7 +67,12 @@
     .serie-hero-text{flex:1;min-width:200px}
     .serie-hero-text .lead{margin-bottom:20px}
     .season{margin-bottom:28px;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden;background:#111}
-    .season h2{font-size:14px;padding:12px 16px;background:#1a1a1a;border-bottom:1px solid #2a2a2a;color:#ddd}
+    .season h2{font-size:14px;padding:12px 16px;margin:0;background:#1a1a1a;border-bottom:1px solid #2a2a2a;color:#ddd}
+    .season-head{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;background:#1a1a1a;border-bottom:1px solid #2a2a2a}
+    .season-poster{width:72px;flex-shrink:0;border-radius:8px;border:1px solid #333;object-fit:cover;aspect-ratio:2/3;background:#222}
+    .season-head-text{flex:1;min-width:0}
+    .season-head-text h2{font-size:14px;padding:0;margin:0 0 6px;background:none;border:none;color:#ddd}
+    .season-note{font-size:12px;color:var(--muted);margin:0;line-height:1.45}
     .ep-list{display:flex;flex-direction:column}
     .ep{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #222;cursor:pointer;font-size:13px}
     .ep:last-child{border-bottom:none}
@@ -219,8 +224,41 @@
         const eps = d.seasons[k] || [];
         const sec = document.createElement('section');
         sec.className = 'season';
-        sec.innerHTML = '<h2>Saison ' + k + '</h2><div class="ep-list"></div>';
-        const list = sec.querySelector('.ep-list');
+        const art = (d.season_art && d.season_art[k]) || {};
+        const hasArt = !!(art.poster_path || art.note);
+        if (hasArt) {
+          const head = document.createElement('div');
+          head.className = 'season-head';
+          if (art.poster_path) {
+            const img = document.createElement('img');
+            img.className = 'season-poster';
+            img.src = posterUrl(art.poster_path);
+            img.alt = '';
+            img.loading = 'lazy';
+            img.onerror = function () { this.style.opacity = '0.25'; };
+            head.appendChild(img);
+          }
+          const ht = document.createElement('div');
+          ht.className = 'season-head-text';
+          const h2 = document.createElement('h2');
+          h2.textContent = 'Saison ' + k;
+          ht.appendChild(h2);
+          if (art.note) {
+            const pn = document.createElement('p');
+            pn.className = 'season-note';
+            pn.textContent = art.note;
+            ht.appendChild(pn);
+          }
+          head.appendChild(ht);
+          sec.appendChild(head);
+        } else {
+          const h2 = document.createElement('h2');
+          h2.textContent = 'Saison ' + k;
+          sec.appendChild(h2);
+        }
+        const list = document.createElement('div');
+        list.className = 'ep-list';
+        sec.appendChild(list);
         eps.forEach((ep) => {
           const row = document.createElement('div');
           row.className = 'ep';

@@ -13,7 +13,7 @@ from core.series_grouping import (
     normalize_series_group_key,
     series_catalog_group_key,
 )
-from db.models import ContentKind, Film, FilmStatut, User
+from db.models import ContentKind, Film, FilmStatut, SeriesSeasonMeta, User
 from db.session import get_db
 
 router = APIRouter(prefix="/api/series", tags=["series"])
@@ -139,6 +139,20 @@ def series_detail(
         )
     for k in seasons:
         seasons[k].sort(key=lambda e: (e.get("episode_number") is None, e.get("episode_number") or 0))
+    meta_rows = (
+        db.query(SeriesSeasonMeta)
+        .filter(SeriesSeasonMeta.series_key.in_(sk_list))
+        .order_by(SeriesSeasonMeta.season_number.asc())
+        .all()
+    )
+    season_art: dict[str, dict[str, Any]] = {}
+    for m in meta_rows:
+        key = str(int(m.season_number))
+        if key not in season_art:
+            season_art[key] = {
+                "poster_path": m.poster_path,
+                "note": m.note,
+            }
     return {
         "series_key": normalize_series_group_key(series_key),
         "title": rep.series_title or rep.titre,
@@ -146,4 +160,5 @@ def series_detail(
         "synopsis": rep.synopsis,
         "note_tmdb": rep.note_tmdb,
         "seasons": seasons,
+        "season_art": season_art,
     }
