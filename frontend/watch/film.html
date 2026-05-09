@@ -69,12 +69,41 @@
     .meta{color:var(--muted);font-size:13px;margin-bottom:12px}
     .syno{color:#ddd;line-height:1.55;font-size:14px;margin-bottom:20px}
     .trailers{margin:8px 0 20px}
-    .trailers-title{font-size:1rem;color:#ddd;margin-bottom:14px;font-weight:600}
-    .trailer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-    .trailer-tile{background:#111;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden}
-    .trailer-tile iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
-    .trailer-cap{padding:8px 10px;font-size:12px;color:var(--muted);line-height:1.35}
+    .trailer-open-btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      padding:10px 18px;border-radius:10px;border:1px solid rgba(139,37,0,.55);
+      background:linear-gradient(180deg,#1f1512,#141210);color:#f5f5f5;font-size:14px;font-weight:600;
+      cursor:pointer;font-family:inherit;transition:border-color .2s,box-shadow .2s,transform .15s;
+    }
+    .trailer-open-btn:hover{border-color:var(--accent);box-shadow:0 6px 20px rgba(139,37,0,.2);color:#fff}
+    .trailer-open-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     .trailers-empty{margin:0;font-size:13px;color:var(--muted);line-height:1.5;max-width:52ch}
+    .trailer-modal[hidden]{display:none!important}
+    .trailer-modal:not([hidden]){
+      position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;
+    }
+    .trailer-modal-backdrop{
+      position:absolute;inset:0;border:0;padding:0;margin:0;width:100%;height:100%;
+      background:rgba(0,0,0,.78);cursor:pointer;
+    }
+    .trailer-modal-panel{
+      position:relative;z-index:1;width:min(920px,100%);max-height:min(90vh,100%);
+      background:#111;border:1px solid #333;border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.55);
+      padding:14px 14px 16px;
+    }
+    .trailer-modal-title{font-size:1rem;font-weight:600;color:#eee;margin:0 40px 12px 4px;line-height:1.3}
+    .trailer-modal-close{
+      position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:10px;
+      border:1px solid #333;background:#1a1a1a;color:#e5e5e5;font-size:22px;line-height:1;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+      font-family:system-ui,sans-serif;
+    }
+    .trailer-modal-close:hover{border-color:var(--accent);color:#fff}
+    .trailer-modal-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .trailer-modal-frame-wrap{
+      position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;
+    }
+    .trailer-modal-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
     .player-wrap{position:relative;max-width:100%;border-radius:12px;overflow:hidden;background:#0a0a0a;border:1px solid #2a2a2a;min-height:200px}
     .plyr--video{border-radius:12px}
     .plyr__control--overlaid{background:rgba(139,37,0,.92);color:#fff}
@@ -157,9 +186,19 @@
       </div>
     </div>
     <section class="trailers" id="trailers-block" hidden>
-      <h2 class="trailers-title">Bande-annonce</h2>
-      <div class="trailer-grid" id="trailers"></div>
+      <button type="button" class="trailer-open-btn" id="trailer-open-btn" hidden>Bande annonce</button>
+      <p class="trailers-empty" id="trailers-empty-msg" hidden></p>
     </section>
+    <div class="trailer-modal" id="trailer-modal" hidden role="dialog" aria-modal="true" aria-labelledby="trailer-modal-title">
+      <button type="button" class="trailer-modal-backdrop" id="trailer-modal-backdrop" aria-label="Fermer la fenêtre"></button>
+      <div class="trailer-modal-panel">
+        <button type="button" class="trailer-modal-close" id="trailer-modal-close" aria-label="Fermer">&times;</button>
+        <h2 class="trailer-modal-title" id="trailer-modal-title">Bande annonce</h2>
+        <div class="trailer-modal-frame-wrap">
+          <iframe id="trailer-modal-iframe" title="Bande annonce" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+      </div>
+    </div>
     <div class="player-wrap">
       <div class="video-loader" id="vloader">
         <div class="spinner"></div>
@@ -200,10 +239,41 @@
       document.getElementById('user-score-el').setAttribute('aria-label', 'Score TMDB ' + pct + ' pour cent');
     }
 
+    let trailerEmbedKey = '';
+    let trailerEmbedName = '';
+
+    function openTrailerModal() {
+      if (!trailerEmbedKey) return;
+      const modal = document.getElementById('trailer-modal');
+      const ifr = document.getElementById('trailer-modal-iframe');
+      const titleEl = document.getElementById('trailer-modal-title');
+      const label = trailerEmbedName || 'Bande annonce';
+      titleEl.textContent = label;
+      ifr.title = label;
+      ifr.src = 'https://www.youtube.com/embed/' + encodeURIComponent(trailerEmbedKey) + '?rel=0&modestbranding=1&autoplay=1';
+      modal.hidden = false;
+      document.body.style.overflow = 'hidden';
+      document.getElementById('trailer-modal-close').focus();
+    }
+
+    function closeTrailerModal() {
+      const modal = document.getElementById('trailer-modal');
+      const ifr = document.getElementById('trailer-modal-iframe');
+      ifr.src = '';
+      modal.hidden = true;
+      document.body.style.overflow = '';
+      const btn = document.getElementById('trailer-open-btn');
+      if (!btn.hidden) btn.focus();
+    }
+
     function renderTrailers(f) {
       const block = document.getElementById('trailers-block');
-      const grid = document.getElementById('trailers');
-      grid.innerHTML = '';
+      const btn = document.getElementById('trailer-open-btn');
+      const empty = document.getElementById('trailers-empty-msg');
+      btn.hidden = true;
+      empty.hidden = true;
+      trailerEmbedKey = '';
+      trailerEmbedName = '';
       if (f.content_kind !== 'film') {
         block.hidden = true;
         return;
@@ -211,32 +281,24 @@
       block.hidden = false;
       const list = f.trailers && f.trailers.length ? f.trailers : [];
       if (!list.length) {
-        const p = document.createElement('p');
-        p.className = 'trailers-empty';
-        p.textContent = f.tmdb_id == null
+        empty.hidden = false;
+        empty.textContent = f.tmdb_id == null
           ? 'Aucune bande-annonce : renseignez un identifiant TMDB sur la fiche (administration) pour lier les vidéos TMDB.'
           : 'Aucune vidéo YouTube répertoriée sur TMDB pour ce film pour l’instant, ou la clé API TMDB n’est pas configurée côté serveur.';
-        grid.appendChild(p);
         return;
       }
-      list.forEach((t) => {
-        const tile = document.createElement('div');
-        tile.className = 'trailer-tile';
-        const ifr = document.createElement('iframe');
-        // No loading="lazy": multiple lazy iframes often stay blank until scroll; feels like "only one trailer".
-        ifr.src = 'https://www.youtube.com/embed/' + encodeURIComponent(t.key) + '?rel=0&modestbranding=1';
-        ifr.title = t.name || 'Bande-annonce';
-        ifr.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-        ifr.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-        ifr.setAttribute('allowfullscreen', '');
-        const cap = document.createElement('div');
-        cap.className = 'trailer-cap';
-        cap.textContent = t.name || '';
-        tile.appendChild(ifr);
-        tile.appendChild(cap);
-        grid.appendChild(tile);
-      });
+      const t = list[0];
+      trailerEmbedKey = t.key;
+      trailerEmbedName = (t.name || '').trim();
+      btn.hidden = false;
     }
+
+    document.getElementById('trailer-open-btn').addEventListener('click', openTrailerModal);
+    document.getElementById('trailer-modal-close').addEventListener('click', closeTrailerModal);
+    document.getElementById('trailer-modal-backdrop').addEventListener('click', closeTrailerModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !document.getElementById('trailer-modal').hidden) closeTrailerModal();
+    });
 
     async function boot() {
       await apiJson('/api/auth/me');
