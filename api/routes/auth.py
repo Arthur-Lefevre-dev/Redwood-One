@@ -22,7 +22,8 @@ from core.security import (
     hash_refresh_token,
     verify_password,
 )
-from db.models import InvitationCode, RefreshToken, User, UserRole
+from core.member_invites import effective_viewer_rank
+from db.models import InvitationCode, RefreshToken, User, UserRole, ViewerRank
 from db.session import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -153,6 +154,7 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
         email=email_norm,
         hashed_password=hash_password(body.password),
         role=UserRole.viewer,
+        viewer_rank=ViewerRank.bronze.value,
         preferences={"favorite_genres": []},
     )
     db.add(user)
@@ -290,11 +292,13 @@ def create_user_invite(
 
 @router.get("/me")
 def me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rank = effective_viewer_rank(user)
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
         "role": user.role.value,
+        "viewer_rank": rank.value,
         "preferences": user.preferences if isinstance(user.preferences, dict) else {},
         "invite": invite_month_status(db, user),
         "my_invites": list_member_invites_payload(db, user),
@@ -343,11 +347,13 @@ def patch_me(
     db.add(user)
     db.commit()
     db.refresh(user)
+    rank = effective_viewer_rank(user)
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
         "role": user.role.value,
+        "viewer_rank": rank.value,
         "preferences": user.preferences if isinstance(user.preferences, dict) else {},
         "invite": invite_month_status(db, user),
         "my_invites": list_member_invites_payload(db, user),

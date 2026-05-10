@@ -1568,6 +1568,7 @@
                       <tr>
                         <th style="padding-left: 16px">Utilisateur</th>
                         <th>Rôle</th>
+                        <th>Rang (viewer)</th>
                         <th>Statut</th>
                         <th>Dernière connexion</th>
                         <th>Actions</th>
@@ -1721,6 +1722,21 @@
         >
           <option value="viewer">viewer</option>
           <option value="admin">admin</option>
+        </select>
+        <label for="nu-rank" id="nu-rank-label" style="display:block;font-size:12px;margin-bottom:4px;opacity:.85">Rang viewer</label>
+        <select
+          id="nu-rank"
+          style="
+            width: 100%;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+          "
+        >
+          <option value="bronze">Bronze (1 inv. / mois)</option>
+          <option value="silver">Argent (3)</option>
+          <option value="gold">Or (6)</option>
+          <option value="platinum">Platine (10)</option>
         </select>
         <div class="row">
           <button class="btn" type="button" id="nu-cancel">Annuler</button>
@@ -3796,7 +3812,7 @@
           </div>
         </div>
       </td>
-      <td></td><td></td><td></td><td></td>`;
+      <td></td><td></td><td></td><td></td><td></td>`;
           tr.querySelector('div[style*="width:26px"]').textContent = initials(
             u.username,
           );
@@ -3806,12 +3822,54 @@
             u.email;
           const tds = tr.querySelectorAll("td");
           tds[1].innerHTML = `<span class="role-badge ${u.role === "admin" ? "role-admin" : "role-viewer"}">${u.role}</span>`;
+          const rankLabels = {
+            bronze: "Bronze",
+            silver: "Argent",
+            gold: "Or",
+            platinum: "Platine",
+          };
+          if (u.role === "viewer") {
+            const sel = document.createElement("select");
+            sel.style.cssText =
+              "max-width:140px;padding:6px 8px;border-radius:8px;font-size:11px;background:var(--color-background-secondary);color:var(--color-text-primary);border:1px solid var(--color-border-secondary)";
+            ["bronze", "silver", "gold", "platinum"].forEach((rk) => {
+              const o = document.createElement("option");
+              o.value = rk;
+              o.textContent = rankLabels[rk];
+              sel.appendChild(o);
+            });
+            const cur = (u.viewer_rank || "bronze").toLowerCase();
+            if (["bronze", "silver", "gold", "platinum"].includes(cur))
+              sel.value = cur;
+            else sel.value = "bronze";
+            sel.addEventListener("change", async () => {
+              const r = await api(`/api/admin/users/${u.id}/viewer-rank`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ viewer_rank: sel.value }),
+              });
+              if (!r.ok) {
+                await showAlertModal(
+                  "Mise à jour impossible",
+                  "Le rang n’a pas pu être enregistré.",
+                  { okText: "Fermer" },
+                );
+                loadUsers();
+                return;
+              }
+              u.viewer_rank = sel.value;
+            });
+            tds[2].appendChild(sel);
+          } else {
+            tds[2].innerHTML =
+              '<span style="font-size:11px;color:var(--color-text-tertiary)">—</span>';
+          }
           const dot = u.is_active ? "#639922" : "#BA7517";
-          tds[2].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? "Actif" : "Inactif"}</span>`;
+          tds[3].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? "Actif" : "Inactif"}</span>`;
           const dc = u.derniere_connexion
             ? new Date(u.derniere_connexion).toLocaleString()
             : "—";
-          tds[3].textContent = dc;
+          tds[4].textContent = dc;
           const act = document.createElement("div");
           act.className = "film-actions";
           const b0 = document.createElement("button");
@@ -3877,7 +3935,7 @@
           act.appendChild(b0);
           act.appendChild(bResetInv);
           act.appendChild(b1);
-          tds[4].appendChild(act);
+          tds[5].appendChild(act);
           tb.appendChild(tr);
         });
       }
@@ -3903,19 +3961,33 @@
         applyUsersFilterAndRender();
       });
 
+      function syncNuRankVisibility() {
+        const role = $("#nu-role") && $("#nu-role").value;
+        const rankEl = $("#nu-rank");
+        const rankLab = $("#nu-rank-label");
+        const show = role === "viewer";
+        if (rankEl) rankEl.style.display = show ? "block" : "none";
+        if (rankLab) rankLab.style.display = show ? "block" : "none";
+      }
+
       $("#btn-new-user").addEventListener("click", () => {
         $("#modal-user").classList.add("show");
+        syncNuRankVisibility();
       });
+      $("#nu-role").addEventListener("change", syncNuRankVisibility);
       $("#nu-cancel").addEventListener("click", () => {
         $("#modal-user").classList.remove("show");
       });
       $("#nu-save").addEventListener("click", async () => {
+        const role = $("#nu-role").value;
         const body = {
           username: $("#nu-user").value.trim(),
           email: $("#nu-email").value.trim(),
           password: $("#nu-pass").value,
-          role: $("#nu-role").value,
+          role,
         };
+        if (role === "viewer" && $("#nu-rank"))
+          body.viewer_rank = $("#nu-rank").value;
         const r = await api("/api/admin/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

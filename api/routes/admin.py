@@ -35,6 +35,7 @@ from db.models import (
     SeriesShowMeta,
     User,
     UserRole,
+    ViewerRank,
 )
 from db.session import get_db
 from worker.tasks import download_torrent_task, process_film_task
@@ -42,6 +43,26 @@ from worker.tasks import download_torrent_task, process_film_task
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _viewer_rank_for_new_viewer(value: Optional[str]) -> str:
+    if value is None or not str(value).strip():
+        return ViewerRank.bronze.value
+    v = str(value).strip().lower()
+    try:
+        ViewerRank(v)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Rang viewer invalide.")
+    return v
+
+
+def _viewer_rank_update_value(value: str) -> str:
+    v = str(value).strip().lower()
+    try:
+        ViewerRank(v)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Rang viewer invalide.")
+    return v
 
 
 def _parse_upload_content_kind(raw: Optional[str]) -> ContentKind:
@@ -531,6 +552,7 @@ class UserOut(BaseModel):
     role: str
     is_active: bool
     derniere_connexion: Optional[datetime]
+    viewer_rank: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -546,6 +568,7 @@ class CreateUserBody(BaseModel):
     email: EmailStr
     password: str = Field(max_length=128)
     role: UserRole = UserRole.viewer
+    viewer_rank: Optional[str] = None
 
 
 @router.post("/users", response_model=UserOut)
@@ -572,11 +595,15 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
     if pw_err:
         raise HTTPException(status_code=400, detail=pw_err)
 
+    rank_val: Optional[str] = None
+    if body.role == UserRole.viewer:
+        rank_val = _viewer_rank_for_new_viewer(body.viewer_rank)
     u = User(
         username=body.username,
         email=email_norm,
         hashed_password=hash_password(body.password),
         role=body.role,
+        viewer_rank=rank_val,
     )
     db.add(u)
     db.commit()
@@ -586,6 +613,29 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
 
 class PatchRoleBody(BaseModel):
     role: UserRole
+
+
+class PatchViewerRankBody(BaseModel):
+    viewer_rank: str
+
+
+@router.patch("/users/{user_id}/viewer-rank")
+def patch_viewer_rank(
+    user_id: int,
+    body: PatchViewerRankBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "Not found")
+    if u.role != UserRole.viewer:
+        raise HTTPException(400, "Le rang ne s’applique qu’aux comptes viewer.")
+    u.viewer_rank = _viewer_rank_update_value(body.viewer_rank)
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return {"ok": True, "viewer_rank": u.viewer_rank}
 
 
 @router.patch("/users/{user_id}/role")
@@ -599,6 +649,10 @@ def patch_role(
     if not u:
         raise HTTPException(404, "Not found")
     u.role = body.role
+    if body.role == UserRole.viewer and not (u.viewer_rank or "").strip():
+        u.viewer_rank = ViewerRank.bronze.value
+    if body.role == UserRole.admin:
+        u.viewer_rank = None
     db.commit()
     return {"ok": True}
 

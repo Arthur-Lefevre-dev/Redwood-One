@@ -49,6 +49,36 @@ def _ensure_films_trailer_columns() -> None:
     logger.info("database schema: ensured films trailer columns (sqlite)")
 
 
+def _ensure_user_viewer_rank_column() -> None:
+    """Viewer rank for monthly invitation quota (bronze/silver/gold/platinum)."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS viewer_rank VARCHAR(20)"))
+            conn.execute(
+                text(
+                    "UPDATE users SET viewer_rank = 'bronze' "
+                    "WHERE viewer_rank IS NULL AND role::text = 'viewer'"
+                )
+            )
+        logger.info("database schema: ensured users.viewer_rank (postgresql)")
+        return
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    if "viewer_rank" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN viewer_rank VARCHAR(20)"))
+        logger.info("database schema: added users.viewer_rank (sqlite)")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE users SET viewer_rank = 'bronze' "
+                "WHERE viewer_rank IS NULL AND role = 'viewer'"
+            )
+        )
+
+
 def _ensure_user_invite_column() -> None:
     """Add last_invite_at for monthly user-generated invitation codes."""
     if engine.dialect.name == "postgresql":
@@ -262,6 +292,7 @@ def init_db() -> None:
     _ensure_films_trailer_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
+    _ensure_user_viewer_rank_column()
     _ensure_invitation_created_by_column()
     _ensure_series_season_meta_table()
     _ensure_series_season_synopsis_column()

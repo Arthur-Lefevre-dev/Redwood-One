@@ -8,7 +8,30 @@ from typing import Any, Dict, List
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from db.models import InvitationCode, User
+from db.models import InvitationCode, User, UserRole, ViewerRank
+
+# Monthly member-invite quota (UTC calendar month) per viewer rank.
+VIEWER_RANK_QUOTAS: Dict[ViewerRank, int] = {
+    ViewerRank.bronze: 1,
+    ViewerRank.silver: 3,
+    ViewerRank.gold: 6,
+    ViewerRank.platinum: 10,
+}
+
+
+def effective_viewer_rank(user: User) -> ViewerRank:
+    """Rank used for invitation quota (admins get platinum-equivalent)."""
+    if user.role == UserRole.admin:
+        return ViewerRank.platinum
+    raw = (user.viewer_rank or "").strip().lower()
+    try:
+        return ViewerRank(raw)
+    except ValueError:
+        return ViewerRank.bronze
+
+
+def monthly_invite_quota(user: User) -> int:
+    return VIEWER_RANK_QUOTAS[effective_viewer_rank(user)]
 
 
 def legacy_invite_note_clause(user: User):
@@ -78,17 +101,17 @@ def member_invites_this_month_count(db: Session, user: User) -> int:
     )
 
 
-INVITE_QUOTA_PER_MONTH = 1
-
-
 def invite_month_status(db: Session, user: User) -> Dict[str, Any]:
-    """One invite per calendar month (UTC), from invitation_codes rows."""
+    """Member invites per UTC month; quota depends on viewer rank."""
     n = member_invites_this_month_count(db, user)
+    quota = monthly_invite_quota(user)
+    rank = effective_viewer_rank(user)
     base = {
         "invites_created_this_month": n,
-        "invite_quota_per_month": INVITE_QUOTA_PER_MONTH,
+        "invite_quota_per_month": quota,
+        "viewer_rank": rank.value,
     }
-    if n < INVITE_QUOTA_PER_MONTH:
+    if n < quota:
         return {
             **base,
             "can_invite_this_month": True,

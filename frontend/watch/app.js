@@ -118,9 +118,18 @@ function injectWatchNavUserStyles() {
   const style = document.createElement('style');
   style.id = 'watch-nav-user-styles';
   style.textContent = `
-    .nav-end{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
-    .nav-end > a{color:var(--muted, #a3a3a3);text-decoration:none;font-size:14px;margin-left:0}
+    .nav-end{display:flex;align-items:center;flex-wrap:wrap;gap:18px}
+    .nav-end > a{color:var(--muted, #a3a3a3);text-decoration:none;font-size:14px;margin-left:0;line-height:1.2}
     .nav-end > a:hover{color:#fff}
+    a.nav-invite-link{
+      display:inline-flex;align-items:center;justify-content:center;
+      padding:0;margin:0;border-radius:0;color:var(--muted, #a3a3a3);
+      font-size:14px;line-height:1;flex-shrink:0;
+    }
+    a.nav-invite-link:hover{color:#fff;background:transparent}
+    a.nav-invite-link svg{width:28px;height:28px;display:block;fill:currentColor;flex-shrink:0}
+    a.nav-invite-link--current{color:#fecaca}
+    a.nav-invite-link--current:hover{color:#fff;background:transparent}
     .nav-user-wrap{position:relative;margin-left:0}
     .nav-user-trigger{
       display:inline-flex;align-items:center;gap:10px;
@@ -336,8 +345,21 @@ async function initViewerAnnouncement() {
   }
 }
 
+/** SVG icon for member invitations (injected into .nav-invite-link anchors). */
+function watchNavInviteIconSvg() {
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0h-.29c-.45.68-1.18 1.25-2.15 1.59.77.53 1.44 1.1 1.89 1.69h3.55v-1.79c0-1.94-3.48-2.49-6-2.49z"/></svg>';
+}
+
+function initWatchNavInviteIcons() {
+  document.querySelectorAll('a.nav-invite-link').forEach((a) => {
+    if (a.querySelector('svg')) return;
+    a.innerHTML = watchNavInviteIconSvg();
+  });
+}
+
 if (typeof document !== 'undefined') {
   initWatchNavUserMenu();
+  initWatchNavInviteIcons();
   hydrateWatchNavUser();
   initViewerAnnouncement();
 }
@@ -352,3 +374,4 @@ window.initWatchNavUserMenu = initWatchNavUserMenu;
 window.hydrateWatchNavUser = hydrateWatchNavUser;
 window.initViewerAnnouncement = initViewerAnnouncement;
 window.watchEscapeHtml = watchEscapeHtml;
+window.initWatchNavInviteIcons = initWatchNavInviteIcons;

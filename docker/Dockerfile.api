@@ -16,8 +16,8 @@ COPY . .
 
 # Non-root user (same uid/gid as Dockerfile.worker for shared volume tmp_data:/tmp/redwood)
 RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents && \
-    groupadd --system --gid 1000 redwood && \
-    useradd --system --uid 1000 --gid redwood --home-dir /app --shell /bin/false redwood && \
+    groupadd --gid 1000 redwood && \
+    useradd --uid 1000 --gid redwood --home-dir /app --shell /bin/false redwood && \
     chown -R redwood:redwood /app /tmp/redwood
 
 USER redwood

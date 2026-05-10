@@ -30,6 +30,15 @@ class UserRole(str, enum.Enum):
     viewer = "viewer"
 
 
+class ViewerRank(str, enum.Enum):
+    """Viewer tier: higher rank = more member invitations per UTC month."""
+
+    bronze = "bronze"
+    silver = "silver"
+    gold = "gold"
+    platinum = "platinum"
+
+
 class FilmSource(str, enum.Enum):
     upload = "upload"
     torrent = "torrent"
@@ -71,6 +80,8 @@ class User(Base):
     last_invite_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Viewer tastes: { "favorite_genres": ["Drame", "Action"] } for "surprise me" picks
     preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    # Invitation quota tier (viewers): bronze|silver|gold|platinum — stored as string for simple migrations.
+    viewer_rank: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
 
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
