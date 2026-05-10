@@ -13,7 +13,16 @@
     .sub { color:var(--muted); font-size:.85rem; margin-bottom:22px; }
     label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
     input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:#0f0f0f; color:var(--text); margin-bottom:14px; }
-    button { width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; margin-top:6px; }
+    .pass-row { margin-bottom:14px; }
+    .pass-row input { margin-bottom:0; }
+    .pass-field { display:flex; gap:8px; align-items:stretch; }
+    .pass-field input { flex:1; min-width:0; }
+    button[type="submit"] { width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; margin-top:6px; }
+    .btn-show-pass {
+      flex-shrink:0; padding:10px 14px; border:1px solid var(--border); border-radius:8px;
+      background:#1a1a1a; color:var(--muted); font-size:.8rem; font-weight:600; cursor:pointer; font-family:inherit;
+    }
+    .btn-show-pass:hover { color:var(--text); border-color:#444; }
     .err { color:#f87171; font-size:.85rem; margin-top:10px; display:none; }
     .links { margin-top:18px; font-size:.85rem; color:var(--muted); text-align:center; }
     a { color:#fca5a5; }
@@ -26,14 +35,30 @@
     <form id="f">
       <label for="u">Identifiant</label>
       <input id="u" name="username" autocomplete="username" required />
-      <label for="p">Mot de passe</label>
-      <input id="p" name="password" type="password" autocomplete="current-password" required />
+      <div class="pass-row">
+        <label for="p">Mot de passe</label>
+        <div class="pass-field">
+          <input id="p" name="password" type="password" autocomplete="current-password" required />
+          <button type="button" class="btn-show-pass" id="btn-show-pass" aria-pressed="false" aria-label="Afficher le mot de passe">Voir</button>
+        </div>
+      </div>
       <button type="submit">Accéder au tableau de bord</button>
     </form>
     <p class="err" id="err"></p>
     <p class="links"><a href="/login.html">Espace spectateur</a></p>
   </div>
   <script>
+    (function () {
+      const inp = document.getElementById('p');
+      const btn = document.getElementById('btn-show-pass');
+      btn.addEventListener('click', () => {
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+        btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+        btn.textContent = show ? 'Masquer' : 'Voir';
+      });
+    })();
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();
       const err = document.getElementById('err');

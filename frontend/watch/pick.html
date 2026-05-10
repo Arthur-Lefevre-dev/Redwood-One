@@ -39,6 +39,11 @@
     .taste-grid{display:flex;flex-wrap:wrap;gap:8px}
     .taste-grid label{font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border-radius:8px;border:1px solid #333;background:#161616}
     .taste-grid input{accent-color:var(--accent)}
+    .pick-search{
+      width:100%;max-width:420px;padding:9px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:#fff;
+      font-size:13px;margin-bottom:12px;font-family:inherit;display:block;
+    }
+    .pick-search::placeholder{color:#666}
     .hint{font-size:13px;color:var(--muted);line-height:1.5;margin-top:20px}
     .hint a{color:#fca5a5}
     .browse-section{border:1px solid #2a2a2a;border-radius:12px;padding:16px 18px;margin-bottom:22px;background:#111}
@@ -95,6 +100,7 @@
     <button type="button" class="btn-pick" id="btn-surprise">Lancer le tirage</button>
     <section class="tastes" id="tastes-wrap">
       <h2>Mes genres préférés</h2>
+      <input type="search" class="pick-search" id="taste-search" placeholder="Rechercher un genre…" autocomplete="off" />
       <div class="taste-grid" id="taste-grid"></div>
       <div style="margin-top:14px">
         <button type="button" class="btn-save-tastes" id="btn-save-tastes">Enregistrer mes goûts</button>
@@ -103,10 +109,12 @@
     <section class="browse-section" id="pick-facets">
       <div class="browse-block">
         <h2>Réalisateurs</h2>
+        <input type="search" class="pick-search" id="pick-search-directors" placeholder="Rechercher un réalisateur…" autocomplete="off" />
         <div class="chip-wrap chip-wrap--tall" id="pick-chips-directors"></div>
       </div>
       <div class="browse-block">
         <h2>Acteurs (cast TMDB)</h2>
+        <input type="search" class="pick-search" id="pick-search-actors" placeholder="Rechercher un acteur…" autocomplete="off" />
         <div class="chip-wrap chip-wrap--tall" id="pick-chips-actors"></div>
       </div>
       <div class="browse-block">
@@ -130,6 +138,34 @@
     let pickActor = '';
     let pickDirectorsList = [];
     let pickActorsList = [];
+    let pickGenresFull = [];
+    let pickGenresChecked = new Set();
+
+    function renderTasteGrid() {
+      document.querySelectorAll('#taste-grid input:checked').forEach((inp) => pickGenresChecked.add(inp.value));
+      const q = (document.getElementById('taste-search').value || '').trim().toLowerCase();
+      const gEl = document.getElementById('taste-grid');
+      gEl.innerHTML = '';
+      const list = pickGenresFull.filter((g) => !q || String(g.name || '').toLowerCase().includes(q));
+      list.forEach((g) => {
+        const lab = document.createElement('label');
+        const inp = document.createElement('input');
+        inp.type = 'checkbox';
+        inp.value = g.name;
+        inp.checked = pickGenresChecked.has(g.name);
+        inp.addEventListener('change', () => {
+          if (inp.checked) pickGenresChecked.add(g.name);
+          else pickGenresChecked.delete(g.name);
+        });
+        lab.appendChild(inp);
+        lab.appendChild(document.createTextNode(' ' + g.name + ' '));
+        const sp = document.createElement('span');
+        sp.style.opacity = '0.5';
+        sp.textContent = '(' + g.count + ')';
+        lab.appendChild(sp);
+        gEl.appendChild(lab);
+      });
+    }
 
     function renderPickActiveFilters() {
       const el = document.getElementById('pick-active-filters');
@@ -162,11 +198,15 @@
     }
 
     function refreshPickChips() {
+      const dirQ = (document.getElementById('pick-search-directors').value || '').trim().toLowerCase();
+      const actQ = (document.getElementById('pick-search-actors').value || '').trim().toLowerCase();
+      const dirs = pickDirectorsList.filter((d) => !dirQ || String(d.name || '').toLowerCase().includes(dirQ));
+      const acts = pickActorsList.filter((a) => !actQ || String(a.name || '').toLowerCase().includes(actQ));
       const cd = document.getElementById('pick-chips-directors');
       const ca = document.getElementById('pick-chips-actors');
       cd.innerHTML = '';
       ca.innerHTML = '';
-      pickDirectorsList.forEach((d) => {
+      dirs.forEach((d) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip' + (pickDirector === d.name ? ' chip--active' : '');
@@ -178,7 +218,7 @@
         });
         cd.appendChild(b);
       });
-      pickActorsList.forEach((a) => {
+      acts.forEach((a) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip' + (pickActor === a.name ? ' chip--active' : '');
@@ -213,8 +253,8 @@
     });
 
     document.getElementById('btn-save-tastes').addEventListener('click', async () => {
-      const boxes = document.querySelectorAll('#taste-grid input:checked');
-      const genres = Array.from(boxes).map((b) => b.value);
+      document.querySelectorAll('#taste-grid input:checked').forEach((inp) => pickGenresChecked.add(inp.value));
+      const genres = Array.from(pickGenresChecked);
       await apiJson('/api/auth/me/preferences', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -231,30 +271,21 @@
         me.preferences && me.preferences.favorite_genres ? me.preferences.favorite_genres : [];
       const [genres, directors, actors] = await Promise.all([
         apiJson('/api/films/genres-summary'),
-        apiJson('/api/films/directors-summary?limit=48'),
-        apiJson('/api/films/actors-summary?limit=72'),
+        apiJson('/api/films/directors-summary?limit=120'),
+        apiJson('/api/films/actors-summary?limit=200'),
       ]);
       pickDirectorsList = directors;
       pickActorsList = actors;
+      pickGenresFull = genres;
+      pickGenresChecked = new Set(prefs);
+      renderTasteGrid();
       refreshPickChips();
       renderPickActiveFilters();
-      const gEl = document.getElementById('taste-grid');
-      gEl.innerHTML = '';
-      genres.slice(0, 24).forEach((g) => {
-        const lab = document.createElement('label');
-        const inp = document.createElement('input');
-        inp.type = 'checkbox';
-        inp.value = g.name;
-        if (prefs.includes(g.name)) inp.checked = true;
-        lab.appendChild(inp);
-        lab.appendChild(document.createTextNode(' ' + g.name + ' '));
-        const sp = document.createElement('span');
-        sp.style.opacity = '0.5';
-        sp.textContent = '(' + g.count + ')';
-        lab.appendChild(sp);
-        gEl.appendChild(lab);
-      });
     }
+
+    document.getElementById('taste-search').addEventListener('input', () => renderTasteGrid());
+    document.getElementById('pick-search-directors').addEventListener('input', () => refreshPickChips());
+    document.getElementById('pick-search-actors').addEventListener('input', () => refreshPickChips());
     boot().catch((e) => {
       if (e && e.message === '401') { location.href = '/login.html'; return; }
       console.error(e);
