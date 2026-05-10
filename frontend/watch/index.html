@@ -26,10 +26,25 @@
     .nav-search::placeholder{color:#666}
     nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
     nav a:hover{color:#fff}
+    .hero-carousel-wrap{
+      position:relative;margin:24px 28px;
+      border-radius:16px;border:1px solid #222;
+      overflow:hidden;
+    }
+    .hero-carousel-viewport{overflow:hidden;width:100%;position:relative}
+    .hero-carousel-track{
+      display:flex;transition:transform .55s cubic-bezier(0.22,1,0.36,1);
+      will-change:transform;
+    }
+    .hero-carousel-wrap.hero-carousel--instant .hero-carousel-track{transition:none}
+    @media (prefers-reduced-motion:reduce){
+      .hero-carousel-track{transition:none}
+    }
     .hero{
-      margin:24px 28px;padding:48px;border-radius:16px;border:1px solid #222;
+      margin:0;padding:48px;border-radius:0;border:none;
       min-height:300px;display:flex;flex-direction:column;justify-content:flex-end;
-      position:relative;overflow:hidden;
+      position:relative;overflow:hidden;flex-shrink:0;
+      box-sizing:border-box;
       background:linear-gradient(120deg,#1a0a0a,#0a0a0a);
       background-size:cover;background-position:center 20%;
     }
@@ -37,6 +52,32 @@
     .hero-inner{position:relative;z-index:1}
     .hero h1{font-size:2rem;margin-bottom:8px;text-shadow:0 2px 24px rgba(0,0,0,.9),0 1px 3px #000}
     .hero p{color:#d4d4d4;max-width:560px;line-height:1.55;text-shadow:0 1px 12px rgba(0,0,0,.85)}
+    .hero-slide:focus-visible{outline:2px solid #fecaca;outline-offset:3px}
+    .hero-carousel-btn{
+      position:absolute;top:50%;transform:translateY(-50%);z-index:4;
+      width:44px;height:44px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.22);
+      background:rgba(0,0,0,.5);color:#fff;font-size:1.65rem;line-height:1;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      font-family:inherit;padding:0;transition:background .2s,border-color .2s,opacity .2s;
+    }
+    .hero-carousel-btn:hover{background:rgba(139,37,0,.55);border-color:rgba(255,255,255,.4)}
+    .hero-carousel-btn:focus-visible{outline:2px solid #fecaca;outline-offset:2px}
+    .hero-carousel-btn:disabled{opacity:.28;cursor:default;pointer-events:none}
+    .hero-carousel-prev{left:10px}
+    .hero-carousel-next{right:10px}
+    .hero-carousel-dots{
+      position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+      display:flex;gap:8px;z-index:4;padding:6px 10px;border-radius:999px;
+      background:rgba(0,0,0,.35);
+    }
+    .hero-carousel-dots button{
+      width:9px;height:9px;border-radius:50%;border:none;padding:0;
+      background:rgba(255,255,255,.38);cursor:pointer;transition:transform .2s,background .2s;
+    }
+    .hero-carousel-dots button:hover{background:rgba(255,255,255,.55)}
+    .hero-carousel-dots button[aria-selected="true"]{background:#fecaca;transform:scale(1.2)}
+    .hero-carousel-dots button:focus-visible{outline:2px solid #fecaca;outline-offset:2px}
     .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px;flex-wrap:wrap;gap:10px}
     .row-head h2{font-size:1rem;color:#ddd}
     .row-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 28px 28px;scroll-snap-type:x mandatory}
@@ -80,9 +121,63 @@
     .donation-goal-bar .don-wallet-btn{
       display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;
       border:1px solid #444;background:#141414;color:#eee;font-size:12px;cursor:pointer;
-      font-family:inherit;transition:border-color .2s,background .2s
+      font-family:inherit;transition:border-color .2s,background .2s,box-shadow .2s,color .2s
     }
-    .donation-goal-bar .don-wallet-btn:hover{border-color:rgba(139,37,0,.75);background:#1c1c1c}
+    /* Per-wallet brand tint (background + border + hover) */
+    .donation-goal-bar .don-wallet-btn--btc{
+      border-color:rgba(247,147,26,.55);
+      background:linear-gradient(145deg,rgba(247,147,26,.2),rgba(12,12,12,.94));
+      color:#fff4e6;
+    }
+    .donation-goal-bar .don-wallet-btn--btc:hover{
+      border-color:rgba(247,147,26,.9);
+      background:linear-gradient(145deg,rgba(247,147,26,.32),rgba(18,18,18,.96));
+      box-shadow:0 0 14px rgba(247,147,26,.18);
+    }
+    .donation-goal-bar .don-wallet-btn--polygon{
+      border-color:rgba(130,71,229,.55);
+      background:linear-gradient(145deg,rgba(130,71,229,.22),rgba(12,12,12,.94));
+      color:#ede9fe;
+    }
+    .donation-goal-bar .don-wallet-btn--polygon:hover{
+      border-color:rgba(130,71,229,.88);
+      background:linear-gradient(145deg,rgba(130,71,229,.34),rgba(18,18,18,.96));
+      box-shadow:0 0 14px rgba(130,71,229,.2);
+    }
+    .donation-goal-bar .don-wallet-btn--solana{
+      border-color:rgba(153,69,255,.45);
+      background:linear-gradient(125deg,rgba(153,69,255,.2),rgba(20,241,149,.12),rgba(10,14,12,.94));
+      color:#ecfeff;
+    }
+    .donation-goal-bar .don-wallet-btn--solana:hover{
+      border-color:rgba(20,241,149,.55);
+      background:linear-gradient(125deg,rgba(153,69,255,.28),rgba(20,241,149,.2),rgba(14,18,16,.96));
+      box-shadow:0 0 16px rgba(20,241,149,.12);
+    }
+    .donation-goal-bar .don-wallet-btn--xrp{
+      border-color:rgba(0,170,228,.45);
+      background:linear-gradient(145deg,rgba(35,41,47,.85),rgba(0,170,228,.14),rgba(10,12,14,.94));
+      color:#e8f7fc;
+    }
+    .donation-goal-bar .don-wallet-btn--xrp:hover{
+      border-color:rgba(0,170,228,.78);
+      background:linear-gradient(145deg,rgba(35,41,47,.92),rgba(0,170,228,.22),rgba(14,16,18,.96));
+      box-shadow:0 0 14px rgba(0,170,228,.15);
+    }
+    .donation-goal-bar .don-wallet-btn--tron{
+      border-color:rgba(235,0,41,.55);
+      background:linear-gradient(145deg,rgba(235,0,41,.2),rgba(12,8,8,.94));
+      color:#ffe8ea;
+    }
+    .donation-goal-bar .don-wallet-btn--tron:hover{
+      border-color:rgba(255,0,19,.85);
+      background:linear-gradient(145deg,rgba(235,0,41,.32),rgba(18,10,10,.96));
+      box-shadow:0 0 14px rgba(235,0,41,.2);
+    }
+    .donation-goal-bar .don-wallet-btn--default:hover{
+      border-color:rgba(139,37,0,.65);
+      background:linear-gradient(145deg,rgba(139,37,0,.15),#1c1c1c);
+    }
     .donation-goal-bar .don-crypto-ico{width:22px;height:22px;flex-shrink:0;display:block;object-fit:contain}
     .donation-goal-bar .don-wallet-lbl{font-weight:600;letter-spacing:.02em}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
@@ -128,11 +223,13 @@
     <p id="search-empty" class="empty" style="display:none;margin-top:16px;padding:20px">Aucun résultat pour cette recherche.</p>
   </div>
   <div id="home-browse">
-  <section class="hero" id="hero">
-    <div class="hero-inner">
-      <h1 id="hero-title">Chargement…</h1>
-      <p id="hero-desc"></p>
+  <section class="hero-carousel-wrap" id="hero-carousel" aria-roledescription="carrousel" aria-label="À la une">
+    <div class="hero-carousel-viewport" id="hero-viewport">
+      <div class="hero-carousel-track" id="hero-track" role="list"></div>
     </div>
+    <button type="button" class="hero-carousel-btn hero-carousel-prev" id="hero-prev" aria-label="Slide précédent" hidden>‹</button>
+    <button type="button" class="hero-carousel-btn hero-carousel-next" id="hero-next" aria-label="Slide suivant" hidden>›</button>
+    <div class="hero-carousel-dots" id="hero-dots" role="tablist" aria-label="Choisir un slide" hidden></div>
   </section>
   <div class="row-head">
     <h2 id="latest-head">Derniers ajouts</h2>
@@ -157,12 +254,269 @@
     let homeLatest = [];
     let homeFeatured = [];
 
+    var HERO_CAROUSEL_MAX = 12;
+    var HERO_AUTOPLAY_MS = 7800;
+    var _heroCarousel = { index: 0, count: 0, timer: null };
+
+    function heroCarouselStopTimer() {
+      if (_heroCarousel.timer) {
+        clearInterval(_heroCarousel.timer);
+        _heroCarousel.timer = null;
+      }
+    }
+
+    function heroCarouselStartTimer() {
+      heroCarouselStopTimer();
+      var wrap = document.getElementById('hero-carousel');
+      if (!wrap || _heroCarousel.count < 2) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      _heroCarousel.timer = setInterval(function () {
+        heroGoTo(_heroCarousel.index + 1, true);
+      }, HERO_AUTOPLAY_MS);
+    }
+
+    function heroGoTo(i, animate) {
+      var vp = document.getElementById('hero-viewport');
+      var track = document.getElementById('hero-track');
+      var wrap = document.getElementById('hero-carousel');
+      if (!vp || !track || !wrap || _heroCarousel.count < 1) return;
+      _heroCarousel.index =
+        ((i % _heroCarousel.count) + _heroCarousel.count) % _heroCarousel.count;
+      var w = vp.getBoundingClientRect().width || 1;
+      if (!animate) wrap.classList.add('hero-carousel--instant');
+      else wrap.classList.remove('hero-carousel--instant');
+      track.style.transform = 'translateX(' + -(_heroCarousel.index * w) + 'px)';
+      if (!animate) {
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            wrap.classList.remove('hero-carousel--instant');
+          });
+        });
+      }
+      var dots = document.getElementById('hero-dots');
+      if (dots) {
+        var buttons = dots.querySelectorAll('button');
+        for (var j = 0; j < buttons.length; j++) {
+          buttons[j].setAttribute('aria-selected', j === _heroCarousel.index ? 'true' : 'false');
+        }
+      }
+    }
+
+    function heroApplyMetrics(animate) {
+      var vp = document.getElementById('hero-viewport');
+      var track = document.getElementById('hero-track');
+      if (!vp || !track) return;
+      var w = vp.getBoundingClientRect().width || 1;
+      var slides = track.querySelectorAll('.hero-slide');
+      for (var s = 0; s < slides.length; s++) {
+        slides[s].style.width = w + 'px';
+        slides[s].style.flexShrink = '0';
+      }
+      heroGoTo(_heroCarousel.index, animate);
+    }
+
+    var _heroResizeScheduled = null;
+    function heroOnResize() {
+      clearTimeout(_heroResizeScheduled);
+      _heroResizeScheduled = setTimeout(function () {
+        heroApplyMetrics(false);
+      }, 100);
+    }
+
+    function initHeroCarousel(featured) {
+      var track = document.getElementById('hero-track');
+      var prev = document.getElementById('hero-prev');
+      var next = document.getElementById('hero-next');
+      var dotsHost = document.getElementById('hero-dots');
+      var wrap = document.getElementById('hero-carousel');
+      var vp = document.getElementById('hero-viewport');
+      if (!track || !wrap) return;
+
+      heroCarouselStopTimer();
+      track.innerHTML = '';
+      track.style.transform = '';
+      if (dotsHost) {
+        dotsHost.innerHTML = '';
+        dotsHost.hidden = true;
+      }
+
+      var list =
+        featured && featured.length ? featured.slice(0, HERO_CAROUSEL_MAX) : [];
+
+      function addSlide(opts) {
+        var titre = opts.titre;
+        var synopsis = opts.synopsis || '';
+        var posterPath = opts.posterPath;
+        var filmId = opts.filmId;
+        var slide = document.createElement('div');
+        slide.className = 'hero hero-slide';
+        slide.setAttribute('role', 'listitem');
+        if (filmId != null) {
+          slide.dataset.filmId = String(filmId);
+          slide.style.cursor = 'pointer';
+          slide.tabIndex = 0;
+          slide.addEventListener('click', function () {
+            location.href = '/watch/film.html?id=' + filmId;
+          });
+          slide.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              location.href = '/watch/film.html?id=' + filmId;
+            }
+          });
+        }
+        var desc =
+          synopsis.slice(0, 220) + (synopsis.length > 220 ? '…' : '');
+        if (posterPath) {
+          var pu = posterUrl(posterPath);
+          slide.classList.add('has-backdrop');
+          slide.style.backgroundImage =
+            'linear-gradient(105deg,rgba(10,10,10,.93) 0%,rgba(10,10,10,.55) 42%,rgba(10,10,10,.25) 72%),' +
+            'linear-gradient(180deg,rgba(10,10,10,.15) 0%,rgba(10,10,10,.88) 100%),' +
+            "url('" + pu.replace(/'/g, "\\'") + "')";
+        } else {
+          slide.classList.remove('has-backdrop');
+          slide.style.backgroundImage = '';
+        }
+        slide.innerHTML =
+          '<div class="hero-inner"><h1></h1><p></p></div>';
+        slide.querySelector('h1').textContent = titre;
+        slide.querySelector('p').textContent = desc;
+        track.appendChild(slide);
+      }
+
+      if (list.length) {
+        for (var fi = 0; fi < list.length; fi++) {
+          var h = list[fi];
+          addSlide({
+            titre: h.titre,
+            synopsis: h.synopsis || '',
+            posterPath: h.poster_path,
+            filmId: h.id,
+          });
+        }
+      } else {
+        addSlide({
+          titre: 'Bienvenue',
+          synopsis:
+            'Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.',
+          posterPath: null,
+          filmId: null,
+        });
+      }
+
+      _heroCarousel.count = track.querySelectorAll('.hero-slide').length;
+      _heroCarousel.index = 0;
+
+      var multi = _heroCarousel.count > 1;
+      if (prev) {
+        prev.hidden = !multi;
+        prev.disabled = !multi;
+        prev.onclick = function () {
+          heroGoTo(_heroCarousel.index - 1, true);
+          heroCarouselStartTimer();
+        };
+      }
+      if (next) {
+        next.hidden = !multi;
+        next.disabled = !multi;
+        next.onclick = function () {
+          heroGoTo(_heroCarousel.index + 1, true);
+          heroCarouselStartTimer();
+        };
+      }
+      if (dotsHost && multi) {
+        dotsHost.hidden = false;
+        for (var j = 0; j < _heroCarousel.count; j++) {
+          (function (idx) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.setAttribute('role', 'tab');
+            b.setAttribute('aria-label', 'Afficher le slide ' + (idx + 1));
+            b.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
+            b.addEventListener('click', function () {
+              heroGoTo(idx, true);
+              heroCarouselStartTimer();
+            });
+            dotsHost.appendChild(b);
+          })(j);
+        }
+      }
+
+      wrap.onmouseenter = function () {
+        heroCarouselStopTimer();
+      };
+      wrap.onmouseleave = function () {
+        heroCarouselStartTimer();
+      };
+
+      wrap.onkeydown = function (e) {
+        if (!multi) return;
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          heroGoTo(_heroCarousel.index - 1, true);
+          heroCarouselStartTimer();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          heroGoTo(_heroCarousel.index + 1, true);
+          heroCarouselStartTimer();
+        }
+      };
+      wrap.tabIndex = multi ? 0 : -1;
+
+      if (vp) {
+        var startX = null;
+        vp.addEventListener(
+          'touchstart',
+          function (e) {
+            if (!multi || !e.touches[0]) return;
+            startX = e.touches[0].clientX;
+          },
+          { passive: true }
+        );
+        vp.addEventListener(
+          'touchend',
+          function (e) {
+            if (!multi || startX == null) return;
+            var endX = e.changedTouches[0] && e.changedTouches[0].clientX;
+            var dx = endX - startX;
+            startX = null;
+            if (endX == null || Math.abs(dx) < 50) return;
+            if (dx > 0) {
+              heroGoTo(_heroCarousel.index - 1, true);
+            } else {
+              heroGoTo(_heroCarousel.index + 1, true);
+            }
+            heroCarouselStartTimer();
+          },
+          { passive: true }
+        );
+      }
+
+      if (!window.__redwoodHeroResizeBound) {
+        window.__redwoodHeroResizeBound = true;
+        window.addEventListener('resize', heroOnResize);
+      }
+
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          heroApplyMetrics(false);
+          heroCarouselStartTimer();
+        });
+      });
+    }
+
     /** Base URL for SVG assets under frontend/watch/assets/crypto-donations/ (nginx: /watch/...). */
     function donationCryptoIconsBase() {
       var p = window.location.pathname || '';
       var ix = p.indexOf('/watch');
       if (ix >= 0) return p.slice(0, ix + '/watch'.length) + '/assets/crypto-donations';
       return '/watch/assets/crypto-donations';
+    }
+
+    function donationWalletButtonModifier(walletId) {
+      var known = { btc: 1, polygon: 1, solana: 1, xrp: 1, tron: 1 };
+      return known[walletId] ? walletId : 'default';
     }
 
     function donationWalletIconHtml(walletId) {
@@ -241,7 +595,8 @@
         wallets.forEach(function (w) {
           const btn = document.createElement('button');
           btn.type = 'button';
-          btn.className = 'don-wallet-btn';
+          btn.className =
+            'don-wallet-btn don-wallet-btn--' + donationWalletButtonModifier(w.id);
           btn.setAttribute('aria-label', 'Copier adresse ' + w.label);
           btn.title = w.address;
           btn.innerHTML = donationWalletIconHtml(w.id) + '<span class="don-wallet-lbl">' + w.symbol + '</span>';
@@ -400,33 +755,7 @@
       });
       homeLatest = merged.slice(0, 24);
 
-      const heroEl = document.getElementById('hero');
-      if (featured.length) {
-        const h = featured[0];
-        document.getElementById('hero-title').textContent = h.titre;
-        document.getElementById('hero-desc').textContent = (h.synopsis || '').slice(0, 220) + (h.synopsis && h.synopsis.length > 220 ? '…' : '');
-        heroEl.style.cursor = 'pointer';
-        heroEl.onclick = () => location.href = '/watch/film.html?id=' + h.id;
-        const pu = h.poster_path ? posterUrl(h.poster_path) : '';
-        if (pu) {
-          heroEl.classList.add('has-backdrop');
-          heroEl.style.backgroundImage =
-            'linear-gradient(105deg,rgba(10,10,10,.93) 0%,rgba(10,10,10,.55) 42%,rgba(10,10,10,.25) 72%),' +
-            'linear-gradient(180deg,rgba(10,10,10,.15) 0%,rgba(10,10,10,.88) 100%),' +
-            "url('" + pu.replace(/'/g, "\\'") + "')";
-        } else {
-          heroEl.classList.remove('has-backdrop');
-          heroEl.style.backgroundImage = '';
-        }
-      } else {
-        document.getElementById('hero-title').textContent = 'Bienvenue';
-        document.getElementById('hero-desc').textContent =
-          'Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.';
-        heroEl.classList.remove('has-backdrop');
-        heroEl.style.backgroundImage = '';
-        heroEl.style.cursor = '';
-        heroEl.onclick = null;
-      }
+      initHeroCarousel(featured);
 
       homeFeatured = featured;
       renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
