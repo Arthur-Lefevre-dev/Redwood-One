@@ -201,7 +201,7 @@ function injectWatchAnnouncementStyles() {
   style.textContent = `
     .watch-announcement-host{margin:0;padding:0}
     .watch-announcement{
-      margin:12px 28px 4px;
+      margin:12px 28px 12px;
       padding:12px 16px;
       border-radius:10px;
       border:1px solid rgba(139,37,0,.45);

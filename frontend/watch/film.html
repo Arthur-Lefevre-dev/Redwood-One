@@ -26,8 +26,17 @@
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text)}
     nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222}
-    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem)}
-    a.brand:hover{color:#fca5a5}
+    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem);transition:color .2s ease}
+    @keyframes brand-neon-flicker{
+      0%,100%{color:#fecaca;text-shadow:0 0 6px rgba(252,165,165,.9),0 0 14px rgba(139,37,0,.75),0 0 26px rgba(139,37,0,.38)}
+      6%{color:#fca5a5;text-shadow:0 0 2px rgba(252,165,165,.35),0 0 6px rgba(139,37,0,.22)}
+      8%{color:#fff7ed;text-shadow:0 0 10px rgba(254,243,199,.55),0 0 22px rgba(252,165,165,.88),0 0 34px rgba(139,37,0,.5)}
+      11%{color:#fecaca;text-shadow:0 0 5px rgba(252,165,165,.55),0 0 12px rgba(139,37,0,.4)}
+      51%{color:#fecaca;text-shadow:0 0 8px rgba(252,165,165,.85),0 0 18px rgba(139,37,0,.62)}
+      53%{color:var(--accent);text-shadow:none}
+      55%{color:#fecaca;text-shadow:0 0 12px rgba(252,165,165,.92),0 0 24px rgba(139,37,0,.58)}
+    }
+    a.brand:hover{color:#fecaca;animation:brand-neon-flicker 2.4s ease-in-out infinite}
     nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
     .backdrop{min-height:320px;background-size:cover;background-position:center;border-bottom:1px solid #222}
     .wrap{max-width:980px;margin:-80px auto 0;padding:0 24px 40px;position:relative}
@@ -115,6 +124,22 @@
     .trailer-modal-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
     .player-wrap{position:relative;max-width:100%;border-radius:12px;overflow:hidden;background:#0a0a0a;border:1px solid #2a2a2a;min-height:200px}
     .plyr--video{border-radius:12px}
+    /* Fullscreen: square corners (Plyr + native video; html class set by JS for stubborn browsers) */
+    .plyr.plyr--fullscreen,.plyr.plyr--video.plyr--fullscreen{border-radius:0!important;overflow:visible!important}
+    .plyr.plyr--fullscreen .plyr__video-wrapper,.plyr.plyr--fullscreen video,
+    video:fullscreen,video:-webkit-full-screen,video:-moz-full-screen{
+      border-radius:0!important;
+    }
+    .player-wrap:fullscreen,.player-wrap:-webkit-full-screen,.player-wrap:-moz-full-screen{
+      border-radius:0!important;border:none!important;overflow:visible!important;
+    }
+    html.redwood-player-fs .player-wrap,
+    html.redwood-player-fs .player-wrap .plyr,
+    html.redwood-player-fs .player-wrap .plyr__video-wrapper,
+    html.redwood-player-fs .player-wrap video#player{
+      border-radius:0!important;
+    }
+    html.redwood-player-fs .player-wrap{border:none!important;overflow:visible!important}
     .plyr__control--overlaid{background:rgba(139,37,0,.92);color:#fff}
     .plyr__control--overlaid:hover,.plyr__control--overlaid:focus{background:#a32f00}
     .plyr__controls{background:linear-gradient(180deg,transparent,rgba(10,10,10,.94));padding:12px 10px 10px}
@@ -394,7 +419,43 @@
         loader.querySelector('span').textContent = 'Lecture impossible (réseau ou fichier).';
       });
       video.src = stream.url;
-      const player = new Plyr(video);
+      const player = new Plyr(video, {
+        seekTime: 5,
+        controls: [
+          'play-large',
+          'restart',
+          'rewind',
+          'play',
+          'fast-forward',
+          'progress',
+          'current-time',
+          'duration',
+          'mute',
+          'volume',
+          'pip',
+          'fullscreen',
+        ],
+        i18n: {
+          rewind: 'Reculer de {seektime} s',
+          fastForward: 'Avancer de {seektime} s',
+          restart: 'Recommencer',
+        },
+      });
+      const playerWrap = document.querySelector('.player-wrap');
+      function syncRedwoodPlayerFullscreenClass() {
+        const fs =
+          document.fullscreenElement ||
+          document.webkitFullscreenElement ||
+          document.mozFullScreenElement ||
+          document.msFullscreenElement;
+        const on = !!(fs && playerWrap && (fs === playerWrap || playerWrap.contains(fs)));
+        document.documentElement.classList.toggle('redwood-player-fs', on);
+      }
+      ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach((ev) => {
+        document.addEventListener(ev, syncRedwoodPlayerFullscreenClass);
+      });
+      player.on('enterfullscreen', syncRedwoodPlayerFullscreenClass);
+      player.on('exitfullscreen', syncRedwoodPlayerFullscreenClass);
       player.on('ended', () => {
         if (f.playback && f.playback.next_episode_id) {
           location.href = '/watch/film.html?id=' + f.playback.next_episode_id;
