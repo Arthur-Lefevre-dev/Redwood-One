@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python3.11-dev \
     ffmpeg \
+    gosu \
     pciutils \
     vainfo \
     aria2 \
@@ -35,6 +36,10 @@ RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents && \
     useradd --uid 1000 --gid redwood --home-dir /app --shell /bin/false redwood && \
     chown -R redwood:redwood /app /tmp/redwood
 
-USER redwood
+COPY docker/redwood-tmp-entrypoint.sh /redwood-tmp-entrypoint.sh
+RUN sed -i 's/\r$//' /redwood-tmp-entrypoint.sh && chmod +x /redwood-tmp-entrypoint.sh
+
+USER root
+ENTRYPOINT ["/redwood-tmp-entrypoint.sh"]
 
 CMD ["celery", "-A", "worker.tasks", "worker", "--loglevel=info", "--concurrency=2"]

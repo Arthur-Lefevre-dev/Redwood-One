@@ -262,6 +262,136 @@ def _ensure_series_show_meta_table() -> None:
     logger.info("database schema: created series_show_meta (sqlite)")
 
 
+def _ensure_donation_settings_table() -> None:
+    """Singleton crypto donation config (addresses, EUR goal, snapshot cache)."""
+    insp = inspect(engine)
+    if "donation_settings" in insp.get_table_names():
+        return
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE donation_settings (
+                        id INTEGER PRIMARY KEY,
+                        goal_eur DOUBLE PRECISION,
+                        address_btc VARCHAR(256),
+                        address_polygon VARCHAR(256),
+                        address_solana VARCHAR(256),
+                        address_xrp VARCHAR(256),
+                        address_tron VARCHAR(256),
+                        campaign_start_utc TIMESTAMP,
+                        campaign_end_utc TIMESTAMP,
+                        recurrence VARCHAR(24) DEFAULT 'none',
+                        snapshot_json JSONB,
+                        updated_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
+                    )
+                    """
+                )
+            )
+        logger.info("database schema: created donation_settings (postgresql)")
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE donation_settings (
+                    id INTEGER NOT NULL PRIMARY KEY,
+                    goal_eur REAL,
+                    address_btc VARCHAR(256),
+                    address_polygon VARCHAR(256),
+                    address_solana VARCHAR(256),
+                    address_xrp VARCHAR(256),
+                    address_tron VARCHAR(256),
+                    campaign_start_utc TIMESTAMP,
+                    campaign_end_utc TIMESTAMP,
+                    recurrence VARCHAR(24) DEFAULT 'none',
+                    snapshot_json TEXT,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    logger.info("database schema: created donation_settings (sqlite)")
+
+
+def _migrate_donation_xmr_to_xrp() -> None:
+    """Rename legacy address_xmr column to address_xrp (Monero replaced by XRP)."""
+    insp = inspect(engine)
+    if "donation_settings" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("donation_settings")}
+    if "address_xmr" in cols and "address_xrp" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE donation_settings RENAME COLUMN address_xmr TO address_xrp")
+            )
+        logger.info("database schema: renamed donation_settings.address_xmr -> address_xrp")
+        return
+    if "address_xrp" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE donation_settings ADD COLUMN address_xrp VARCHAR(256)")
+            )
+        logger.info("database schema: added donation_settings.address_xrp")
+
+
+def _ensure_donation_settings_extended_columns() -> None:
+    """Tron address + campaign window + recurrence on existing donation_settings."""
+    insp = inspect(engine)
+    if "donation_settings" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("donation_settings")}
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            if "address_tron" not in cols:
+                conn.execute(
+                    text("ALTER TABLE donation_settings ADD COLUMN address_tron VARCHAR(256)")
+                )
+            if "campaign_start_utc" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE donation_settings ADD COLUMN campaign_start_utc TIMESTAMP"
+                    )
+                )
+            if "campaign_end_utc" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE donation_settings ADD COLUMN campaign_end_utc TIMESTAMP"
+                    )
+                )
+            if "recurrence" not in cols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE donation_settings ADD COLUMN recurrence VARCHAR(24) "
+                        "DEFAULT 'none'"
+                    )
+                )
+        logger.info("database schema: ensured donation_settings tron/campaign columns (postgresql)")
+        return
+    with engine.begin() as conn:
+        if "address_tron" not in cols:
+            conn.execute(
+                text("ALTER TABLE donation_settings ADD COLUMN address_tron VARCHAR(256)")
+            )
+        if "campaign_start_utc" not in cols:
+            conn.execute(
+                text("ALTER TABLE donation_settings ADD COLUMN campaign_start_utc DATETIME")
+            )
+        if "campaign_end_utc" not in cols:
+            conn.execute(
+                text("ALTER TABLE donation_settings ADD COLUMN campaign_end_utc DATETIME")
+            )
+        if "recurrence" not in cols:
+            conn.execute(
+                text(
+                    "ALTER TABLE donation_settings ADD COLUMN recurrence VARCHAR(24) "
+                    "DEFAULT 'none'"
+                )
+            )
+    logger.info("database schema: ensured donation_settings tron/campaign columns (sqlite)")
+
+
 def _widen_series_meta_poster_columns() -> None:
     """Allow full TMDB/CDN URLs in poster_path (existing DBs may still be VARCHAR(512))."""
     if engine.dialect.name != "postgresql":
@@ -297,6 +427,9 @@ def init_db() -> None:
     _ensure_series_season_meta_table()
     _ensure_series_season_synopsis_column()
     _ensure_series_show_meta_table()
+    _ensure_donation_settings_table()
+    _migrate_donation_xmr_to_xrp()
+    _ensure_donation_settings_extended_columns()
     _widen_series_meta_poster_columns()
 
 

@@ -66,6 +66,15 @@
     .home-search-panel{margin:0 28px 32px}
     .home-search-panel .search-sub{margin:22px 0 10px;font-size:0.95rem;color:#d4d4d4;font-weight:600}
     .home-search-panel .search-sub:first-of-type{margin-top:8px}
+    .donation-goal-bar{
+      margin:0 28px 20px;padding:14px 18px;border-radius:12px;border:1px solid rgba(139,37,0,.45);
+      background:linear-gradient(105deg,rgba(139,37,0,.18),rgba(20,20,20,.95));font-size:13px;color:#e5e5e5;
+    }
+    .donation-goal-bar .don-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .donation-goal-bar .don-label{font-weight:700;color:#fecaca;letter-spacing:.02em}
+    .donation-goal-bar .don-meta{font-size:11px;color:var(--muted)}
+    .donation-goal-bar .don-track{height:8px;border-radius:999px;background:#222;overflow:hidden;border:1px solid #333}
+    .donation-goal-bar .don-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#8B2500,#ea580c);transition:width .4s ease}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
   </style>
 </head>
@@ -96,6 +105,7 @@
     </div>
   </nav>
   <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+  <div id="donation-goal-bar" class="donation-goal-bar" hidden></div>
   <div id="home-search" class="home-search-panel" hidden>
     <h2 class="row-head" id="search-main-title" style="margin:0 0 6px">Recherche</h2>
     <p style="margin:0 0 8px;font-size:13px;color:var(--muted);line-height:1.5;max-width:720px">
@@ -310,6 +320,61 @@
       homeFeatured = featured;
       renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
       renderCards(document.getElementById('row-featured'), homeFeatured);
+
+      try {
+        const don = await apiJson('/api/donations/progress');
+        const donEl = document.getElementById('donation-goal-bar');
+        if (don && don.visible && don.goal_eur > 0 && donEl) {
+          const raised = typeof don.raised_eur === 'number' ? don.raised_eur : 0;
+          const goal = don.goal_eur;
+          const pct = typeof don.progress_percent === 'number' ? don.progress_percent : 0;
+          const fmt = (n) =>
+            new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+          const recHint = {
+            none: '',
+            repeat_span: ' · Récurrence : même durée',
+            weekly: ' · Récurrence : hebdomadaire',
+            monthly: ' · Récurrence : ~30 j.',
+            yearly: ' · Récurrence : ~365 j.',
+          };
+          const recSuf = recHint[don.recurrence] || '';
+          let periodLine = '';
+          if (don.period_start_utc && don.period_end_utc) {
+            const opts = { dateStyle: 'short', timeStyle: 'short' };
+            const a = new Date(don.period_start_utc.endsWith('Z') ? don.period_start_utc : don.period_start_utc + 'Z');
+            const b = new Date(don.period_end_utc.endsWith('Z') ? don.period_end_utc : don.period_end_utc + 'Z');
+            periodLine =
+              'Période : ' +
+              a.toLocaleString('fr-FR', opts) +
+              ' — ' +
+              b.toLocaleString('fr-FR', opts) +
+              recSuf +
+              '<br/>';
+          }
+          const sub =
+            periodLine +
+            (don.updated_at
+              ? 'Estimation portefeuilles · MAJ ' +
+                new Date(don.updated_at.endsWith('Z') ? don.updated_at : don.updated_at + 'Z').toLocaleString('fr-FR', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })
+              : 'Estimation à partir des portefeuilles configurés');
+          donEl.hidden = false;
+          donEl.innerHTML =
+            '<div class="don-row"><span class="don-label">Soutien du projet</span><span><strong>' +
+            fmt(raised) +
+            '</strong> / ' +
+            fmt(goal) +
+            ' · ' +
+            pct.toFixed(1) +
+            ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
+            Math.min(100, pct) +
+            '%"></div></div><p class="don-meta" style="margin-top:8px">' +
+            sub +
+            '</p>';
+        }
+      } catch (_) {}
 
       try {
         const series = await apiJson('/api/series');

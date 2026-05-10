@@ -56,10 +56,17 @@ async function readJsonSafe(response) {
       const line = text.trim().split(/\r?\n/)[0] || '';
       msg = line.slice(0, 240) || 'HTTP ' + response.status;
       if (looksLikeHtmlBody(text)) {
-        msg =
-          'HTTP ' +
-          response.status +
-          ' — réponse HTML (pas JSON). Cause fréquente : API injoignable (502 nginx), ou page ouverte hors Docker sans proxy /api. Utilisez le port nginx du stack, ou définissez window.__REDWOOD_API_BASE__ vers l’URL de l’API.';
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          msg =
+            'HTTP ' +
+            response.status +
+            ' — la passerelle (nginx) ne reçoit pas de réponse de l’API FastAPI. Vérifiez : (1) le conteneur api est « healthy » : docker compose ps ; (2) les logs : docker logs redwood_api ; (3) vous ouvrez le site via le même hôte/port que nginx (pas un fichier local ni Live Server seul). En dev sans Docker : définissez window.__REDWOOD_API_BASE__ vers l’URL de l’API (ex. http://localhost:8000).';
+        } else {
+          msg =
+            'HTTP ' +
+            response.status +
+            ' — réponse HTML (pas JSON). Cause fréquente : API injoignable, ou page ouverte sans proxy /api. Utilisez l’URL servie par nginx du stack, ou définissez window.__REDWOOD_API_BASE__ vers l’URL de l’API.';
+        }
       }
     }
     const err = new Error(msg);

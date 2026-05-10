@@ -15,6 +15,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
+from api.routes.donations import get_or_create_donation_settings
 from api.routes.announcement import _get_or_create_row, _is_active
 from api.routes.films import RefreshImdbApiBody, refresh_imdbapi as films_refresh_imdbapi
 from config import get_settings
@@ -23,6 +24,8 @@ from core.trailers_util import trailers_from_admin_lines, trailers_from_json_col
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
 from core.email_policy import validate_viewer_email
+from core.donation_campaign import RECURRENCE_NONE, normalize_recurrence
+from core.donation_service import compute_donation_snapshot
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
 from db.models import (
@@ -354,6 +357,18 @@ async def admin_upload(
         path, size = await save_upload_stream(file)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    except OSError as e:
+        logger.exception("upload: failed to write file under /tmp/redwood/uploads")
+        raise HTTPException(
+            status_code=507,
+            detail=(
+                "Écriture du fichier impossible (disque plein ou répertoire non inscriptible). "
+                "En production Docker : le volume tmp_data monté sur /tmp/redwood doit être "
+                "accessible en écriture par l’utilisateur redwood (uid 1000). Reconstruire les "
+                "images et redémarrer les services api/worker après mise à jour. "
+                f"Détail : {e}"
+            ),
+        ) from e
 
     ck = _parse_upload_content_kind(content_kind)
     film = Film(
@@ -904,3 +919,126 @@ def admin_put_viewer_announcement(
         "ends_at": ends.strftime("%Y-%m-%dT%H:%M:%SZ") if ends else None,
         "active": _is_active(row),
     }
+
+
+def _strip_addr(s: Optional[str]) -> Optional[str]:
+    t = (s or "").strip()
+    return t if t else None
+
+
+def _donation_campaign_iso(dt: Optional[datetime]) -> Optional[str]:
+    if dt is None:
+        return None
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+class DonationSettingsBody(BaseModel):
+    goal_eur: float = Field(ge=0, le=1_000_000_000)
+    address_btc: str = ""
+    address_polygon: str = ""
+    address_solana: str = ""
+    address_xrp: str = ""
+    address_tron: str = ""
+    campaign_start_utc: Optional[datetime] = None
+    campaign_end_utc: Optional[datetime] = None
+    recurrence: str = "none"
+
+
+@router.get("/donations")
+def admin_get_donations(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = get_or_create_donation_settings(db)
+    snap = row.snapshot_json if isinstance(row.snapshot_json, dict) else None
+    return {
+        "goal_eur": row.goal_eur if row.goal_eur is not None else 0.0,
+        "address_btc": row.address_btc or "",
+        "address_polygon": row.address_polygon or "",
+        "address_solana": row.address_solana or "",
+        "address_xrp": row.address_xrp or "",
+        "address_tron": row.address_tron or "",
+        "campaign_start_utc": _donation_campaign_iso(row.campaign_start_utc),
+        "campaign_end_utc": _donation_campaign_iso(row.campaign_end_utc),
+        "recurrence": normalize_recurrence(row.recurrence),
+        "snapshot": snap,
+        "updated_at": row.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if row.updated_at
+        else None,
+    }
+
+
+@router.put("/donations")
+@router.post("/donations")
+def admin_put_donations(
+    body: DonationSettingsBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rec = normalize_recurrence(body.recurrence)
+    if rec != RECURRENCE_NONE:
+        if body.campaign_start_utc is None or body.campaign_end_utc is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Récurrence : renseignez la date et l’heure de début et de fin de campagne (UTC)."
+                ),
+            )
+        if body.campaign_end_utc <= body.campaign_start_utc:
+            raise HTTPException(
+                status_code=400,
+                detail="La fin de campagne doit être strictement après le début.",
+            )
+    row = get_or_create_donation_settings(db)
+    row.goal_eur = float(body.goal_eur)
+    row.address_btc = _strip_addr(body.address_btc)
+    row.address_polygon = _strip_addr(body.address_polygon)
+    row.address_solana = _strip_addr(body.address_solana)
+    row.address_xrp = _strip_addr(body.address_xrp)
+    row.address_tron = _strip_addr(body.address_tron)
+    row.campaign_start_utc = body.campaign_start_utc
+    row.campaign_end_utc = body.campaign_end_utc
+    row.recurrence = rec
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    snap = row.snapshot_json if isinstance(row.snapshot_json, dict) else None
+    return {
+        "ok": True,
+        "goal_eur": row.goal_eur,
+        "address_btc": row.address_btc or "",
+        "address_polygon": row.address_polygon or "",
+        "address_solana": row.address_solana or "",
+        "address_xrp": row.address_xrp or "",
+        "address_tron": row.address_tron or "",
+        "campaign_start_utc": _donation_campaign_iso(row.campaign_start_utc),
+        "campaign_end_utc": _donation_campaign_iso(row.campaign_end_utc),
+        "recurrence": rec,
+        "snapshot": snap,
+        "updated_at": row.updated_at.strftime("%Y-%m-%dT%H:%M:%SZ")
+        if row.updated_at
+        else None,
+    }
+
+
+@router.post("/donations/refresh-balances")
+def admin_refresh_donation_balances(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = get_or_create_donation_settings(db)
+    addresses = {
+        "btc": row.address_btc,
+        "polygon": row.address_polygon,
+        "solana": row.address_solana,
+        "xrp": row.address_xrp,
+        "tron": row.address_tron,
+    }
+    try:
+        snap = compute_donation_snapshot(addresses)
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    row.snapshot_json = snap
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "snapshot": snap}

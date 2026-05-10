@@ -209,3 +209,23 @@ class ViewerAnnouncement(Base):
     message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DonationSettings(Base):
+    """Singleton row id=1: crypto donation addresses, EUR goal, cached balance snapshot."""
+
+    __tablename__ = "donation_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    goal_eur: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    address_btc: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    address_polygon: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    address_solana: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    address_xrp: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    address_tron: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # Campaign visibility window (stored as UTC naive); optional recurrence rolls the window.
+    campaign_start_utc: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    campaign_end_utc: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    recurrence: Mapped[Optional[str]] = mapped_column(String(24), nullable=True, default="none")
+    snapshot_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

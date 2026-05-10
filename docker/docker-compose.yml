@@ -47,6 +47,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)",
+        ]
+      interval: 10s
+      timeout: 6s
+      retries: 5
+      start_period: 90s
     networks:
       - redwood_net
 
@@ -123,7 +135,8 @@ services:
       - ../nginx/certs:/etc/nginx/certs:ro
       - ../nginx/acme-webroot:/var/www/certbot:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - redwood_net
 

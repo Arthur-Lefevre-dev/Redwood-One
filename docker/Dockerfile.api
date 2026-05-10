@@ -2,6 +2,7 @@ FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    gosu \
     pciutils \
     vainfo \
     && rm -rf /var/lib/apt/lists/*
@@ -20,7 +21,12 @@ RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents && \
     useradd --uid 1000 --gid redwood --home-dir /app --shell /bin/false redwood && \
     chown -R redwood:redwood /app /tmp/redwood
 
-USER redwood
+COPY docker/redwood-tmp-entrypoint.sh /redwood-tmp-entrypoint.sh
+RUN sed -i 's/\r$//' /redwood-tmp-entrypoint.sh && chmod +x /redwood-tmp-entrypoint.sh
+
+# Entrypoint fixes permissions on the mounted volume, then drops to redwood.
+USER root
+ENTRYPOINT ["/redwood-tmp-entrypoint.sh"]
 
 EXPOSE 8000
 
