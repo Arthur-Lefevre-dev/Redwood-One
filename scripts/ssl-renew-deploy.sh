@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Certbot --deploy-hook: copy renewed certs into the repo and reload nginx.
-# Example crontab (root):
-#   0 3 * * * certbot renew --webroot -w /path/to/Redwood-One/nginx/acme-webroot --deploy-hook /path/to/Redwood-One/scripts/ssl-renew-deploy.sh
+# Only runs when certbot is installed ON THE HOST (apt install certbot).
+#
+# If you do NOT have certbot on the host, use ssl-renew-docker.sh instead (cron that script).
+#
+# Example crontab (root), with system certbot:
+#   0 3 * * * certbot renew --webroot -w /path/to/repo/nginx/acme-webroot --deploy-hook /path/to/repo/scripts/ssl-renew-deploy.sh
 #
 # Certbot sets RENEWED_LINEAGE to e.g. /etc/letsencrypt/live/example.com
 

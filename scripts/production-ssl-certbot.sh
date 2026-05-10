@@ -22,9 +22,11 @@
 #   # or:
 #   sudo env DOMAIN=redwood-plus.fr EMAIL=contact@redwood.fr ./scripts/production-ssl-certbot.sh
 #
-# After success, add a cron job for renewal, e.g. twice daily:
-#   0 3,15 * * * certbot renew --webroot -w /opt/redwood/nginx/acme-webroot --deploy-hook /opt/redwood/scripts/ssl-renew-deploy.sh
-# (adjust paths; deploy-hook copies certs and reloads nginx)
+# Renewal (pick one):
+#   A) No certbot .deb: use Docker (same as initial issuance):
+#      15 3 * * * /opt/redwood/scripts/ssl-renew-docker.sh >> /var/log/redwood-ssl-renew.log 2>&1
+#   B) After apt install certbot:
+#      0 3 * * * certbot renew --webroot -w /opt/redwood/nginx/acme-webroot --deploy-hook /opt/redwood/scripts/ssl-renew-deploy.sh
 
 set -euo pipefail
 
