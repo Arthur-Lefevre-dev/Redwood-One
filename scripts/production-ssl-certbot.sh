@@ -3,22 +3,27 @@
 #
 # Prerequisites (on the Linux server):
 #   - Docker and Docker Compose plugin
-#   - DNS A/AAAA records for DOMAIN (and www if WWW=1) pointing to this host
+#   - DNS A/AAAA records for DOMAIN (and www if requested) pointing to this host
 #   - Ports 80 and 443 reachable from the Internet
 #   - Stack running so nginx serves /.well-known/acme-challenge/ (see nginx.conf + docker-compose volume)
 #
-# Usage:
-#   export DOMAIN=redwood-plus.fr
-#   export EMAIL=admin@example.com
-#   # optional: also request www and add it to server_name
-#   export WWW=1
-#   sudo ./scripts/production-ssl-certbot.sh
+# Usage (recommended — arguments are not stripped by sudo on Debian):
+#   cd /opt/redwood
+#   chmod +x scripts/production-ssl-certbot.sh
+#   sudo ./scripts/production-ssl-certbot.sh redwood-plus.fr contact@redwood.fr
+#   # optional 3rd arg "www" to include www.<domain> in cert + server_name:
+#   sudo ./scripts/production-ssl-certbot.sh redwood-plus.fr contact@redwood.fr www
 #
-# Or one line:
-#   sudo DOMAIN=redwood-plus.fr EMAIL=you@domain.tld ./scripts/production-ssl-certbot.sh
+# If you are already in scripts/:
+#   sudo ./production-ssl-certbot.sh redwood-plus.fr contact@redwood.fr
+#
+# With environment variables you must preserve them through sudo:
+#   sudo -E ./scripts/production-ssl-certbot.sh
+#   # or:
+#   sudo env DOMAIN=redwood-plus.fr EMAIL=contact@redwood.fr ./scripts/production-ssl-certbot.sh
 #
 # After success, add a cron job for renewal, e.g. twice daily:
-#   0 3,15 * * * certbot renew --webroot -w /opt/Redwood-One/nginx/acme-webroot --deploy-hook /opt/Redwood-One/scripts/ssl-renew-deploy.sh
+#   0 3,15 * * * certbot renew --webroot -w /opt/redwood/nginx/acme-webroot --deploy-hook /opt/redwood/scripts/ssl-renew-deploy.sh
 # (adjust paths; deploy-hook copies certs and reloads nginx)
 
 set -euo pipefail
@@ -26,6 +31,16 @@ set -euo pipefail
 DOMAIN="${DOMAIN:-}"
 EMAIL="${EMAIL:-}"
 WWW="${WWW:-0}"
+
+# Positional args (work reliably with sudo; env vars are often dropped by sudo's env_reset)
+if [[ $# -ge 2 ]]; then
+  DOMAIN="$1"
+  EMAIL="$2"
+  case "${3:-}" in
+    www|WWW|1|yes|true) WWW=1 ;;
+  esac
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEBROOT="${REPO_ROOT}/nginx/acme-webroot"
 CERT_DIR="${REPO_ROOT}/nginx/certs"
@@ -35,8 +50,14 @@ COMPOSE_FILE="${REPO_ROOT}/docker/docker-compose.yml"
 LE_DIR="${LE_DIR:-/etc/letsencrypt}"
 
 usage() {
-  echo "Usage: sudo DOMAIN=example.com EMAIL=you@mail.tld $0"
-  echo "Optional: WWW=1 to include www.\$DOMAIN in the certificate and server_name."
+  echo "Usage:"
+  echo "  sudo $0 <domain> <email> [www]"
+  echo "Example (from repo root $REPO_ROOT):"
+  echo "  cd \"$REPO_ROOT\""
+  echo "  sudo ./scripts/production-ssl-certbot.sh redwood-plus.fr contact@example.fr"
+  echo ""
+  echo "Or with env (use sudo -E or sudo env ...):"
+  echo "  sudo env DOMAIN=example.com EMAIL=you@mail.tld $0"
   exit 1
 }
 
