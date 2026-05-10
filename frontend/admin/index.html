@@ -1877,6 +1877,7 @@
                         <th style="padding-left: 16px">Utilisateur</th>
                         <th>Rôle</th>
                         <th>Rang (viewer)</th>
+                        <th>Inscription</th>
                         <th>Statut</th>
                         <th>Dernière connexion</th>
                         <th>Actions</th>
@@ -4328,6 +4329,40 @@
         btn.hidden = !inp.value.trim();
       }
 
+      /** Label + title for signup origin (invite code, admin, open registration, legacy). */
+      function adminUserSignupLabel(u) {
+        if (u.registered_invite_code) {
+          const note = u.registered_invite_note
+            ? ` — ${u.registered_invite_note}`
+            : "";
+          return {
+            text: u.registered_invite_code,
+            title: `Code d’invitation : ${u.registered_invite_code}${note}`,
+          };
+        }
+        const ch = u.signup_channel;
+        if (ch === "admin")
+          return {
+            text: "Création admin",
+            title: "Compte créé depuis le panneau administrateur",
+          };
+        if (ch === "open")
+          return {
+            text: "Inscription ouverte",
+            title: "Inscription sans code (inscriptions ouvertes)",
+          };
+        if (ch === "invite")
+          return {
+            text: "—",
+            title:
+              "Canal « invitation » sans code en base (donnée manquante ou code supprimé)",
+          };
+        return {
+          text: "—",
+          title: "Non enregistré (compte antérieur au suivi)",
+        };
+      }
+
       function applyUsersFilterAndRender() {
         const rows = adminUsersCache;
         if (!rows) return;
@@ -4344,11 +4379,16 @@
         const q = qRaw.trim().toLowerCase();
         const filtered = !q
           ? rows
-          : rows.filter(
-              (u) =>
+          : rows.filter((u) => {
+              const su = adminUserSignupLabel(u);
+              return (
                 (u.username && String(u.username).toLowerCase().includes(q)) ||
-                (u.email && String(u.email).toLowerCase().includes(q)),
-            );
+                (u.email && String(u.email).toLowerCase().includes(q)) ||
+                (u.registered_invite_code &&
+                  String(u.registered_invite_code).toLowerCase().includes(q)) ||
+                (su.text && String(su.text).toLowerCase().includes(q))
+              );
+            });
         const sub = $("#users-sub");
         if (sub) {
           sub.textContent = q
@@ -4369,7 +4409,7 @@
           </div>
         </div>
       </td>
-      <td></td><td></td><td></td><td></td><td></td>`;
+      <td></td><td></td><td></td><td></td><td></td><td></td>`;
           tr.querySelector(".user-row-avatar").textContent = initials(
             u.username,
           );
@@ -4426,12 +4466,19 @@
             tds[2].innerHTML =
               '<span style="font-size:11px;color:var(--color-text-tertiary)">—</span>';
           }
+          const signup = adminUserSignupLabel(u);
+          const signupEl = document.createElement("span");
+          signupEl.style.cssText =
+            "font-size:11px;word-break:break-all;line-height:1.35";
+          signupEl.textContent = signup.text;
+          signupEl.title = signup.title;
+          tds[3].appendChild(signupEl);
           const dot = u.is_active ? "#639922" : "#BA7517";
-          tds[3].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? "Actif" : "Inactif"}</span>`;
+          tds[4].innerHTML = `<span><span class="active-dot" style="background:${dot}"></span>${u.is_active ? "Actif" : "Inactif"}</span>`;
           const dc = u.derniere_connexion
             ? new Date(u.derniere_connexion).toLocaleString()
             : "—";
-          tds[4].textContent = dc;
+          tds[5].textContent = dc;
           const act = document.createElement("div");
           act.className = "film-actions";
           const b0 = document.createElement("button");
@@ -4497,7 +4544,7 @@
           act.appendChild(b0);
           act.appendChild(bResetInv);
           act.appendChild(b1);
-          tds[5].appendChild(act);
+          tds[6].appendChild(act);
           tb.appendChild(tr);
         });
       }

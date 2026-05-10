@@ -82,6 +82,12 @@ class User(Base):
     preferences: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     # Invitation quota tier (viewers): bronze|silver|gold|platinum — stored as string for simple migrations.
     viewer_rank: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default=None)
+    # How the account was created: invite (registration with admin/member code), open (REGISTRATION_OPEN), admin (panel).
+    signup_channel: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Invitation code row used at self-registration (null for admin-created or open registration without code).
+    registered_via_invite_code_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("invitation_codes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"

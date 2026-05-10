@@ -568,6 +568,9 @@ class UserOut(BaseModel):
     is_active: bool
     derniere_connexion: Optional[datetime]
     viewer_rank: Optional[str] = None
+    signup_channel: Optional[str] = None
+    registered_invite_code: Optional[str] = None
+    registered_invite_note: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -575,7 +578,34 @@ class UserOut(BaseModel):
 
 @router.get("/users", response_model=List[UserOut])
 def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    return db.query(User).order_by(User.id.asc()).all()
+    rows = db.query(User).order_by(User.id.asc()).all()
+    inv_ids = {u.registered_via_invite_code_id for u in rows if u.registered_via_invite_code_id}
+    inv_map: dict[int, InvitationCode] = {}
+    if inv_ids:
+        for ic in db.query(InvitationCode).filter(InvitationCode.id.in_(inv_ids)).all():
+            inv_map[ic.id] = ic
+    out: list[UserOut] = []
+    for u in rows:
+        ic = (
+            inv_map.get(u.registered_via_invite_code_id)
+            if u.registered_via_invite_code_id
+            else None
+        )
+        out.append(
+            UserOut(
+                id=u.id,
+                username=u.username,
+                email=u.email,
+                role=u.role.value,
+                is_active=u.is_active,
+                derniere_connexion=u.derniere_connexion,
+                viewer_rank=u.viewer_rank,
+                signup_channel=u.signup_channel,
+                registered_invite_code=ic.code if ic else None,
+                registered_invite_note=ic.note if ic else None,
+            )
+        )
+    return out
 
 
 class CreateUserBody(BaseModel):
@@ -628,6 +658,7 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
         role=body.role,
         viewer_rank=rank_val,
         preferences=viewer_prefs,
+        signup_channel="admin",
     )
     db.add(u)
     db.commit()

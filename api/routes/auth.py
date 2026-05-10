@@ -156,6 +156,8 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
         role=UserRole.viewer,
         viewer_rank=ViewerRank.bronze.value,
         preferences={"favorite_genres": []},
+        signup_channel="invite" if inv else "open",
+        registered_via_invite_code_id=inv.id if inv else None,
     )
     db.add(user)
     if inv:

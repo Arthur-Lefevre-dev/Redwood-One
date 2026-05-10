@@ -79,6 +79,38 @@ def _ensure_user_viewer_rank_column() -> None:
         )
 
 
+def _ensure_user_signup_origin_columns() -> None:
+    """Track signup path: invite code id + channel (invite|open|admin)."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    "registered_via_invite_code_id INTEGER "
+                    "REFERENCES invitation_codes(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_users_registered_via_invite_code_id "
+                    "ON users(registered_via_invite_code_id)"
+                )
+            )
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS signup_channel VARCHAR(20)"))
+        logger.info("database schema: ensured users signup origin columns (postgresql)")
+        return
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    with engine.begin() as conn:
+        if "registered_via_invite_code_id" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN registered_via_invite_code_id INTEGER"))
+        if "signup_channel" not in cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN signup_channel VARCHAR(20)"))
+    logger.info("database schema: ensured users signup origin columns (sqlite)")
+
+
 def _ensure_user_invite_column() -> None:
     """Add last_invite_at for monthly user-generated invitation codes."""
     if engine.dialect.name == "postgresql":
@@ -422,6 +454,7 @@ def init_db() -> None:
     _ensure_films_trailer_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
+    _ensure_user_signup_origin_columns()
     _ensure_user_viewer_rank_column()
     _ensure_invitation_created_by_column()
     _ensure_series_season_meta_table()
