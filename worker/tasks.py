@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from celery import Celery
+from celery.schedules import crontab
 
 from config import get_settings
 
@@ -25,7 +26,12 @@ app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    beat_schedule={},
+    beat_schedule={
+        "refresh-donation-balances-hourly": {
+            "task": "worker.tasks.refresh_donation_balances_snapshot",
+            "schedule": crontab(minute=0),
+        },
+    },
     # Celery 5.3+: explicit startup retry; broker_connection_retry alone is deprecated for this.
     broker_connection_retry_on_startup=True,
 )
@@ -178,5 +184,43 @@ def process_film_task(self, film_id: int, local_path: str):
                 s2.close()
 
         process_film_file(db, film, local_path, progress=prog)
+    finally:
+        db.close()
+
+
+@app.task(name="worker.tasks.refresh_donation_balances_snapshot")
+def refresh_donation_balances_snapshot() -> None:
+    """Refresh cached crypto balances + EUR snapshot for donation bar (CoinGecko + chain RPC)."""
+    from datetime import datetime
+
+    from core.donation_service import compute_donation_snapshot
+    from core.donation_settings_store import get_or_create_donation_settings
+    from db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        row = get_or_create_donation_settings(db)
+        addresses = {
+            "btc": row.address_btc,
+            "polygon": row.address_polygon,
+            "solana": row.address_solana,
+            "xrp": row.address_xrp,
+            "tron": row.address_tron,
+        }
+        if not any((v or "").strip() for v in addresses.values()):
+            logger.info("refresh_donation_balances_snapshot: no addresses configured, skip")
+            return
+        try:
+            snap = compute_donation_snapshot(addresses)
+        except ValueError as exc:
+            logger.warning("refresh_donation_balances_snapshot: %s", exc)
+            return
+        except Exception:
+            logger.exception("refresh_donation_balances_snapshot: chain/API error")
+            return
+        row.snapshot_json = snap
+        row.updated_at = datetime.utcnow()
+        db.commit()
+        logger.info("refresh_donation_balances_snapshot: ok raised_eur=%s", snap.get("raised_eur"))
     finally:
         db.close()

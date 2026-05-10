@@ -75,6 +75,16 @@
     .donation-goal-bar .don-meta{font-size:11px;color:var(--muted)}
     .donation-goal-bar .don-track{height:8px;border-radius:999px;background:#222;overflow:hidden;border:1px solid #333}
     .donation-goal-bar .don-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#8B2500,#ea580c);transition:width .4s ease}
+    .donation-goal-bar .don-wallets-h{margin:14px 0 8px;font-size:12px;font-weight:600;color:#d4d4d4}
+    .donation-goal-bar .don-wallets{display:flex;flex-wrap:wrap;gap:8px}
+    .donation-goal-bar .don-wallet-btn{
+      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;
+      border:1px solid #444;background:#141414;color:#eee;font-size:12px;cursor:pointer;
+      font-family:inherit;transition:border-color .2s,background .2s
+    }
+    .donation-goal-bar .don-wallet-btn:hover{border-color:rgba(139,37,0,.75);background:#1c1c1c}
+    .donation-goal-bar .don-crypto-ico{width:22px;height:22px;flex-shrink:0;display:block}
+    .donation-goal-bar .don-wallet-lbl{font-weight:600;letter-spacing:.02em}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
   </style>
 </head>
@@ -146,6 +156,102 @@
 
     let homeLatest = [];
     let homeFeatured = [];
+
+    function donationWalletIconSvg(wid) {
+      switch (wid) {
+        case 'btc':
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#f7931a"/><text x="12" y="16.5" text-anchor="middle" fill="#fff" font-size="13" font-family="system-ui,sans-serif" font-weight="800">₿</text></svg>';
+        case 'polygon':
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#8247e5" d="M12 2l8.5 5v10L12 22l-8.5-5V7L12 2z"/><path fill="#c9aefc" d="M12 6.2L7.2 9v6l4.8 2.8L16.8 15V9L12 6.2z"/></svg>';
+        case 'solana':
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#9945ff"/><stop offset="100%" style="stop-color:#14f195"/></linearGradient></defs><path fill="url(#g)" d="M4 14.5l2.5-2.5h13l-2.5 2.5H4zm0-3l2.5-2.5h13L17 11.5H4zm2.5-5L9 4h13l-2.5 2.5H6.5z"/></svg>';
+        case 'xrp':
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="12" fill="#23292f"/><path fill="#fff" d="M7 7h2.2l2.8 3.2L14.8 7H17l-3.7 4.2L17 15.5h-2.2l-2.9-3.3-2.9 3.3H7l3.8-4.3L7 7z"/></svg>';
+        case 'tron':
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#ff060a" d="M12 2L4 6v12l8 4 8-4V6l-8-4zm-1 5.2h2v7.1l3.5-2V8.5L11 5.2z"/></svg>';
+        default:
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#666"/></svg>';
+      }
+    }
+
+    async function copyDonationAddress(addr, btn) {
+      const lbl = btn.querySelector('.don-wallet-lbl');
+      const prev = lbl ? lbl.textContent : '';
+      try {
+        await navigator.clipboard.writeText(addr);
+        if (lbl) lbl.textContent = 'Copié !';
+        setTimeout(function () { if (lbl) lbl.textContent = prev; }, 1600);
+      } catch (_) {
+        window.prompt('Copiez cette adresse :', addr);
+      }
+    }
+
+    function renderDonationBar(don) {
+      const donEl = document.getElementById('donation-goal-bar');
+      if (!donEl) return;
+      if (!don || !don.visible || !(don.goal_eur > 0)) {
+        donEl.hidden = true;
+        donEl.innerHTML = '';
+        return;
+      }
+      const raised = typeof don.raised_eur === 'number' ? don.raised_eur : 0;
+      const goal = don.goal_eur;
+      const pct = typeof don.progress_percent === 'number' ? don.progress_percent : 0;
+      const fmt = function (n) {
+        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
+      };
+      let periodHtml = '';
+      if (don.period_start_utc && don.period_end_utc) {
+        const opts = { dateStyle: 'short', timeStyle: 'short' };
+        const a = new Date(don.period_start_utc.endsWith('Z') ? don.period_start_utc : don.period_start_utc + 'Z');
+        const b = new Date(don.period_end_utc.endsWith('Z') ? don.period_end_utc : don.period_end_utc + 'Z');
+        periodHtml =
+          '<p class="don-meta" style="margin-top:8px">Période : ' +
+          a.toLocaleString('fr-FR', opts) +
+          ' — ' +
+          b.toLocaleString('fr-FR', opts) +
+          '</p>';
+      }
+      const wallets = don.wallets && don.wallets.length ? don.wallets : [];
+      let walletsBlock = '';
+      if (wallets.length) {
+        walletsBlock =
+          '<p class="don-wallets-h">Faire un don — cliquez pour copier l’adresse</p><div class="don-wallets" id="don-wallets-host"></div>';
+      }
+      donEl.hidden = false;
+      donEl.innerHTML =
+        '<div class="don-row"><span class="don-label">Soutien du projet</span><span><strong>' +
+        fmt(raised) +
+        '</strong> / ' +
+        fmt(goal) +
+        ' · ' +
+        pct.toFixed(1) +
+        ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
+        Math.min(100, pct) +
+        '%"></div></div>' +
+        periodHtml +
+        walletsBlock;
+      const host = document.getElementById('don-wallets-host');
+      if (host) {
+        wallets.forEach(function (w) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'don-wallet-btn';
+          btn.setAttribute('aria-label', 'Copier adresse ' + w.label);
+          btn.title = w.address;
+          btn.innerHTML = donationWalletIconSvg(w.id) + '<span class="don-wallet-lbl">' + w.symbol + '</span>';
+          btn.addEventListener('click', function () {
+            copyDonationAddress(w.address, btn);
+          });
+          host.appendChild(btn);
+        });
+      }
+    }
+
+    async function refreshDonationBar() {
+      const don = await apiJson('/api/donations/progress');
+      renderDonationBar(don);
+    }
 
     async function fetchRecentSeriesForHome(limit) {
       try {
@@ -322,58 +428,11 @@
       renderCards(document.getElementById('row-featured'), homeFeatured);
 
       try {
-        const don = await apiJson('/api/donations/progress');
-        const donEl = document.getElementById('donation-goal-bar');
-        if (don && don.visible && don.goal_eur > 0 && donEl) {
-          const raised = typeof don.raised_eur === 'number' ? don.raised_eur : 0;
-          const goal = don.goal_eur;
-          const pct = typeof don.progress_percent === 'number' ? don.progress_percent : 0;
-          const fmt = (n) =>
-            new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
-          const recHint = {
-            none: '',
-            repeat_span: ' · Récurrence : même durée',
-            weekly: ' · Récurrence : hebdomadaire',
-            monthly: ' · Récurrence : ~30 j.',
-            yearly: ' · Récurrence : ~365 j.',
-          };
-          const recSuf = recHint[don.recurrence] || '';
-          let periodLine = '';
-          if (don.period_start_utc && don.period_end_utc) {
-            const opts = { dateStyle: 'short', timeStyle: 'short' };
-            const a = new Date(don.period_start_utc.endsWith('Z') ? don.period_start_utc : don.period_start_utc + 'Z');
-            const b = new Date(don.period_end_utc.endsWith('Z') ? don.period_end_utc : don.period_end_utc + 'Z');
-            periodLine =
-              'Période : ' +
-              a.toLocaleString('fr-FR', opts) +
-              ' — ' +
-              b.toLocaleString('fr-FR', opts) +
-              recSuf +
-              '<br/>';
-          }
-          const sub =
-            periodLine +
-            (don.updated_at
-              ? 'Estimation portefeuilles · MAJ ' +
-                new Date(don.updated_at.endsWith('Z') ? don.updated_at : don.updated_at + 'Z').toLocaleString('fr-FR', {
-                  dateStyle: 'short',
-                  timeStyle: 'short',
-                })
-              : 'Estimation à partir des portefeuilles configurés');
-          donEl.hidden = false;
-          donEl.innerHTML =
-            '<div class="don-row"><span class="don-label">Soutien du projet</span><span><strong>' +
-            fmt(raised) +
-            '</strong> / ' +
-            fmt(goal) +
-            ' · ' +
-            pct.toFixed(1) +
-            ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
-            Math.min(100, pct) +
-            '%"></div></div><p class="don-meta" style="margin-top:8px">' +
-            sub +
-            '</p>';
-        }
+        await refreshDonationBar();
+        if (window.__redwoodDonationPoll) clearInterval(window.__redwoodDonationPoll);
+        window.__redwoodDonationPoll = setInterval(function () {
+          refreshDonationBar().catch(function () {});
+        }, 3600000);
       } catch (_) {}
 
       try {

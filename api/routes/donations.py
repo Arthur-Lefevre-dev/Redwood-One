@@ -8,10 +8,9 @@ from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
 from core.donation_campaign import effective_campaign_window, normalize_recurrence
+from core.donation_settings_store import get_or_create_donation_settings
 from db.models import DonationSettings, User
 from db.session import get_db
-
-_ROW_ID = 1
 
 router = APIRouter(prefix="/api/donations", tags=["donations"])
 
@@ -22,14 +21,28 @@ def _period_iso(dt: Optional[datetime]) -> Optional[str]:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def get_or_create_donation_settings(db: Session) -> DonationSettings:
-    row = db.get(DonationSettings, _ROW_ID)
-    if row is None:
-        row = DonationSettings(id=_ROW_ID)
-        db.add(row)
-        db.commit()
-        db.refresh(row)
-    return row
+def _public_wallets(row: DonationSettings) -> list[Dict[str, str]]:
+    """Configured deposit addresses for viewer copy-to-clipboard (no secrets)."""
+    pairs = [
+        ("btc", "Bitcoin", "BTC", row.address_btc),
+        ("polygon", "Polygon", "MATIC", row.address_polygon),
+        ("solana", "Solana", "SOL", row.address_solana),
+        ("xrp", "XRP Ledger", "XRP", row.address_xrp),
+        ("tron", "Tron", "TRX", row.address_tron),
+    ]
+    out: list[Dict[str, str]] = []
+    for wid, label, symbol, addr in pairs:
+        a = (addr or "").strip()
+        if a:
+            out.append(
+                {
+                    "id": wid,
+                    "label": label,
+                    "symbol": symbol,
+                    "address": a,
+                }
+            )
+    return out
 
 
 @router.get("/progress")
@@ -63,6 +76,7 @@ def donation_progress(
             "period_end_utc": _period_iso(eff_end),
             "in_campaign": in_campaign,
             "recurrence": normalize_recurrence(row.recurrence),
+            "wallets": [],
         }
     goal_f = float(goal)
     raised_f = float(raised) if raised is not None else 0.0
@@ -77,4 +91,5 @@ def donation_progress(
         "period_end_utc": _period_iso(eff_end),
         "in_campaign": in_campaign,
         "recurrence": normalize_recurrence(row.recurrence),
+        "wallets": _public_wallets(row),
     }

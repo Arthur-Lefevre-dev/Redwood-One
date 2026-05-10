@@ -15,7 +15,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
-from api.routes.donations import get_or_create_donation_settings
+from core.donation_settings_store import get_or_create_donation_settings
 from api.routes.announcement import _get_or_create_row, _is_active
 from api.routes.films import RefreshImdbApiBody, refresh_imdbapi as films_refresh_imdbapi
 from config import get_settings
