@@ -573,8 +573,14 @@ class CreateUserBody(BaseModel):
 
 @router.post("/users", response_model=UserOut)
 def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    if db.query(User).filter(User.username == body.username).first():
-        raise HTTPException(400, "Username exists")
+    username_clean = body.username.strip()
+    if len(username_clean) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="L’identifiant doit contenir au moins 2 caractères.",
+        )
+    if db.query(User).filter(User.username == username_clean).first():
+        raise HTTPException(status_code=400, detail="Identifiant déjà utilisé.")
     email_norm, email_err = validate_viewer_email(str(body.email))
     if email_err or not email_norm:
         raise HTTPException(status_code=400, detail=email_err or "Adresse e-mail invalide.")
@@ -583,27 +589,30 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
         .filter(func.lower(User.email) == email_norm.lower())
         .first()
     ):
-        raise HTTPException(400, "Email exists")
+        raise HTTPException(status_code=400, detail="Cette adresse e-mail est déjà utilisée.")
     from core.password_policy import validate_password_strength
     from core.security import hash_password
 
     pw_err = validate_password_strength(
         body.password,
-        username=body.username.strip(),
+        username=username_clean,
         email=email_norm.lower(),
     )
     if pw_err:
         raise HTTPException(status_code=400, detail=pw_err)
 
     rank_val: Optional[str] = None
+    viewer_prefs = None
     if body.role == UserRole.viewer:
         rank_val = _viewer_rank_for_new_viewer(body.viewer_rank)
+        viewer_prefs = {"favorite_genres": []}
     u = User(
-        username=body.username,
+        username=username_clean,
         email=email_norm,
         hashed_password=hash_password(body.password),
         role=body.role,
         viewer_rank=rank_val,
+        preferences=viewer_prefs,
     )
     db.add(u)
     db.commit()
