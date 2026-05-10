@@ -48,24 +48,39 @@
       background:linear-gradient(120deg,#1a0a0a,#0a0a0a);
       background-size:cover;background-position:center 20%;
     }
+    /* Keep copy clear of absolutely positioned nav chevrons (tall SVG + hover scale) */
+    .hero-carousel-wrap .hero{
+      padding:48px clamp(4.75rem, 11vw, 7.25rem);
+    }
     .hero.has-backdrop{background-color:#0a0a0a}
     .hero-inner{position:relative;z-index:1}
+    .hero-kind{
+      font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+      color:#fecaca;margin:0 0 10px;text-shadow:0 1px 14px rgba(0,0,0,.9);
+    }
     .hero h1{font-size:2rem;margin-bottom:8px;text-shadow:0 2px 24px rgba(0,0,0,.9),0 1px 3px #000}
-    .hero p{color:#d4d4d4;max-width:560px;line-height:1.55;text-shadow:0 1px 12px rgba(0,0,0,.85)}
+    .hero .hero-blurb{color:#d4d4d4;max-width:560px;line-height:1.55;text-shadow:0 1px 12px rgba(0,0,0,.85);margin:0}
     .hero-slide:focus-visible{outline:2px solid #fecaca;outline-offset:3px}
     .hero-carousel-btn{
       position:absolute;top:50%;transform:translateY(-50%);z-index:4;
-      width:44px;height:44px;border-radius:50%;
-      border:1px solid rgba(255,255,255,.22);
-      background:rgba(0,0,0,.5);color:#fff;font-size:1.65rem;line-height:1;
+      width:auto;height:auto;min-width:48px;min-height:72px;padding:8px 6px;border:none;border-radius:0;
+      background:transparent;color:#fafafa;
       cursor:pointer;display:flex;align-items:center;justify-content:center;
-      font-family:inherit;padding:0;transition:background .2s,border-color .2s,opacity .2s;
+      font-family:inherit;
+      box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+      transition:opacity .2s,transform .22s ease,color .22s,filter .22s;
     }
-    .hero-carousel-btn:hover{background:rgba(139,37,0,.55);border-color:rgba(255,255,255,.4)}
-    .hero-carousel-btn:focus-visible{outline:2px solid #fecaca;outline-offset:2px}
-    .hero-carousel-btn:disabled{opacity:.28;cursor:default;pointer-events:none}
-    .hero-carousel-prev{left:10px}
-    .hero-carousel-next{right:10px}
+    .hero-carousel-btn:hover{
+      background:transparent;color:#fff;
+      transform:translateY(-50%) scale(1.06);
+      filter:drop-shadow(0 0 10px rgba(0,0,0,.85));
+    }
+    .hero-carousel-btn:active{transform:translateY(-50%) scale(1)}
+    .hero-carousel-btn:focus-visible{outline:2px solid #fecaca;outline-offset:4px;border-radius:4px}
+    .hero-carousel-btn:disabled{opacity:.32;cursor:default;pointer-events:none;transform:translateY(-50%)}
+    .hero-carousel-ico{display:block;flex-shrink:0;filter:drop-shadow(0 2px 12px rgba(0,0,0,.75))}
+    .hero-carousel-prev{left:14px}
+    .hero-carousel-next{right:14px}
     .hero-carousel-dots{
       position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
       display:flex;gap:8px;z-index:4;padding:6px 10px;border-radius:999px;
@@ -178,7 +193,11 @@
       border-color:rgba(139,37,0,.65);
       background:linear-gradient(145deg,rgba(139,37,0,.15),#1c1c1c);
     }
-    .donation-goal-bar .don-crypto-ico{width:22px;height:22px;flex-shrink:0;display:block;object-fit:contain}
+    /* Light halo so SVG / img icons read on tinted wallet buttons */
+    .donation-goal-bar .don-crypto-ico{
+      width:22px;height:22px;flex-shrink:0;display:block;object-fit:contain;
+      filter:drop-shadow(0 0 1.5px rgba(255,255,255,.5));
+    }
     .donation-goal-bar .don-wallet-lbl{font-weight:600;letter-spacing:.02em}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222}
   </style>
@@ -223,12 +242,16 @@
     <p id="search-empty" class="empty" style="display:none;margin-top:16px;padding:20px">Aucun résultat pour cette recherche.</p>
   </div>
   <div id="home-browse">
-  <section class="hero-carousel-wrap" id="hero-carousel" aria-roledescription="carrousel" aria-label="À la une">
+  <section class="hero-carousel-wrap" id="hero-carousel" aria-roledescription="carrousel" aria-label="Trois suggestions aléatoires — films et séries">
     <div class="hero-carousel-viewport" id="hero-viewport">
       <div class="hero-carousel-track" id="hero-track" role="list"></div>
     </div>
-    <button type="button" class="hero-carousel-btn hero-carousel-prev" id="hero-prev" aria-label="Slide précédent" hidden>‹</button>
-    <button type="button" class="hero-carousel-btn hero-carousel-next" id="hero-next" aria-label="Slide suivant" hidden>›</button>
+    <button type="button" class="hero-carousel-btn hero-carousel-prev" id="hero-prev" aria-label="Slide précédent" hidden>
+      <svg class="hero-carousel-ico" width="44" height="72" viewBox="0 0 24 36" aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" d="M15 30L7 18l8-12"/></svg>
+    </button>
+    <button type="button" class="hero-carousel-btn hero-carousel-next" id="hero-next" aria-label="Slide suivant" hidden>
+      <svg class="hero-carousel-ico" width="44" height="72" viewBox="0 0 24 36" aria-hidden="true" preserveAspectRatio="xMidYMid meet"><path fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" d="M9 30l8-12-8-12"/></svg>
+    </button>
     <div class="hero-carousel-dots" id="hero-dots" role="tablist" aria-label="Choisir un slide" hidden></div>
   </section>
   <div class="row-head">
@@ -254,9 +277,57 @@
     let homeLatest = [];
     let homeFeatured = [];
 
-    var HERO_CAROUSEL_MAX = 12;
+    var HERO_SPOTLIGHT_COUNT = 3;
     var HERO_AUTOPLAY_MS = 7800;
     var _heroCarousel = { index: 0, count: 0, timer: null };
+
+    function shuffleArray(arr) {
+      var a = arr.slice();
+      for (var i = a.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+      }
+      return a;
+    }
+
+    /**
+     * Spotlight slides: random mix of films + series. When both pools are non-empty,
+     * keeps at least one film and one series, third pick is random from the rest.
+     */
+    function pickHeroSpotlight(films, series) {
+      var out = [];
+      var fPool = shuffleArray(films || []);
+      var sPool = shuffleArray(series || []);
+      var hasF = fPool.length > 0;
+      var hasS = sPool.length > 0;
+      var n = HERO_SPOTLIGHT_COUNT;
+
+      if (hasF && hasS) {
+        out.push({ kind: 'film', data: fPool.shift() });
+        out.push({ kind: 'series', data: sPool.shift() });
+        var rest = [];
+        fPool.forEach(function (x) {
+          rest.push({ kind: 'film', data: x });
+        });
+        sPool.forEach(function (x) {
+          rest.push({ kind: 'series', data: x });
+        });
+        rest = shuffleArray(rest);
+        if (rest.length) out.push(rest[0]);
+      } else if (hasF) {
+        fPool.slice(0, n).forEach(function (x) {
+          out.push({ kind: 'film', data: x });
+        });
+      } else if (hasS) {
+        sPool.slice(0, n).forEach(function (x) {
+          out.push({ kind: 'series', data: x });
+        });
+      }
+
+      return out.slice(0, n);
+    }
 
     function heroCarouselStopTimer() {
       if (_heroCarousel.timer) {
@@ -323,7 +394,7 @@
       }, 100);
     }
 
-    function initHeroCarousel(featured) {
+    function initHeroCarousel(heroEntries) {
       var track = document.getElementById('hero-track');
       var prev = document.getElementById('hero-prev');
       var next = document.getElementById('hero-next');
@@ -340,28 +411,54 @@
         dotsHost.hidden = true;
       }
 
-      var list =
-        featured && featured.length ? featured.slice(0, HERO_CAROUSEL_MAX) : [];
+      var list = heroEntries && heroEntries.length ? heroEntries : [];
 
-      function addSlide(opts) {
-        var titre = opts.titre;
-        var synopsis = opts.synopsis || '';
-        var posterPath = opts.posterPath;
-        var filmId = opts.filmId;
+      function addSlide(entry) {
+        var kind = entry.kind;
+        var raw = entry.data;
+        var titre = kind === 'film' ? raw.titre : raw.title || 'Série';
+        var synopsis = (kind === 'film' ? raw.synopsis : raw.synopsis) || '';
+        if (!synopsis && kind === 'series') {
+          var nEp = Number(raw.episode_count) || 0;
+          var nSe = Number(raw.season_count) || 0;
+          synopsis =
+            'Série · ' +
+            (nEp === 1 ? '1 épisode' : nEp + ' épisodes') +
+            ' · ' +
+            (nSe === 1 ? '1 saison' : nSe + ' saisons');
+        }
+        var posterPath = raw.poster_path;
         var slide = document.createElement('div');
         slide.className = 'hero hero-slide';
         slide.setAttribute('role', 'listitem');
-        if (filmId != null) {
-          slide.dataset.filmId = String(filmId);
+        if (kind === 'film' && raw.id != null) {
+          var fid = raw.id;
+          slide.dataset.filmId = String(fid);
           slide.style.cursor = 'pointer';
           slide.tabIndex = 0;
           slide.addEventListener('click', function () {
-            location.href = '/watch/film.html?id=' + filmId;
+            location.href = '/watch/film.html?id=' + fid;
           });
           slide.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              location.href = '/watch/film.html?id=' + filmId;
+              location.href = '/watch/film.html?id=' + fid;
+            }
+          });
+        } else if (kind === 'series' && raw.series_key) {
+          var sk = raw.series_key;
+          slide.dataset.seriesKey = sk;
+          slide.style.cursor = 'pointer';
+          slide.tabIndex = 0;
+          slide.addEventListener('click', function () {
+            location.href =
+              '/watch/serie.html?key=' + encodeURIComponent(sk);
+          });
+          slide.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              location.href =
+                '/watch/serie.html?key=' + encodeURIComponent(sk);
             }
           });
         }
@@ -379,30 +476,27 @@
           slide.style.backgroundImage = '';
         }
         slide.innerHTML =
-          '<div class="hero-inner"><h1></h1><p></p></div>';
+          '<div class="hero-inner"><p class="hero-kind"></p><h1></h1><p class="hero-blurb"></p></div>';
+        slide.querySelector('.hero-kind').textContent =
+          kind === 'film' ? 'Film' : 'Série';
         slide.querySelector('h1').textContent = titre;
-        slide.querySelector('p').textContent = desc;
+        slide.querySelector('.hero-blurb').textContent = desc;
         track.appendChild(slide);
       }
 
       if (list.length) {
         for (var fi = 0; fi < list.length; fi++) {
-          var h = list[fi];
-          addSlide({
-            titre: h.titre,
-            synopsis: h.synopsis || '',
-            posterPath: h.poster_path,
-            filmId: h.id,
-          });
+          addSlide(list[fi]);
         }
       } else {
-        addSlide({
-          titre: 'Bienvenue',
-          synopsis:
-            'Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.',
-          posterPath: null,
-          filmId: null,
-        });
+        var slide = document.createElement('div');
+        slide.className = 'hero hero-slide';
+        slide.setAttribute('role', 'listitem');
+        slide.classList.remove('has-backdrop');
+        slide.style.backgroundImage = '';
+        slide.innerHTML =
+          '<div class="hero-inner"><p class="hero-kind">Redwood Plus</p><h1>Bienvenue</h1><p class="hero-blurb">Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.</p></div>';
+        track.appendChild(slide);
       }
 
       _heroCarousel.count = track.querySelectorAll('.hero-slide').length;
@@ -742,8 +836,8 @@
 
       const [featured, latestFilms, recentSeries] = await Promise.all([
         apiJson('/api/films/featured'),
-        apiJson('/api/films/latest?limit=24'),
-        fetchRecentSeriesForHome(24),
+        apiJson('/api/films/latest?limit=48'),
+        fetchRecentSeriesForHome(48),
       ]);
       const merged = [];
       latestFilms.forEach((f) => merged.push(Object.assign({ kind: 'film' }, f)));
@@ -755,7 +849,7 @@
       });
       homeLatest = merged.slice(0, 24);
 
-      initHeroCarousel(featured);
+      initHeroCarousel(pickHeroSpotlight(latestFilms, recentSeries));
 
       homeFeatured = featured;
       renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
