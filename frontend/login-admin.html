@@ -15,14 +15,19 @@
     input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:#0f0f0f; color:var(--text); margin-bottom:14px; }
     .pass-row { margin-bottom:14px; }
     .pass-row input { margin-bottom:0; }
-    .pass-field { display:flex; gap:8px; align-items:stretch; }
-    .pass-field input { flex:1; min-width:0; }
+    .pass-field { position:relative; width:100%; }
+    .pass-field input { width:100%; padding:10px 44px 10px 12px; }
     button[type="submit"] { width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; margin-top:6px; }
     .btn-show-pass {
-      flex-shrink:0; padding:10px 14px; border:1px solid var(--border); border-radius:8px;
-      background:#1a1a1a; color:var(--muted); font-size:.8rem; font-weight:600; cursor:pointer; font-family:inherit;
+      position:absolute; right:2px; top:50%; transform:translateY(-50%);
+      width:40px; height:34px; display:inline-flex; align-items:center; justify-content:center;
+      padding:0; border:none; border-radius:6px; background:transparent; color:var(--muted);
+      cursor:pointer; font-family:inherit;
     }
-    .btn-show-pass:hover { color:var(--text); border-color:#444; }
+    .btn-show-pass:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .btn-show-pass .icon-eye-off { display:none; }
+    .btn-show-pass.is-revealed .icon-eye { display:none; }
+    .btn-show-pass.is-revealed .icon-eye-off { display:block; }
     .err { color:#f87171; font-size:.85rem; margin-top:10px; display:none; }
     .links { margin-top:18px; font-size:.85rem; color:var(--muted); text-align:center; }
     a { color:#fca5a5; }
@@ -39,7 +44,15 @@
         <label for="p">Mot de passe</label>
         <div class="pass-field">
           <input id="p" name="password" type="password" autocomplete="current-password" required />
-          <button type="button" class="btn-show-pass" id="btn-show-pass" aria-pressed="false" aria-label="Afficher le mot de passe">Voir</button>
+          <button type="button" class="btn-show-pass" id="btn-show-pass" aria-pressed="false" aria-label="Afficher le mot de passe">
+            <svg class="icon-eye" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="icon-eye-off" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
         </div>
       </div>
       <button type="submit">Accéder au tableau de bord</button>
@@ -54,9 +67,9 @@
       btn.addEventListener('click', () => {
         const show = inp.type === 'password';
         inp.type = show ? 'text' : 'password';
+        btn.classList.toggle('is-revealed', show);
         btn.setAttribute('aria-pressed', show ? 'true' : 'false');
         btn.setAttribute('aria-label', show ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
-        btn.textContent = show ? 'Masquer' : 'Voir';
       });
     })();
     document.getElementById('f').addEventListener('submit', async (e) => {

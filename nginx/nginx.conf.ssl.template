@@ -1,3 +1,7 @@
+# HTTPS production — generated from template. Placeholders: __SERVER_NAMES__
+# After first deploy, renew with: sudo certbot renew --webroot -w /path/to/repo/nginx/acme-webroot
+# (or use scripts/ssl-renew-deploy.sh as --deploy-hook)
+
 events {
     worker_connections 1024;
 }
@@ -20,20 +24,34 @@ http {
         keepalive 32;
     }
 
+    # HTTP — ACME challenges + redirect to HTTPS
     server {
         listen 80;
-        server_name _;
+        server_name __SERVER_NAMES__;
 
-        root  /usr/share/nginx/html;
-        index login.html;
-
-        # Let's Encrypt HTTP-01 (certbot --webroot). Mount: nginx/acme-webroot -> /var/www/certbot
         location ^~ /.well-known/acme-challenge/ {
             root /var/www/certbot;
             default_type text/plain;
         }
 
-        # API first: never let try_files / SPA fallbacks swallow /api/* (would return HTML).
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS — same app as HTTP config
+    server {
+        listen 443 ssl http2;
+        server_name __SERVER_NAMES__;
+
+        ssl_certificate     /etc/nginx/certs/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers off;
+
+        root  /usr/share/nginx/html;
+        index login.html;
+
         location /api/ {
             proxy_pass              http://api;
             proxy_http_version      1.1;

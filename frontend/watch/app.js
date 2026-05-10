@@ -171,6 +171,25 @@ function setWatchUserMenuOpen(wrap, open) {
   menu.hidden = !open;
 }
 
+function ensureWatchNavAdminLink(isAdmin) {
+  const menu = document.getElementById('nav-user-menu');
+  if (!menu) return;
+  const existing = document.getElementById('nav-admin-dashboard');
+  if (isAdmin) {
+    if (!existing) {
+      const link = document.createElement('a');
+      link.id = 'nav-admin-dashboard';
+      link.href = '/admin/';
+      link.setAttribute('role', 'menuitem');
+      link.className = 'nav-admin-dashboard';
+      link.textContent = 'Administration';
+      menu.insertBefore(link, menu.firstChild);
+    }
+  } else if (existing) {
+    existing.remove();
+  }
+}
+
 function initWatchNavUserMenu() {
   injectWatchNavUserStyles();
   const wrap = document.getElementById('nav-user-wrap');
@@ -216,6 +235,8 @@ async function hydrateWatchNavUser() {
     if (elName) elName.textContent = name;
     if (elIni) elIni.textContent = watchNavUserInitials(name);
     if (trigger) trigger.setAttribute('aria-label', 'Menu compte — ' + name);
+    const role = me.role != null ? String(me.role).toLowerCase() : '';
+    ensureWatchNavAdminLink(role === 'admin');
   } catch (_) {
     /* 401 → redirect in api() */
   }
