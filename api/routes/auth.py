@@ -12,6 +12,7 @@ from api.deps import get_current_user
 from api.limits import limiter
 from config import get_settings
 from core.member_invites import invite_month_status, list_member_invites_payload
+from core.password_policy import validate_password_strength
 from core.security import (
     create_access_token,
     create_refresh_token_jwt,
@@ -36,7 +37,7 @@ class LoginBody(BaseModel):
 class RegisterBody(BaseModel):
     username: str = Field(min_length=2, max_length=80)
     email: EmailStr
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(max_length=128)
     invite_code: Optional[str] = None
 
 
@@ -47,7 +48,7 @@ class PreferencesBody(BaseModel):
 class PatchMeBody(BaseModel):
     email: Optional[EmailStr] = None
     current_password: Optional[str] = None
-    new_password: Optional[str] = Field(None, min_length=6, max_length=128)
+    new_password: Optional[str] = Field(None, max_length=128)
 
 
 def _cookie_kwargs():
@@ -128,6 +129,14 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail="Username already taken")
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    pw_err = validate_password_strength(
+        body.password,
+        username=body.username.strip(),
+        email=str(body.email).lower().strip(),
+    )
+    if pw_err:
+        raise HTTPException(status_code=400, detail=pw_err)
 
     user = User(
         username=body.username.strip(),
@@ -297,6 +306,14 @@ def patch_me(
         raise HTTPException(status_code=400, detail="Mot de passe actuel requis")
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
+    if pw_change:
+        pw_err = validate_password_strength(
+            body.new_password or "",
+            username=user.username,
+            email=(new_email if email_change else user.email) or user.email,
+        )
+        if pw_err:
+            raise HTTPException(status_code=400, detail=pw_err)
     if email_change:
         taken = db.query(User).filter(User.email == new_email, User.id != user.id).first()
         if taken:

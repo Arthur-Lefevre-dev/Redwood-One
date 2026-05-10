@@ -541,9 +541,9 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
 
 
 class CreateUserBody(BaseModel):
-    username: str
+    username: str = Field(min_length=2, max_length=80)
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
     role: UserRole = UserRole.viewer
 
 
@@ -553,7 +553,16 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
         raise HTTPException(400, "Username exists")
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(400, "Email exists")
+    from core.password_policy import validate_password_strength
     from core.security import hash_password
+
+    pw_err = validate_password_strength(
+        body.password,
+        username=body.username.strip(),
+        email=str(body.email).lower().strip(),
+    )
+    if pw_err:
+        raise HTTPException(status_code=400, detail=pw_err)
 
     u = User(
         username=body.username,

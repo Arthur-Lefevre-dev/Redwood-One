@@ -32,7 +32,8 @@
       <label for="e">E-mail</label>
       <input id="e" name="email" type="email" autocomplete="email" required />
       <label for="p">Mot de passe</label>
-      <input id="p" name="password" type="password" autocomplete="new-password" required minlength="6" />
+      <input id="p" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128" />
+      <p class="sub" style="margin-top:-6px;margin-bottom:12px;font-size:13px;opacity:.9">Au moins 12 caractères, sans espace : une minuscule, une majuscule, un chiffre et un symbole (! # @ …).</p>
       <button type="submit">S’inscrire</button>
     </form>
     <p class="err" id="err"></p>

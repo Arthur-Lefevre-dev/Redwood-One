@@ -109,9 +109,10 @@
       <h2>Mot de passe</h2>
       <form id="form-password">
         <label for="pw-new">Nouveau mot de passe</label>
-        <input id="pw-new" type="password" autocomplete="new-password" required minlength="6" />
+        <input id="pw-new" type="password" autocomplete="new-password" required minlength="12" maxlength="128" />
+        <p class="hint">Comme à l’inscription : min. 12 caractères, sans espace — minuscule, majuscule, chiffre et symbole.</p>
         <label for="pw-confirm">Confirmer le mot de passe</label>
-        <input id="pw-confirm" type="password" autocomplete="new-password" required minlength="6" />
+        <input id="pw-confirm" type="password" autocomplete="new-password" required minlength="12" maxlength="128" />
         <label for="pw-current">Mot de passe actuel</label>
         <input id="pw-current" type="password" autocomplete="current-password" required />
         <button type="submit" class="btn">Changer le mot de passe</button>
