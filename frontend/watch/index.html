@@ -125,12 +125,7 @@
     .donation-goal-bar .don-label{font-weight:700;color:#fecaca;letter-spacing:.02em}
     .donation-goal-bar .don-meta{font-size:11px;color:var(--muted)}
     .donation-goal-bar .don-track{height:8px;border-radius:999px;background:#222;overflow:hidden;border:1px solid #333}
-    .donation-goal-bar .don-fill{
-      height:100%;border-radius:999px;
-      transition:width .4s ease,background .35s ease,background-color .35s ease;
-      /* Inline style sets crypto gradient from donationProgressFillCss() */
-      background:linear-gradient(90deg,#f7931a,#8247e5,#14f195,#00aae4,#eb0029);
-    }
+    .donation-goal-bar .don-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,#8B2500,#ea580c);transition:width .4s ease}
     .donation-goal-bar .don-wallets-h{margin:14px 0 8px;font-size:12px;font-weight:600;color:#d4d4d4}
     .donation-goal-bar .don-wallets{display:flex;flex-wrap:wrap;gap:8px}
     .donation-goal-bar .don-wallet-btn{
@@ -639,46 +634,6 @@
       }
     }
 
-    /** Brand hex for progress bar (aligned with .don-wallet-btn--* tints). */
-    function donationBrandHex(walletId) {
-      switch (walletId) {
-        case 'btc':
-          return '#f7931a';
-        case 'polygon':
-          return '#8247e5';
-        case 'solana':
-          return '#14f195';
-        case 'xrp':
-          return '#00aae4';
-        case 'tron':
-          return '#eb0029';
-        default:
-          return '#ea580c';
-      }
-    }
-
-    /**
-     * Fill style: gradient across configured donation wallets (same order as API).
-     * As width grows with %, more of the spectrum appears — ties progress to crypto colours.
-     */
-    function donationProgressFillCss(wallets) {
-      var ids = [];
-      (wallets || []).forEach(function (w) {
-        if (w && w.id && ids.indexOf(w.id) < 0) ids.push(w.id);
-      });
-      var colors = ids.length
-        ? ids.map(donationBrandHex)
-        : ['#f7931a', '#8247e5', '#14f195', '#00aae4', '#eb0029'];
-      if (colors.length === 1) {
-        return 'background:' + colors[0];
-      }
-      var stops = colors.map(function (c, i) {
-        var p = colors.length === 1 ? 0 : (i / (colors.length - 1)) * 100;
-        return c + ' ' + p.toFixed(2) + '%';
-      });
-      return 'background:linear-gradient(90deg,' + stops.join(',') + ')';
-    }
-
     function renderDonationBar(don) {
       const donEl = document.getElementById('donation-goal-bar');
       if (!donEl) return;
@@ -721,9 +676,7 @@
         pct.toFixed(1) +
         ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
         Math.min(100, pct) +
-        '%;' +
-        donationProgressFillCss(wallets) +
-        '"></div></div>' +
+        '%"></div></div>' +
         periodHtml +
         walletsBlock;
       const host = document.getElementById('don-wallets-host');
