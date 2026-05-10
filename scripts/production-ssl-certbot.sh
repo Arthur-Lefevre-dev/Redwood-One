@@ -87,7 +87,7 @@ else
   echo "Warning: $COMPOSE_FILE not found; start nginx yourself so port 80 serves the webroot."
 fi
 
-echo "==> Requesting certificate for: ${CERTBOT_DOMAINS[*]}"
+echo "==> Requesting certificate for: $SERVER_NAMES"
 docker run --rm \
   -v "$WEBROOT:/var/www/certbot:rw" \
   -v "$LE_DIR:/etc/letsencrypt" \
@@ -97,6 +97,7 @@ docker run --rm \
   -m "$EMAIL" \
   --agree-tos \
   --non-interactive \
+  --expand \
   --keep-until-expiring
 
 LIVE="$LE_DIR/live/$DOMAIN"
