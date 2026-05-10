@@ -26,6 +26,8 @@ app.conf.update(
     timezone="UTC",
     enable_utc=True,
     beat_schedule={},
+    # Celery 5.3+: explicit startup retry; broker_connection_retry alone is deprecated for this.
+    broker_connection_retry_on_startup=True,
 )
 
 

@@ -4,6 +4,8 @@
 #
 # If you do NOT have certbot on the host, use ssl-renew-docker.sh instead (cron that script).
 #
+# The hook file must be executable: chmod +x scripts/ssl-renew-deploy.sh
+#
 # Example crontab (root), with system certbot:
 #   0 3 * * * certbot renew --webroot -w /path/to/repo/nginx/acme-webroot --deploy-hook /path/to/repo/scripts/ssl-renew-deploy.sh
 #
