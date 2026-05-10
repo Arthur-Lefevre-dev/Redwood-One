@@ -1,9 +1,10 @@
 """Series catalog: list shows and season-grouped episodes."""
 
 from collections import defaultdict
+from datetime import datetime
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,25 @@ from db.models import ContentKind, Film, FilmStatut, SeriesSeasonMeta, SeriesSho
 from db.session import get_db
 
 router = APIRouter(prefix="/api/series", tags=["series"])
+
+
+def _series_matches_search(rep: Film, title: str, canon: str, sk_list: List[str], needle: str) -> bool:
+    """Match query against show title, keys, episode row metadata, director, cast, synopsis."""
+    if not needle:
+        return True
+    n = needle.lower()
+    chunks = [
+        (title or "").lower(),
+        " ".join(sk_list).lower(),
+        canon.lower(),
+        (rep.series_title or "").lower(),
+        (rep.titre or "").lower(),
+        (rep.realisateur or "").lower(),
+        ((rep.synopsis or "").lower() if rep.synopsis else ""),
+    ]
+    if rep.acteurs:
+        chunks.append(str(rep.acteurs).lower())
+    return any(n in c for c in chunks if c)
 
 
 def _merge_show_meta_rows(rows: List[SeriesShowMeta]) -> tuple[Optional[str], Optional[str]]:
@@ -37,12 +57,7 @@ def _merge_show_meta_rows(rows: List[SeriesShowMeta]) -> tuple[Optional[str], Op
     return poster, hero
 
 
-@router.get("")
-def list_series(
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-    q: Optional[str] = None,
-):
+def _build_series_catalog(db: Session, q: Optional[str] = None) -> List[dict[str, Any]]:
     rows = (
         db.query(Film.series_key)
         .filter(
@@ -83,11 +98,8 @@ def list_series(
         show_poster = show_poster or ""
         list_poster = show_poster or (rep.poster_path or "")
         title = rep.series_title or rep.titre
-        if needle:
-            t = (title or "").lower()
-            skl = " ".join(sk_list).lower()
-            if needle not in t and needle not in skl and needle not in canon.lower():
-                continue
+        if needle and not _series_matches_search(rep, title, canon, sk_list, needle):
+            continue
         ep_count = (
             db.query(func.count(Film.id))
             .filter(
@@ -144,6 +156,55 @@ def list_series(
     out = list(merged.values())
     out.sort(key=lambda x: (x.get("title") or "").lower())
     return out
+
+
+@router.get("")
+def list_series(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    q: Optional[str] = None,
+):
+    return _build_series_catalog(db, q)
+
+
+@router.get("/recent")
+def series_recent(
+    limit: int = Query(16, ge=1, le=48),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Shows ordered by most recent episode addition (max date_ajout per series group).
+    Each item includes date_ajout (UTC) for the latest episode in that show.
+    """
+    agg = (
+        db.query(Film.series_key, func.max(Film.date_ajout).label("mx"))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.content_kind == ContentKind.series_episode,
+            Film.series_key.isnot(None),
+        )
+        .group_by(Film.series_key)
+        .all()
+    )
+    canon_to_mx: dict[str, datetime] = {}
+    for sk, mx in agg:
+        if not sk or mx is None:
+            continue
+        canon = normalize_series_group_key(sk)
+        prev = canon_to_mx.get(canon)
+        if prev is None or mx > prev:
+            canon_to_mx[canon] = mx
+    items = _build_series_catalog(db, None)
+    for it in items:
+        sk = it.get("series_key")
+        if sk:
+            it["date_ajout"] = canon_to_mx.get(sk)
+    items.sort(
+        key=lambda x: x.get("date_ajout") or datetime.min,
+        reverse=True,
+    )
+    return items[:limit]
 
 
 @router.get("/{series_key}/detail")

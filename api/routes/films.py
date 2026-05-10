@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_
+from sqlalchemy import Text, cast, func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, require_admin
@@ -103,6 +103,23 @@ def _film_genre_set(genres_raw: Any) -> set[str]:
     return {g.lower() for g in _genre_labels(genres_raw)}
 
 
+def _actor_labels(acteurs_raw: Any) -> List[str]:
+    """Normalize cast JSON to display names (strings or TMDB-style dicts)."""
+    if not acteurs_raw:
+        return []
+    if isinstance(acteurs_raw, list):
+        out: List[str] = []
+        for item in acteurs_raw:
+            if isinstance(item, str) and item.strip():
+                out.append(item.strip())
+            elif isinstance(item, dict):
+                n = item.get("name")
+                if isinstance(n, str) and n.strip():
+                    out.append(n.strip())
+        return out
+    return []
+
+
 def _resolve_tmdb_trailers_cached(db: Session, f: Film) -> List[dict]:
     """
     Return TMDB YouTube trailer list from DB cache when fresh, else fetch videos API and persist.
@@ -135,14 +152,34 @@ def list_films(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     q: Optional[str] = None,
+    genre: Optional[str] = None,
+    actor: Optional[str] = None,
+    director: Optional[str] = None,
+    tmdb_id: Optional[int] = Query(None, description="Filter by stored TMDB id (movie or TV ref)."),
 ):
     query = db.query(Film).filter(
         Film.statut == FilmStatut.disponible,
         Film.content_kind == ContentKind.film,
     )
+    if tmdb_id is not None:
+        query = query.filter(Film.tmdb_id == tmdb_id)
+    if director and director.strip():
+        query = query.filter(Film.realisateur.ilike(f"%{director.strip()}%"))
+    if actor and actor.strip():
+        query = query.filter(cast(Film.acteurs, Text).ilike(f"%{actor.strip()}%"))
+    if genre and genre.strip():
+        query = query.filter(cast(Film.genres, Text).ilike(f"%{genre.strip()}%"))
     if q:
         like = f"%{q}%"
-        query = query.filter(or_(Film.titre.ilike(like), Film.realisateur.ilike(like)))
+        clauses = [
+            Film.titre.ilike(like),
+            Film.titre_original.ilike(like),
+            Film.realisateur.ilike(like),
+            Film.synopsis.ilike(like),
+            cast(Film.acteurs, Text).ilike(like),
+            cast(Film.genres, Text).ilike(like),
+        ]
+        query = query.filter(or_(*clauses))
     films = query.order_by(Film.date_ajout.desc()).all()
     return films
 
@@ -202,12 +239,104 @@ def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_curre
     return rows
 
 
-@router.get("/surprise-me", response_model=FilmOut)
-def surprise_me(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Pick a catalog title weighted by the viewer's favorite genres (preferences)."""
+@router.get("/directors-summary")
+def directors_summary(
+    limit: int = 40,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Distinct directors (realisateur) with film counts for browse chips."""
+    lim = max(5, min(150, limit))
+    rows = (
+        db.query(Film.realisateur, func.count(Film.id))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.content_kind == ContentKind.film,
+            Film.realisateur.isnot(None),
+            Film.realisateur != "",
+        )
+        .group_by(Film.realisateur)
+        .order_by(func.count(Film.id).desc())
+        .limit(lim)
+        .all()
+    )
+    return [{"name": n, "count": int(c)} for n, c in rows if n]
+
+
+@router.get("/actors-summary")
+def actors_summary(
+    limit: int = 60,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Aggregated cast names from stored TMDB/IMDb metadata (JSON acteurs)."""
+    lim = max(10, min(400, limit))
+    films = (
+        db.query(Film.acteurs)
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.content_kind == ContentKind.film,
+            Film.acteurs.isnot(None),
+        )
+        .all()
+    )
+    counts: dict[str, int] = {}
+    for (raw,) in films:
+        for name in _actor_labels(raw):
+            counts[name] = counts.get(name, 0) + 1
+    rows = [{"name": k, "count": v} for k, v in counts.items()]
+    rows.sort(key=lambda x: (-x["count"], x["name"].lower()))
+    return rows[:lim]
+
+
+def _surprise_me_candidate_query(
+    db: Session,
+    *,
+    genre: Optional[str] = None,
+    actor: Optional[str] = None,
+    director: Optional[str] = None,
+    score_min: Optional[float] = None,
+):
+    """Base query for surprise-me pool; same filter semantics as list_films."""
     q = db.query(Film).filter(
         Film.statut == FilmStatut.disponible,
         Film.content_kind == ContentKind.film,
+    )
+    if director and director.strip():
+        q = q.filter(Film.realisateur.ilike(f"%{director.strip()}%"))
+    if actor and actor.strip():
+        q = q.filter(cast(Film.acteurs, Text).ilike(f"%{actor.strip()}%"))
+    if genre and genre.strip():
+        q = q.filter(cast(Film.genres, Text).ilike(f"%{genre.strip()}%"))
+    if score_min is not None:
+        q = q.filter(Film.note_tmdb.isnot(None), Film.note_tmdb >= float(score_min))
+    return q
+
+
+@router.get("/surprise-me", response_model=FilmOut)
+def surprise_me(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    genre: Optional[str] = None,
+    actor: Optional[str] = None,
+    director: Optional[str] = None,
+    score_min: Optional[float] = Query(
+        None,
+        ge=0,
+        le=10,
+        description="Minimum TMDB vote_average (0–10) stored on the film row.",
+    ),
+):
+    """Pick a catalog title weighted by the viewer's favorite genres (preferences).
+
+    Optional filters narrow the pool (same rules as GET /api/films).
+    """
+    q = _surprise_me_candidate_query(
+        db,
+        genre=genre,
+        actor=actor,
+        director=director,
+        score_min=score_min,
     )
     films = q.all()
     if not films:

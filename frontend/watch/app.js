@@ -3,8 +3,30 @@
  */
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w500';
 
+/** Optional: set before loading app.js when the UI is not served behind the same origin as FastAPI (e.g. Live Server on :5500, API on :8000). Cross-origin cookies may require CORS + cookie settings on the API. */
+function getApiBase() {
+  if (typeof window === 'undefined') return '';
+  const b = window.__REDWOOD_API_BASE__;
+  if (b == null || String(b).trim() === '') return '';
+  return String(b).replace(/\/$/, '');
+}
+
+function apiUrl(path) {
+  const p = path.startsWith('/') ? path : '/' + path;
+  const base = getApiBase();
+  return base ? base + p : p;
+}
+
+function looksLikeHtmlBody(text) {
+  const t = String(text || '')
+    .trim()
+    .slice(0, 80)
+    .toLowerCase();
+  return t.startsWith('<!doctype') || t.startsWith('<html');
+}
+
 async function api(path, opts = {}) {
-  const r = await fetch(path, { credentials: 'include', cache: 'no-store', ...opts });
+  const r = await fetch(apiUrl(path), { credentials: 'include', cache: 'no-store', ...opts });
   if (r.status === 401) {
     window.location.href = '/login.html';
     throw new Error('401');
@@ -33,6 +55,12 @@ async function readJsonSafe(response) {
     } else {
       const line = text.trim().split(/\r?\n/)[0] || '';
       msg = line.slice(0, 240) || 'HTTP ' + response.status;
+      if (looksLikeHtmlBody(text)) {
+        msg =
+          'HTTP ' +
+          response.status +
+          ' — réponse HTML (pas JSON). Cause fréquente : API injoignable (502 nginx), ou page ouverte hors Docker sans proxy /api. Utilisez le port nginx du stack, ou définissez window.__REDWOOD_API_BASE__ vers l’URL de l’API.';
+      }
     }
     const err = new Error(msg);
     err.status = response.status;
@@ -42,6 +70,13 @@ async function readJsonSafe(response) {
   try {
     return JSON.parse(text);
   } catch (_) {
+    if (looksLikeHtmlBody(text)) {
+      const err = new Error(
+        'Réponse HTML au lieu de JSON — les requêtes /api/* n’atteignent probablement pas FastAPI. Ouvrez l’interface via nginx du projet ou définissez window.__REDWOOD_API_BASE__.'
+      );
+      err.status = response.status;
+      throw err;
+    }
     const err = new Error(
       'Réponse invalide (JSON attendu). Cause fréquente : erreur serveur ou base non migrée. Début de réponse : ' +
         text.slice(0, 120).replace(/\s+/g, ' ')
