@@ -11,7 +11,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
@@ -22,6 +22,7 @@ from core.catalog_sync import sync_s3_films_to_db
 from core.trailers_util import trailers_from_admin_lines, trailers_from_json_column, trailers_to_watch_urls
 from core.gpu_detect import encoder_dict_for_api
 from core.system_stats import collect_system_stats
+from core.email_policy import validate_viewer_email
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
 from db.models import (
@@ -551,7 +552,14 @@ class CreateUserBody(BaseModel):
 def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(400, "Username exists")
-    if db.query(User).filter(User.email == body.email).first():
+    email_norm, email_err = validate_viewer_email(str(body.email))
+    if email_err or not email_norm:
+        raise HTTPException(status_code=400, detail=email_err or "Adresse e-mail invalide.")
+    if (
+        db.query(User)
+        .filter(func.lower(User.email) == email_norm.lower())
+        .first()
+    ):
         raise HTTPException(400, "Email exists")
     from core.password_policy import validate_password_strength
     from core.security import hash_password
@@ -559,14 +567,14 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
     pw_err = validate_password_strength(
         body.password,
         username=body.username.strip(),
-        email=str(body.email).lower().strip(),
+        email=email_norm.lower(),
     )
     if pw_err:
         raise HTTPException(status_code=400, detail=pw_err)
 
     u = User(
         username=body.username,
-        email=body.email,
+        email=email_norm,
         hashed_password=hash_password(body.password),
         role=body.role,
     )

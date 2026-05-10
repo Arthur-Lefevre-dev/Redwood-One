@@ -6,11 +6,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user
 from api.limits import limiter
 from config import get_settings
+from core.email_policy import validate_viewer_email
 from core.member_invites import invite_month_status, list_member_invites_payload
 from core.password_policy import validate_password_strength
 from core.security import (
@@ -127,20 +129,28 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
 
     if db.query(User).filter(User.username == body.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
-    if db.query(User).filter(User.email == body.email).first():
+
+    email_norm, email_err = validate_viewer_email(str(body.email))
+    if email_err or not email_norm:
+        raise HTTPException(status_code=400, detail=email_err or "Adresse e-mail invalide.")
+    if (
+        db.query(User)
+        .filter(func.lower(User.email) == email_norm.lower())
+        .first()
+    ):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     pw_err = validate_password_strength(
         body.password,
         username=body.username.strip(),
-        email=str(body.email).lower().strip(),
+        email=email_norm.lower(),
     )
     if pw_err:
         raise HTTPException(status_code=400, detail=pw_err)
 
     user = User(
         username=body.username.strip(),
-        email=body.email.lower().strip(),
+        email=email_norm,
         hashed_password=hash_password(body.password),
         role=UserRole.viewer,
         preferences={"favorite_genres": []},
@@ -297,8 +307,13 @@ def patch_me(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    new_email = str(body.email).lower().strip() if body.email is not None else None
-    email_change = new_email is not None and new_email != (user.email or "").lower()
+    new_email: str | None = None
+    if body.email is not None:
+        norm, em_err = validate_viewer_email(str(body.email))
+        if em_err or not norm:
+            raise HTTPException(status_code=400, detail=em_err or "Adresse e-mail invalide.")
+        new_email = norm
+    email_change = new_email is not None and new_email.lower() != (user.email or "").lower()
     pw_change = body.new_password is not None
     if not email_change and not pw_change:
         raise HTTPException(status_code=400, detail="Aucune modification demandée")
@@ -315,7 +330,11 @@ def patch_me(
         if pw_err:
             raise HTTPException(status_code=400, detail=pw_err)
     if email_change:
-        taken = db.query(User).filter(User.email == new_email, User.id != user.id).first()
+        taken = (
+            db.query(User)
+            .filter(func.lower(User.email) == new_email.lower(), User.id != user.id)
+            .first()
+        )
         if taken:
             raise HTTPException(status_code=400, detail="Cette adresse e-mail est déjà utilisée")
         user.email = new_email
