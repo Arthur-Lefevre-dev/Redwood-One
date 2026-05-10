@@ -135,6 +135,16 @@
     let homeLatest = [];
     let homeFeatured = [];
 
+    async function fetchRecentSeriesForHome(limit) {
+      try {
+        return await apiJson('/api/series/recent?limit=' + limit);
+      } catch (e) {
+        // Production may run an older API without GET /api/series/recent (404 Not Found).
+        if (e && e.status === 404) return [];
+        throw e;
+      }
+    }
+
     function renderSeriesSearchCards(container, list) {
       container.innerHTML = '';
       list.forEach((s) => {
@@ -255,7 +265,7 @@
       const [featured, latestFilms, recentSeries] = await Promise.all([
         apiJson('/api/films/featured'),
         apiJson('/api/films/latest?limit=24'),
-        apiJson('/api/series/recent?limit=24'),
+        fetchRecentSeriesForHome(24),
       ]);
       const merged = [];
       latestFilms.forEach((f) => merged.push(Object.assign({ kind: 'film' }, f)));
