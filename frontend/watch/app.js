@@ -168,27 +168,38 @@ function injectWatchMobileNavStyles() {
     .watch-nav-drawer-panel{
       position:absolute;top:0;left:0;bottom:0;width:min(88vw,300px);
       background:#111;border-right:1px solid #333;
-      padding:56px 16px 24px;overflow-y:auto;
+      padding:16px 16px 24px;overflow-y:auto;
       box-shadow:8px 0 40px rgba(0,0,0,.55);
+      display:flex;flex-direction:column;gap:0;
+    }
+    .watch-nav-drawer-head{
+      display:flex;flex-direction:row;align-items:center;justify-content:space-between;
+      gap:12px;flex-shrink:0;padding-bottom:14px;margin-bottom:12px;
+      border-bottom:1px solid #2a2a2a;
+    }
+    .watch-nav-drawer-title{
+      margin:0;padding:0;font-weight:800;font-size:clamp(1.15rem,4vw,1.35rem);
+      letter-spacing:0.02em;line-height:1.15;color:var(--accent,#8B2500);
+      flex:1;min-width:0;
     }
     .watch-nav-drawer-close{
-      position:absolute;top:12px;right:12px;width:40px;height:40px;
+      position:relative;top:auto;right:auto;width:40px;height:40px;flex-shrink:0;
       border-radius:10px;border:1px solid #333;background:#1a1a1a;color:#e5e5e5;
       font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit;
     }
     .watch-nav-drawer-close:hover{border-color:var(--accent,#8B2500);color:#fff}
-    .watch-nav-drawer-links{display:flex;flex-direction:column;gap:4px;padding-top:8px}
+    .watch-nav-drawer-links{display:flex;flex-direction:column;gap:6px;padding-top:0}
     .watch-nav-drawer-links a.watch-nav-drawer-link{
-      display:block;padding:12px 14px;border-radius:10px;color:#e5e5e5;text-decoration:none;font-size:15px;
+      display:block;padding:11px 12px;border-radius:10px;color:#e5e5e5;text-decoration:none;font-size:15px;line-height:1.3;
     }
     .watch-nav-drawer-links a.watch-nav-drawer-link:hover{background:#222;color:#fff}
     .watch-nav-drawer-link--invite{font-weight:600}
     .watch-nav-drawer-links + .watch-nav-drawer-footer{
-      margin-top:16px;padding-top:16px;border-top:1px solid #2a2a2a;
+      margin-top:12px;padding-top:14px;border-top:1px solid #2a2a2a;
     }
     .watch-nav-drawer-footer{
       margin-top:0;padding-top:0;border-top:none;
-      display:flex;flex-direction:column;gap:12px;
+      display:flex;flex-direction:column;gap:10px;
     }
     .watch-nav-drawer-footer .nav-user-wrap{margin:0}
     .watch-nav-drawer-footer .nav-user-name{max-width:min(200px,55vw)!important}
@@ -197,15 +208,22 @@ function injectWatchMobileNavStyles() {
     }
     .watch-nav-drawer-invite{
       display:flex!important;align-items:center;gap:12px;font-weight:600;
+      padding:11px 12px;border-radius:10px;
       color:#e5e5e5!important;text-decoration:none!important;
     }
+    .watch-nav-drawer-invite:hover{background:#222;color:#fff!important}
     .watch-nav-drawer-invite:visited{color:#e5e5e5!important}
     .watch-nav-drawer-admin{
-      font-weight:600;color:#e5e5e5!important;text-decoration:none!important;
+      display:flex!important;align-items:center;gap:12px;font-weight:600;
+      padding:11px 12px;border-radius:10px;
+      color:#e5e5e5!important;text-decoration:none!important;
     }
+    .watch-nav-drawer-admin:hover{background:#222;color:#fff!important}
     .watch-nav-drawer-admin:visited{color:#e5e5e5!important}
     .watch-nav-drawer-invite svg{width:28px;height:28px;flex-shrink:0;display:block;fill:currentColor}
     .watch-nav-drawer-invite-txt{flex:1}
+    .watch-nav-drawer-admin svg{width:28px;height:28px;flex-shrink:0;display:block;fill:currentColor}
+    .watch-nav-drawer-admin-txt{flex:1}
     .watch-nav-drawer-footer .nav-user-menu{z-index:410}
     #watch-nav-drawer-admin[hidden]{display:none!important}
   `;
@@ -281,7 +299,7 @@ function upgradeWatchNavForMobile() {
   drawer.hidden = true;
   drawer.setAttribute('role', 'dialog');
   drawer.setAttribute('aria-modal', 'true');
-  drawer.setAttribute('aria-label', 'Menu de navigation');
+  drawer.setAttribute('aria-labelledby', 'watch-nav-drawer-title');
 
   const backdrop = document.createElement('div');
   backdrop.className = 'watch-nav-drawer-backdrop';
@@ -295,6 +313,16 @@ function upgradeWatchNavForMobile() {
   closeBtn.className = 'watch-nav-drawer-close';
   closeBtn.setAttribute('aria-label', 'Fermer le menu');
   closeBtn.innerHTML = '&times;';
+
+  const head = document.createElement('div');
+  head.className = 'watch-nav-drawer-head';
+  const titleEl = document.createElement('p');
+  titleEl.className = 'watch-nav-drawer-title';
+  titleEl.id = 'watch-nav-drawer-title';
+  const brandA = nav.querySelector('a.brand');
+  titleEl.textContent = (brandA && brandA.textContent && brandA.textContent.trim()) || 'Redwood Plus';
+  head.appendChild(titleEl);
+  head.appendChild(closeBtn);
 
   let linksWrap = null;
   const primaryEl = nav.querySelector('.nav-primary-links');
@@ -329,11 +357,13 @@ function upgradeWatchNavForMobile() {
   adminA.id = 'watch-nav-drawer-admin';
   adminA.href = '/admin/';
   adminA.className = 'watch-nav-drawer-link watch-nav-drawer-admin';
-  adminA.textContent = 'Administration';
+  adminA.setAttribute('aria-label', 'Administration');
+  adminA.innerHTML =
+    watchNavDrawerAdminIconSvg() + '<span class="watch-nav-drawer-admin-txt">Administration</span>';
   adminA.hidden = true;
   footer.appendChild(adminA);
 
-  panel.appendChild(closeBtn);
+  panel.appendChild(head);
   if (linksWrap) panel.appendChild(linksWrap);
   panel.appendChild(footer);
   drawer.appendChild(backdrop);
@@ -656,6 +686,11 @@ async function initViewerAnnouncement() {
     host.hidden = true;
     host.innerHTML = '';
   }
+}
+
+/** SVG for admin shortcut in the mobile drawer (aligns with Invitations row). */
+function watchNavDrawerAdminIconSvg() {
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>';
 }
 
 /** SVG icon for member invitations (injected into .nav-invite-link anchors). */
