@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Invitations — Redwood Plus</title>
+  <style>
+    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; --card:#111; --border:#2a2a2a; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
+    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem);transition:color .2s ease}
+    @keyframes brand-neon-flicker{
+      0%,100%{color:#fecaca;text-shadow:0 0 6px rgba(252,165,165,.9),0 0 14px rgba(139,37,0,.75),0 0 26px rgba(139,37,0,.38)}
+      6%{color:#fca5a5;text-shadow:0 0 2px rgba(252,165,165,.35),0 0 6px rgba(139,37,0,.22)}
+      8%{color:#fff7ed;text-shadow:0 0 10px rgba(254,243,199,.55),0 0 22px rgba(252,165,165,.88),0 0 34px rgba(139,37,0,.5)}
+      11%{color:#fecaca;text-shadow:0 0 5px rgba(252,165,165,.55),0 0 12px rgba(139,37,0,.4)}
+      51%{color:#fecaca;text-shadow:0 0 8px rgba(252,165,165,.85),0 0 18px rgba(139,37,0,.62)}
+      53%{color:var(--accent);text-shadow:none}
+      55%{color:#fecaca;text-shadow:0 0 12px rgba(252,165,165,.92),0 0 24px rgba(139,37,0,.58)}
+    }
+    a.brand:hover{color:#fecaca;animation:brand-neon-flicker 2.4s ease-in-out infinite}
+    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
+    nav a:hover{color:#fff}
+    nav a.nav-active{color:#fecaca;font-weight:600}
+    main{max-width:720px;margin:0 auto;padding:28px 24px 48px}
+    h1{font-size:1.35rem;margin-bottom:8px}
+    .lead{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.55}
+    .identity{font-size:14px;color:#ccc;margin-bottom:20px}
+    .identity strong{color:#fff}
+    .quota-card{
+      background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:22px;
+    }
+    .quota-card h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
+    .quota-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+    .quota-top span{font-size:13px;color:var(--muted)}
+    .quota-top strong{font-size:1.1rem;font-variant-numeric:tabular-nums;color:#fecaca}
+    .quota-bar{
+      height:10px;border-radius:999px;background:#1f1f1f;overflow:hidden;border:1px solid #333;
+    }
+    .quota-fill{
+      height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#c94a1a);
+      width:0%;transition:width .35s ease;
+    }
+    .quota-hint{font-size:13px;color:var(--muted);margin-top:12px;line-height:1.5}
+    .quota-meta{font-size:13px;color:#aaa;margin-top:14px;padding-top:14px;border-top:1px solid #2a2a2a}
+    .quota-meta strong{color:#e5e5e5}
+    section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px}
+    section h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:8px;
+      border:1px solid var(--accent);background:rgba(139,37,0,.25);color:#fecaca;font-size:14px;font-weight:600;
+      cursor:pointer;font-family:inherit;margin-top:4px;
+    }
+    .btn:hover{background:rgba(139,37,0,.4);color:#fff}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .btn-secondary{border-color:#444;background:#1a1a1a;color:#ddd}
+    .btn-secondary:hover{border-color:#666;color:#fff;background:#222}
+    .code-box{
+      margin-top:12px;padding:12px 14px;border-radius:10px;background:#0a0a0a;border:1px dashed #444;
+      font-family:ui-monospace,monospace;font-size:15px;letter-spacing:.06em;word-break:break-all;color:#fecaca;
+    }
+    .row-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center}
+    .invite-history-title{font-size:13px;color:#aaa;margin:22px 0 10px;font-weight:600}
+    .invite-table-wrap{overflow-x:auto;margin-top:8px;border-radius:10px;border:1px solid #333;background:#0d0d0d}
+    .invite-table{width:100%;border-collapse:collapse;font-size:13px}
+    .invite-table th,.invite-table td{padding:10px 12px;text-align:left;border-bottom:1px solid #2a2a2a;vertical-align:middle}
+    .invite-table tr:last-child td{border-bottom:none}
+    .invite-table th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+    .invite-table td.mono{font-family:ui-monospace,monospace;color:#fecaca;word-break:break-all}
+    .invite-table .btn-tiny{padding:6px 10px;font-size:12px;margin:0}
+    .badge{font-size:11px;padding:3px 8px;border-radius:999px;font-weight:600;white-space:nowrap}
+    .badge-ok{background:rgba(34,197,94,.15);color:#86efac}
+    .badge-warn{background:rgba(234,179,8,.12);color:#facc15}
+    .badge-off{background:#2a2a2a;color:#888}
+    .msg.err{color:#f87171;font-size:13px;margin-top:10px;line-height:1.45;display:none}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/watch/">Redwood Plus</a>
+    <div class="nav-end">
+      <a href="/watch/">Accueil</a>
+      <a href="/watch/films.html">Films</a>
+      <a href="/watch/serie.html">Séries</a>
+      <a href="/watch/categories.html">Catégories</a>
+      <a href="/watch/pick.html">Choisir pour moi</a>
+      <a href="/watch/invitations.html" class="nav-active">Invitations</a>
+      <div class="nav-user-wrap" id="nav-user-wrap">
+        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
+          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
+          <span class="nav-user-name" id="nav-user-name">…</span>
+        </button>
+        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+  <main>
+    <h1>Invitations</h1>
+    <p class="lead">Invitez une personne à créer un compte viewer avec un code à usage limité. Règle : <strong>une invitation par mois calendaire (UTC)</strong> par compte.</p>
+    <p class="identity" id="identity-line" hidden>Connecté en tant que <strong id="id-user"></strong></p>
+
+    <div class="quota-card">
+      <h2>Votre quota ce mois-ci</h2>
+      <div class="quota-top">
+        <span>Invitations créées / maximum (UTC)</span>
+        <strong id="quota-fraction">— / —</strong>
+      </div>
+      <div class="quota-bar" id="quota-bar" role="progressbar" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="Quota mensuel d’invitations">
+        <div class="quota-fill" id="quota-fill"></div>
+      </div>
+      <p class="quota-hint" id="quota-hint"></p>
+      <p class="quota-meta">Codes générés au total (historique affiché ci-dessous) : <strong id="total-codes">0</strong></p>
+    </div>
+
+    <section>
+      <h2>Nouveau code</h2>
+      <p class="hint" id="invite-hint"></p>
+      <button type="button" class="btn" id="btn-invite" hidden>Générer un code d’invitation</button>
+      <div id="invite-result" hidden>
+        <p class="hint">Transmettez ce code à la personne invitée. Elle pourra l’utiliser sur la page d’inscription.</p>
+        <div class="code-box" id="invite-code-display"></div>
+        <div class="row-actions">
+          <button type="button" class="btn btn-secondary" id="btn-copy">Copier le code</button>
+        </div>
+      </div>
+      <p class="msg err" id="msg-invite"></p>
+    </section>
+
+    <section>
+      <h2>Historique de vos codes</h2>
+      <p class="hint" id="invite-history-empty">Aucun code généré pour l’instant.</p>
+      <div class="invite-table-wrap" id="invite-history-wrap" hidden>
+        <table class="invite-table" aria-label="Historique des codes d’invitation">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Créé le</th>
+              <th>Utilisations</th>
+              <th>Statut</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="invite-history-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="/watch/app.js"></script>
+  <script>
+    function formatNextInvite(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'UTC' }) + ' (UTC)';
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    function monthUsedAndQuota(inv) {
+      const quota = typeof inv.invite_quota_per_month === 'number' ? inv.invite_quota_per_month : 1;
+      let used = inv.invites_created_this_month;
+      if (typeof used !== 'number') {
+        used = inv.can_invite_this_month ? 0 : quota;
+      }
+      used = Math.max(0, Math.min(used, quota));
+      return { used, quota };
+    }
+
+    function updateQuotaBar(inv, totalHistory) {
+      const { used, quota } = monthUsedAndQuota(inv || {});
+      const frac = document.getElementById('quota-fraction');
+      const fill = document.getElementById('quota-fill');
+      const bar = document.getElementById('quota-bar');
+      const hint = document.getElementById('quota-hint');
+      const totalEl = document.getElementById('total-codes');
+      if (totalEl) totalEl.textContent = String(totalHistory);
+      if (!inv || typeof inv.can_invite_this_month === 'undefined') {
+        if (frac) frac.textContent = '— / —';
+        if (fill) fill.style.width = '0%';
+        if (bar) { bar.setAttribute('aria-valuemax', '1'); bar.setAttribute('aria-valuenow', '0'); }
+        if (hint) hint.textContent = '';
+        return;
+      }
+      if (frac) frac.textContent = used + ' / ' + quota;
+      const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+      if (fill) fill.style.width = pct + '%';
+      if (bar) {
+        bar.setAttribute('aria-valuemax', String(quota));
+        bar.setAttribute('aria-valuenow', String(used));
+      }
+      if (hint) {
+        if (inv.can_invite_this_month) {
+          hint.textContent = 'Vous pouvez encore créer ' + (quota - used) + ' invitation(s) ce mois-ci.';
+        } else {
+          const when = formatNextInvite(inv.next_invite_at);
+          hint.textContent = when
+            ? 'Quota mensuel atteint. Prochain créneau à partir du : ' + when
+            : 'Quota mensuel atteint.';
+        }
+      }
+    }
+
+    function applyInviteUi(inv) {
+      const hint = document.getElementById('invite-hint');
+      const btn = document.getElementById('btn-invite');
+      const res = document.getElementById('invite-result');
+      if (!inv || typeof inv.can_invite_this_month === 'undefined') {
+        if (hint) hint.textContent = '';
+        if (btn) btn.hidden = true;
+        return;
+      }
+      if (inv.can_invite_this_month) {
+        if (hint) hint.textContent = 'Vous pouvez générer une nouvelle invitation pour ce mois-ci.';
+        if (btn) btn.hidden = false;
+      } else {
+        const when = formatNextInvite(inv.next_invite_at);
+        if (hint) {
+          hint.textContent = when
+            ? 'Limite atteinte pour ce mois. Prochain créneau à partir du : ' + when
+            : 'Limite atteinte pour ce mois.';
+        }
+        if (btn) btn.hidden = true;
+      }
+      if (!inv.can_invite_this_month && res) res.hidden = true;
+    }
+
+    let lastCode = '';
+
+    function formatInviteDate(iso) {
+      if (!iso) return '—';
+      try {
+        return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      } catch (_) {
+        return iso;
+      }
+    }
+
+    function inviteStatusLabel(row) {
+      if (row.usable) return { text: 'Utilisable', cls: 'badge-ok' };
+      if (row.expires_at) {
+        try {
+          if (new Date(row.expires_at) <= new Date()) return { text: 'Expiré', cls: 'badge-off' };
+        } catch (_) {}
+      }
+      if (row.uses >= row.max_uses) return { text: 'Utilisé', cls: 'badge-warn' };
+      return { text: 'Inutilisable', cls: 'badge-off' };
+    }
+
+    async function copyCode(code) {
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    }
+
+    function renderInviteHistory(me) {
+      const list = Array.isArray(me.my_invites) ? me.my_invites : [];
+      const emptyEl = document.getElementById('invite-history-empty');
+      const wrap = document.getElementById('invite-history-wrap');
+      const body = document.getElementById('invite-history-body');
+      body.innerHTML = '';
+      updateQuotaBar(me.invite, list.length);
+      if (!list.length) {
+        emptyEl.hidden = false;
+        wrap.hidden = true;
+        return;
+      }
+      emptyEl.hidden = true;
+      wrap.hidden = false;
+      list.forEach((row) => {
+        const st = inviteStatusLabel(row);
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="mono">' +
+          watchEscapeHtml(row.code) +
+          '</td><td>' +
+          watchEscapeHtml(formatInviteDate(row.created_at)) +
+          '</td><td>' +
+          watchEscapeHtml(String(row.uses) + ' / ' + String(row.max_uses)) +
+          '</td><td><span class="badge ' +
+          st.cls +
+          '">' +
+          watchEscapeHtml(st.text) +
+          '</span></td><td></td>';
+        const tdBtn = tr.querySelector('td:last-child');
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-secondary btn-tiny';
+        b.textContent = 'Copier';
+        b.addEventListener('click', () => copyCode(row.code));
+        tdBtn.appendChild(b);
+        body.appendChild(tr);
+      });
+    }
+
+    async function loadMe() {
+      const me = await apiJson('/api/auth/me');
+      document.getElementById('id-user').textContent = me.username;
+      document.getElementById('identity-line').hidden = false;
+      applyInviteUi(me.invite);
+      renderInviteHistory(me);
+      return me;
+    }
+
+    document.getElementById('btn-invite').addEventListener('click', async () => {
+      const errEl = document.getElementById('msg-invite');
+      errEl.style.display = 'none';
+      try {
+        const data = await apiJson('/api/auth/member-invite', { method: 'POST' });
+        lastCode = data.code || '';
+        document.getElementById('invite-code-display').textContent = lastCode;
+        document.getElementById('invite-result').hidden = false;
+        applyInviteUi(data.invite);
+        if (Array.isArray(data.my_invites)) renderInviteHistory({ my_invites: data.my_invites, invite: data.invite });
+        else await loadMe();
+      } catch (err) {
+        errEl.textContent = err.message || String(err);
+        errEl.style.display = 'block';
+      }
+    });
+
+    document.getElementById('btn-copy').addEventListener('click', async () => {
+      if (!lastCode) return;
+      try {
+        await navigator.clipboard.writeText(lastCode);
+      } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = lastCode;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      const b = document.getElementById('btn-copy');
+      const prev = b.textContent;
+      b.textContent = 'Copié !';
+      setTimeout(() => { b.textContent = prev; }, 1600);
+    });
+
+    loadMe().catch((e) => {
+      if (e && e.message === '401') { window.location.href = '/login.html'; return; }
+      console.error(e);
+      alert('Impossible de charger le profil : ' + (e.message || e));
+      window.location.href = '/watch/';
+    });
+  </script>
+</body>
+</html>

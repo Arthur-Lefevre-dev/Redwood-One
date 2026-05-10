@@ -78,18 +78,33 @@ def member_invites_this_month_count(db: Session, user: User) -> int:
     )
 
 
+INVITE_QUOTA_PER_MONTH = 1
+
+
 def invite_month_status(db: Session, user: User) -> Dict[str, Any]:
     """One invite per calendar month (UTC), from invitation_codes rows."""
     n = member_invites_this_month_count(db, user)
-    if n < 1:
-        return {"can_invite_this_month": True, "next_invite_at": None}
+    base = {
+        "invites_created_this_month": n,
+        "invite_quota_per_month": INVITE_QUOTA_PER_MONTH,
+    }
+    if n < INVITE_QUOTA_PER_MONTH:
+        return {
+            **base,
+            "can_invite_this_month": True,
+            "next_invite_at": None,
+        }
     now = datetime.now(timezone.utc)
     if now.month == 12:
         y, m = now.year + 1, 1
     else:
         y, m = now.year, now.month + 1
     next_start = datetime(y, m, 1, tzinfo=timezone.utc)
-    return {"can_invite_this_month": False, "next_invite_at": next_start.isoformat()}
+    return {
+        **base,
+        "can_invite_this_month": False,
+        "next_invite_at": next_start.isoformat(),
+    }
 
 
 def reset_member_invite_quota_current_month(db: Session, user: User) -> int:
