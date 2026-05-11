@@ -147,6 +147,54 @@ def _ensure_user_deactivated_at_column() -> None:
     logger.info("database schema: ensured users.deactivated_at (sqlite)")
 
 
+def _ensure_films_pipeline_celery_columns() -> None:
+    """Track active Celery task id + kind for admin pipeline cancel."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS pipeline_celery_task_id VARCHAR(64)")
+            )
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS pipeline_celery_task_kind VARCHAR(32)")
+            )
+        logger.info("database schema: ensured films pipeline Celery columns (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    with engine.begin() as conn:
+        if "pipeline_celery_task_id" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN pipeline_celery_task_id VARCHAR(64)"))
+        if "pipeline_celery_task_kind" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN pipeline_celery_task_kind VARCHAR(32)"))
+    logger.info("database schema: ensured films pipeline Celery columns (sqlite)")
+
+
+def _ensure_films_transcode_target_columns() -> None:
+    """Torrent routing: local worker vs Vast GPU after download."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS transcode_target VARCHAR(16)")
+            )
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS vast_offer_id INTEGER")
+            )
+        logger.info("database schema: ensured films.transcode_target / vast_offer_id (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    with engine.begin() as conn:
+        if "transcode_target" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN transcode_target VARCHAR(16)"))
+        if "vast_offer_id" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN vast_offer_id INTEGER"))
+    logger.info("database schema: ensured films.transcode_target / vast_offer_id (sqlite)")
+
+
 def _ensure_films_imdb_title_id_column() -> None:
     """Optional IMDb id for imdbapi.dev enrichment."""
     if engine.dialect.name == "postgresql":
@@ -470,6 +518,8 @@ def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
     _ensure_films_trailer_columns()
+    _ensure_films_transcode_target_columns()
+    _ensure_films_pipeline_celery_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
     _ensure_user_deactivated_at_column()

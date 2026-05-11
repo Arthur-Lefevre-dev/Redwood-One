@@ -151,6 +151,13 @@ class Film(Base):
     pipeline_progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # Live BitTorrent stats while aria2 downloads (seeders, leechers, bps, …)
     torrent_stats: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    # After torrent download: "local" = worker ffmpeg pipeline; "vast" = S3 + Vast GPU transcode then finalize to library.
+    transcode_target: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    # When transcode_target is vast: optional Vast offer id (same as admin upload Vast field).
+    vast_offer_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Active Celery task for admin cancel (download / local encode / Vast transcode).
+    pipeline_celery_task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    pipeline_celery_task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     # Series: one row per episode; films keep content_kind=film and null series_* fields
     content_kind: Mapped[ContentKind] = mapped_column(
         Enum(ContentKind, values_callable=lambda x: [e.value for e in x]),

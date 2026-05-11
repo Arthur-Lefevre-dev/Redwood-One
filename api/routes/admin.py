@@ -5,13 +5,14 @@ import logging
 import os
 import re
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
-from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import String, cast, func, or_
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from sqlalchemy import String, case, cast, func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
@@ -28,11 +29,14 @@ from core.donation_campaign import RECURRENCE_NONE, normalize_recurrence
 from core.donation_service import compute_donation_snapshot
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
+from core.s3 import upload_file
+from core.vast_transcode_cancel import cancel_vast_transcode_test, store_job_envelope
 from db.models import (
     ContentKind,
     Film,
     FilmSource,
     FilmStatut,
+    FilmTraitement,
     InvitationCode,
     SeriesSeasonMeta,
     SeriesShowMeta,
@@ -41,11 +45,31 @@ from db.models import (
     ViewerRank,
 )
 from db.session import get_db
-from worker.tasks import download_torrent_task, process_film_task
+from worker.tasks import download_torrent_task, process_film_task, vast_transcode_test_task
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _parse_torrent_transcode_target(raw: Optional[str]) -> str:
+    v = (raw or "local").lower().strip()
+    if v not in ("local", "vast"):
+        raise HTTPException(400, "transcode_target doit être local ou vast")
+    return v
+
+
+def _parse_optional_positive_int_form(raw: Optional[str]) -> Optional[int]:
+    if raw is None:
+        return None
+    t = str(raw).strip()
+    if not t:
+        return None
+    try:
+        n = int(t)
+    except ValueError:
+        return None
+    return n if n > 0 else None
 
 
 def _viewer_rank_for_new_viewer(value: Optional[str]) -> str:
@@ -84,7 +108,12 @@ def _parse_upload_content_kind(raw: Optional[str]) -> ContentKind:
 def _enqueue_process_film_or_raise(film_id: int, local_path: str, db: Session) -> None:
     """Queue Celery pipeline; on broker failure, remove temp file and mark film failed."""
     try:
-        process_film_task.delay(film_id, local_path)
+        async_res = process_film_task.delay(film_id, local_path)
+        row = db.get(Film, film_id)
+        if row:
+            row.pipeline_celery_task_id = async_res.id
+            row.pipeline_celery_task_kind = "process_film"
+            db.commit()
     except Exception:
         logger.exception(
             "enqueue process_film_task failed (Redis/Celery?). film_id=%s",
@@ -119,7 +148,12 @@ def _enqueue_download_torrent_or_raise(
     torrent_b64: Optional[str] = None,
 ) -> None:
     try:
-        download_torrent_task.delay(film_id, magnet, torrent_b64)
+        async_res = download_torrent_task.delay(film_id, magnet, torrent_b64)
+        row = db.get(Film, film_id)
+        if row:
+            row.pipeline_celery_task_id = async_res.id
+            row.pipeline_celery_task_kind = "download_torrent"
+            db.commit()
     except Exception:
         logger.exception(
             "enqueue download_torrent_task failed (Redis/Celery?). film_id=%s",
@@ -263,6 +297,55 @@ def _film_to_admin_detail(f: Film) -> dict[str, Any]:
         "season_number": f.season_number,
         "episode_number": f.episode_number,
         "trailers_manual_lines": trailers_to_watch_urls(trailers_from_json_column(f.trailers_manual)),
+    }
+
+
+def _estimated_gpu_rental_usd(duree_min: Optional[int], dph_usd: float) -> Optional[float]:
+    """Rough Vast-style rental hint: title duration (hours) × max $/h from settings."""
+    if duree_min is None or int(duree_min) <= 0:
+        return None
+    hours = float(duree_min) / 60.0
+    return round(hours * float(dph_usd), 4)
+
+
+@router.get("/films/{film_id}/processing-state")
+def admin_film_processing_state(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Live pipeline fields for admin « Sur la machine » UI (progress, stream URL, cost hint).
+    """
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film not found")
+    s = get_settings()
+    dph = float(s.VAST_MAX_DPH_PER_HOUR)
+    pct = int(f.pipeline_progress or 0)
+    if f.statut == FilmStatut.en_cours and pct <= 0:
+        pct = 1
+    return {
+        "id": f.id,
+        "titre": f.titre,
+        "statut": f.statut.value,
+        "traitement": f.traitement.value if f.traitement else None,
+        "pipeline_progress": pct,
+        "duree_min": f.duree_min,
+        "codec_video": f.codec_video,
+        "codec_audio": f.codec_audio,
+        "resolution": f.resolution,
+        "taille_octets": f.taille_octets,
+        "bitrate_kbps": f.bitrate_kbps,
+        "url_streaming": f.url_streaming if f.statut == FilmStatut.disponible else None,
+        "erreur_message": f.erreur_message if f.statut == FilmStatut.erreur else None,
+        "estimated_gpu_rental_usd": _estimated_gpu_rental_usd(f.duree_min, dph),
+        "pricing_dph_usd": dph,
+        "pricing_note_fr": (
+            "Estimation indicative : durée du titre × VAST_MAX_DPH_PER_HOUR "
+            "(location GPU type Vast). Ce n’est pas une facture ; le transcodage "
+            "réel tourne sur votre worker local."
+        ),
     }
 
 
@@ -439,6 +522,16 @@ async def admin_upload(
 class TorrentMagnetBody(BaseModel):
     magnet: str
     content_kind: ContentKind = ContentKind.film
+    transcode_target: str = "local"
+    vast_offer_id: Optional[int] = None
+
+    @field_validator("transcode_target")
+    @classmethod
+    def _validate_transcode_target(cls, v: str) -> str:
+        s = (v or "local").lower().strip()
+        if s not in ("local", "vast"):
+            raise ValueError("transcode_target must be local or vast")
+        return s
 
 
 @router.post("/torrents")
@@ -449,12 +542,21 @@ def admin_torrent_magnet(
 ):
     if not body.magnet.startswith("magnet:?"):
         raise HTTPException(400, "Invalid magnet link")
+    s = get_settings()
+    if body.transcode_target == "vast" and not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY requise pour enchaîner torrent → transcodage Vast.",
+        )
+    vast_oid = body.vast_offer_id if body.vast_offer_id and body.vast_offer_id > 0 else None
     film = Film(
         titre="Torrent",
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
         content_kind=body.content_kind,
+        transcode_target=body.transcode_target,
+        vast_offer_id=vast_oid if body.transcode_target == "vast" else None,
     )
     db.add(film)
     db.commit()
@@ -467,19 +569,31 @@ def admin_torrent_magnet(
 async def admin_torrent_file(
     torrent: UploadFile = File(...),
     content_kind: str = Form("film"),
+    transcode_target: str = Form("local"),
+    vast_offer_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     if not torrent.filename or not torrent.filename.lower().endswith(".torrent"):
         raise HTTPException(400, "Expected .torrent file")
+    tt = _parse_torrent_transcode_target(transcode_target)
+    s = get_settings()
+    if tt == "vast" and not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY requise pour enchaîner torrent → transcodage Vast.",
+        )
     data = await torrent.read()
     ck = _parse_upload_content_kind(content_kind)
+    v_oid = _parse_optional_positive_int_form(vast_offer_id) if tt == "vast" else None
     film = Film(
         titre=Path(torrent.filename).stem,
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
         content_kind=ck,
+        transcode_target=tt,
+        vast_offer_id=v_oid,
     )
     db.add(film)
     db.commit()
@@ -666,9 +780,236 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
                 "erreur_message": f.erreur_message,
                 "source": f.source.value,
                 "torrent_stats": f.torrent_stats,
+                "transcode_target": getattr(f, "transcode_target", None) or "local",
+                "celery_task_id": getattr(f, "pipeline_celery_task_id", None),
+                "celery_task_kind": getattr(f, "pipeline_celery_task_kind", None),
             }
         )
     return {"items": out}
+
+
+@router.post("/queue/jobs/{film_id}/cancel")
+def admin_cancel_pipeline_job(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Revoke the worker's active Celery task for this film (torrent download, local encode, or Vast transcode)."""
+    from worker.tasks import app as celery_app
+
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film introuvable")
+    if f.statut != FilmStatut.en_cours:
+        raise HTTPException(
+            status_code=409,
+            detail="Seuls les films en cours peuvent être annulés depuis la file.",
+        )
+    tid = (getattr(f, "pipeline_celery_task_id", None) or "").strip()
+    kind = (getattr(f, "pipeline_celery_task_kind", None) or "").strip()
+    if not tid:
+        raise HTTPException(
+            status_code=409,
+            detail="Aucune tâche Celery n’est encore enregistrée pour ce film. Réessayez après rafraîchissement.",
+        )
+    try:
+        if kind == "vast_transcode":
+            s = get_settings()
+            if not (s.VAST_API_KEY or "").strip():
+                raise HTTPException(
+                    status_code=503,
+                    detail="VAST_API_KEY requise pour annuler le transcodage Vast.",
+                )
+            cancel_vast_transcode_test(celery_app, tid)
+        else:
+            celery_app.control.revoke(tid, terminate=True, signal="SIGTERM")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_cancel_pipeline_job film_id=%s", film_id)
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+
+    f.statut = FilmStatut.erreur
+    f.erreur_message = "Annulé par l’administrateur."[:8000]
+    f.pipeline_celery_task_id = None
+    f.pipeline_celery_task_kind = None
+    f.torrent_stats = None
+    f.pipeline_progress = None
+    db.commit()
+    return {"ok": True, "film_id": film_id}
+
+
+def _month_bucket_expr(column, dialect_name: str):
+    if dialect_name == "postgresql":
+        return func.date_trunc("month", column)
+    return func.strftime("%Y-%m", column)
+
+
+def _monthly_counts(db: Session, column, since: datetime) -> List[Dict[str, Any]]:
+    dialect = db.get_bind().dialect.name
+    bucket = _month_bucket_expr(column, dialect)
+    rows = (
+        db.query(bucket, func.count(1))
+        .filter(column.isnot(None), column >= since)
+        .group_by(bucket)
+        .order_by(bucket)
+        .all()
+    )
+    out: List[Dict[str, Any]] = []
+    for b, cnt in rows:
+        if b is None:
+            continue
+        if dialect == "postgresql":
+            try:
+                label = b.date().isoformat()[:7]  # type: ignore[union-attr]
+            except Exception:
+                label = str(b)[:7]
+        else:
+            label = str(b)[:7]
+        out.append({"month": label, "count": int(cnt)})
+    return out
+
+
+@router.get("/statistics/overview")
+def admin_statistics_overview(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    months: int = Query(12, ge=1, le=36, description="Months of history for time series."),
+):
+    """
+    Aggregated metrics for the admin dashboard: users, films, storage (catalog taille_octets),
+    Vast-related counts and a rough spend upper bound from settings (not live Vast billing).
+    """
+    s = get_settings()
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=32 * months)
+
+    total_users = int(db.query(func.count(User.id)).scalar() or 0)
+    active_users = int(
+        db.query(func.count(User.id)).filter(User.is_active.is_(True)).scalar() or 0
+    )
+    admins_count = int(db.query(func.count(User.id)).filter(User.role == UserRole.admin).scalar() or 0)
+    viewers_count = int(db.query(func.count(User.id)).filter(User.role == UserRole.viewer).scalar() or 0)
+
+    total_films = int(db.query(func.count(Film.id)).scalar() or 0)
+    ok = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.disponible).scalar() or 0)
+    err = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.erreur).scalar() or 0)
+    pending = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.en_cours).scalar() or 0)
+
+    films_feature = int(
+        db.query(func.count(Film.id)).filter(Film.content_kind == ContentKind.film).scalar() or 0
+    )
+    episodes = int(
+        db.query(func.count(Film.id)).filter(Film.content_kind == ContentKind.series_episode).scalar() or 0
+    )
+
+    by_source: dict[str, int] = {}
+    for src, n in db.query(Film.source, func.count(Film.id)).group_by(Film.source).all():
+        key = getattr(src, "value", str(src))
+        by_source[key] = int(n)
+
+    trait_label = case(
+        (Film.traitement == FilmTraitement.direct, "direct"),
+        (Film.traitement == FilmTraitement.optimise, "optimise"),
+        (Film.traitement == FilmTraitement.transcode, "transcode"),
+        else_="unknown",
+    )
+    by_traitement: dict[str, int] = {}
+    for lab, n in db.query(trait_label, func.count(Film.id)).group_by(trait_label).all():
+        by_traitement[str(lab)] = int(n)
+
+    sum_bytes_row = (
+        db.query(func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+        )
+        .scalar()
+    )
+    total_bytes = int(sum_bytes_row or 0)
+    sized_count = int(
+        db.query(func.count(Film.id))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+        )
+        .scalar()
+        or 0
+    )
+    total_gb = round(total_bytes / (1024.0**3), 3) if total_bytes else 0.0
+
+    vast_target = int(
+        db.query(func.count(Film.id))
+        .filter(Film.transcode_target == "vast")
+        .scalar()
+        or 0
+    )
+    vast_done = int(
+        db.query(func.count(Film.id))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+        or 0
+    )
+    dph_cap = float(s.VAST_MAX_DPH_PER_HOUR)
+    minutes_sum_row = (
+        db.query(func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+    )
+    total_minutes_vast_done = int(minutes_sum_row or 0)
+    est_hours = total_minutes_vast_done / 60.0
+    est_usd_upper = round(est_hours * dph_cap, 4) if vast_done else 0.0
+
+    invites_total = int(db.query(func.count(InvitationCode.id)).scalar() or 0)
+    invites_uses = int(db.query(func.coalesce(func.sum(InvitationCode.uses), 0)).scalar() or 0)
+
+    films_by_month = _monthly_counts(db, Film.date_ajout, since)
+    users_by_month = _monthly_counts(db, User.date_creation, since)
+
+    return {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "users": {
+            "total": total_users,
+            "active": active_users,
+            "inactive": max(0, total_users - active_users),
+            "admins": admins_count,
+            "viewers": viewers_count,
+        },
+        "films": {
+            "total": total_films,
+            "disponible": ok,
+            "en_cours": pending,
+            "erreur": err,
+            "feature_films": films_feature,
+            "series_episodes": episodes,
+            "by_source": by_source,
+            "by_traitement": by_traitement,
+        },
+        "storage": {
+            "total_bytes": total_bytes,
+            "total_gb": total_gb,
+            "disponible_with_size_count": sized_count,
+            "note": "Somme des taille_octets des contenus disponibles (métadonnées catalogue, pas un audit S3 byte-par-byte).",
+        },
+        "vast": {
+            "films_transcode_target_vast": vast_target,
+            "films_vast_disponible": vast_done,
+            "estimated_gpu_hours_from_film_duration": round(est_hours, 2),
+            "estimated_rental_usd_upper_bound": est_usd_upper,
+            "pricing_dph_usd_assumption": dph_cap,
+            "disclaimer": (
+                "Estimation indicative : durée des titres (duree_min) × VAST_MAX_DPH_PER_HOUR. "
+                "La facturation réelle Vast.ai dépend des offres, du temps réel de VM et du trafic."
+            ),
+        },
+        "invites": {"codes_total": invites_total, "uses_total": invites_uses},
+        "timeseries": {
+            "months": months,
+            "films_added_by_month": films_by_month,
+            "users_registered_by_month": users_by_month,
+        },
+    }
 
 
 @router.get("/system/stats")
@@ -1278,3 +1619,366 @@ def admin_refresh_donation_balances(
     row.updated_at = datetime.utcnow()
     db.commit()
     return {"ok": True, "snapshot": snap}
+
+
+@router.get("/vast/status")
+def admin_vast_status(_: User = Depends(require_admin)):
+    """Whether Vast.ai API key is configured (never return the key)."""
+    s = get_settings()
+    key_set = bool((getattr(s, "VAST_API_KEY", None) or "").strip())
+    return {
+        "configured": key_set,
+        "api_base_url": (getattr(s, "VAST_API_BASE_URL", None) or "").strip()
+        or "https://console.vast.ai/api/v0",
+    }
+
+
+@router.get("/vast/offers")
+def admin_vast_offers(
+    gpu: Optional[str] = Query(
+        None,
+        description="GPU names comma-separated; defaults to VAST_DEFAULT_GPU_NAMES from env.",
+    ),
+    limit: int = Query(8, ge=1, le=25),
+    max_dph: Optional[float] = Query(
+        None,
+        ge=0.001,
+        le=500.0,
+        description="Override VAST_MAX_DPH_PER_HOUR ($/h, dph_total lte).",
+    ),
+    max_bandwidth_usd_per_tb: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=500.0,
+        description="Override VAST_MAX_BANDWIDTH_USD_PER_TB; 0 = no inet cost cap in query.",
+    ),
+    verified_only: bool = Query(
+        True,
+        description="Si true, ne retourne que les offres explicitement vérifiées (verified ≠ false).",
+    ),
+    min_inet_down_mbps: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=20000.0,
+        description="Débit descendant min. (Mb/s, API Vast). Omis = env VAST_MIN_INET_DOWN_MBPS ; 0 = sans filtre.",
+    ),
+    min_inet_up_mbps: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=20000.0,
+        description="Débit montant min. (Mb/s). Omis = env VAST_MIN_INET_UP_MBPS ; 0 = sans filtre.",
+    ),
+    _: User = Depends(require_admin),
+):
+    """Search rentable GPU offers on Vast.ai (test / ops). Requires VAST_API_KEY."""
+    from core import vast_ai
+
+    if not (get_settings().VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée. Voir docker/env.example.",
+        )
+    names = (
+        [x.strip() for x in (gpu or "").split(",") if x.strip()]
+        if (gpu or "").strip()
+        else vast_ai.default_gpu_name_list()
+    )
+    if not names:
+        raise HTTPException(status_code=400, detail="Aucun nom de GPU à rechercher.")
+    try:
+        rows = vast_ai.search_offers(
+            names,
+            limit=limit,
+            max_dph_per_hour=max_dph,
+            max_bandwidth_usd_per_tb=max_bandwidth_usd_per_tb,
+            verified=True,
+            min_inet_down_mbps=min_inet_down_mbps,
+            min_inet_up_mbps=min_inet_up_mbps,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_vast_offers")
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    if verified_only:
+        rows = [r for r in rows if isinstance(r, dict) and r.get("verified") is not False]
+    s = get_settings()
+    dph_applied = float(max_dph) if max_dph is not None else float(s.VAST_MAX_DPH_PER_HOUR)
+    bw_applied = (
+        float(max_bandwidth_usd_per_tb)
+        if max_bandwidth_usd_per_tb is not None
+        else float(s.VAST_MAX_BANDWIDTH_USD_PER_TB)
+    )
+    eff_down = (
+        float(min_inet_down_mbps)
+        if min_inet_down_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_DOWN_MBPS", 0.0) or 0.0)
+    )
+    eff_up = (
+        float(min_inet_up_mbps)
+        if min_inet_up_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_UP_MBPS", 0.0) or 0.0)
+    )
+    return {
+        "offers": rows,
+        "count": len(rows),
+        "filters": {
+            "max_dph_per_hour": dph_applied,
+            "max_bandwidth_usd_per_tb": bw_applied,
+            "inet_cost_cap_usd_per_gb": (bw_applied / 1024.0) if bw_applied > 0 else None,
+            "verified_only": verified_only,
+            "min_inet_down_mbps": eff_down,
+            "min_inet_up_mbps": eff_up,
+        },
+    }
+
+
+@router.delete("/vast/instances/{instance_id}")
+def admin_vast_destroy_instance(
+    instance_id: int,
+    _: User = Depends(require_admin),
+):
+    """Destroy a Vast instance by id (same id as new_contract when created). Test cleanup only."""
+    from core import vast_ai
+
+    if not (get_settings().VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée.",
+        )
+    try:
+        out = vast_ai.destroy_instance(instance_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_vast_destroy_instance")
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    return out
+
+
+class VastTestCreateBody(BaseModel):
+    """Create a short-lived Vast GPU instance for connectivity / nvidia-smi smoke test."""
+
+    offer_id: int = Field(..., ge=1)
+    label: str = Field(default="redwood-vast-test", max_length=80)
+    disk_gb: int = Field(default=24, ge=8, le=200)
+    image: str = Field(
+        default="nvidia/cuda:12.3.1-base-ubuntu22.04",
+        max_length=512,
+    )
+
+
+@router.post("/vast/test-instance")
+def admin_vast_create_test_instance(
+    body: VastTestCreateBody,
+    _: User = Depends(require_admin),
+):
+    """
+    Rent one instance on a chosen offer and run `nvidia-smi` on start (SSH image).
+    Costs money while running — destroy with DELETE /vast/instances/{id}.
+    """
+    from core import vast_ai
+
+    if not (get_settings().VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée.",
+        )
+    try:
+        raw = vast_ai.create_instance(
+            body.offer_id,
+            image=body.image.strip(),
+            disk_gb=body.disk_gb,
+            runtype="ssh_direct",
+            label=body.label.strip() or "redwood-vast-test",
+            onstart="nvidia-smi || true",
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("admin_vast_create_test_instance")
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    iid = raw.get("new_contract") if isinstance(raw, dict) else None
+    return {
+        "ok": True,
+        "instance_id": iid,
+        "raw": raw,
+        "hint": "DELETE /api/admin/vast/instances/{instance_id} pour détruire l’instance.",
+    }
+
+
+_VAST_TEST_VIDEO_EXT = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
+
+
+@router.post("/transcode/vast")
+async def admin_transcode_vast_upload(
+    file: UploadFile = File(...),
+    offer_id: Optional[int] = Form(None),
+    _: User = Depends(require_admin),
+):
+    """
+    Upload one video to S3 under vast-test/{token}/ and queue a Celery job that rents a Vast GPU,
+    runs ffmpeg (NVENC) on the instance, uploads the MP4 back to S3, then destroys the instance.
+    Requires VAST_API_KEY and S3 (same as production uploads).
+    """
+    s = get_settings()
+    if not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée.",
+        )
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in _VAST_TEST_VIDEO_EXT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extension non prise en charge ({', '.join(sorted(_VAST_TEST_VIDEO_EXT))}).",
+        )
+    try:
+        path, _size = await save_upload_stream(file)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except OSError as e:
+        logger.exception("transcode vast: save upload failed")
+        raise HTTPException(
+            status_code=507,
+            detail=f"Écriture du fichier impossible : {e}",
+        ) from e
+
+    job_token = uuid.uuid4().hex
+    s3_key = f"vast-test/{job_token}/input{ext}"
+    try:
+        upload_file(path, s3_key)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:
+        logger.exception("transcode vast: S3 upload")
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    oid = int(offer_id) if offer_id is not None and int(offer_id) > 0 else None
+    try:
+        async_res = vast_transcode_test_task.delay(job_token, ext, oid)
+    except Exception as e:
+        logger.exception("transcode vast: Celery enqueue")
+        raise HTTPException(
+            status_code=503,
+            detail="Impossible de lancer la tâche Celery (Redis / worker).",
+        ) from e
+    store_job_envelope(async_res.id, job_token, ext)
+    return {
+        "task_id": async_res.id,
+        "job_token": job_token,
+        "s3_input_key": s3_key,
+        "offer_id": oid,
+    }
+
+
+@router.get("/transcode/vast/status/{task_id}")
+def admin_transcode_vast_status(
+    task_id: str,
+    _: User = Depends(require_admin),
+):
+    """Poll Celery state + PROGRESS meta for POST /transcode/vast."""
+    from celery.result import AsyncResult
+
+    from worker.tasks import app as celery_app
+
+    res = AsyncResult(task_id, app=celery_app)
+    # Celery 5.x: ready and successful are methods — must call them (res.ready is always truthy).
+    ready = bool(res.ready())
+    out: dict[str, Any] = {
+        "task_id": task_id,
+        "state": res.state,
+        "ready": ready,
+    }
+    if isinstance(res.info, dict) and res.state in ("PROGRESS", "STARTED", "RETRY"):
+        out["meta"] = res.info
+    if ready:
+        if res.successful():
+            out["result"] = res.result
+        else:
+            err = res.result
+            out["error"] = str(err) if err is not None else "failure"
+            if isinstance(res.info, dict) and res.info:
+                out["meta"] = res.info
+    return out
+
+
+@router.get("/transcode/vast/queue")
+def admin_transcode_vast_queue(_: User = Depends(require_admin)):
+    """
+    List active/reserved Celery tasks for the Vast transcode worker task (inspect).
+    """
+    from worker.tasks import app as celery_app
+
+    task_name = "worker.tasks.vast_transcode_test_task"
+    items: list[dict[str, Any]] = []
+    try:
+        insp = celery_app.control.inspect(timeout=2.0)
+        if not insp:
+            return {"items": []}
+        for kind, getter in (("active", insp.active), ("reserved", insp.reserved)):
+            try:
+                mapping = getter()
+            except Exception:
+                mapping = None
+            if not mapping:
+                continue
+            for worker, task_list in mapping.items():
+                if not task_list:
+                    continue
+                for t in task_list:
+                    if not isinstance(t, dict):
+                        continue
+                    if t.get("name") != task_name:
+                        continue
+                    tid = t.get("id")
+                    if not tid:
+                        continue
+                    items.append(
+                        {
+                            "task_id": tid,
+                            "worker": worker,
+                            "args": str(t.get("args") or "")[:500],
+                            "kind": kind,
+                        }
+                    )
+    except Exception as e:
+        logger.exception("transcode vast queue")
+        return {"items": [], "error": str(e)[:500]}
+    return {"items": items}
+
+
+@router.post("/transcode/vast/cancel/{task_id}")
+def admin_transcode_vast_cancel(
+    task_id: str,
+    _: User = Depends(require_admin),
+):
+    """
+    Cancel a Vast transcode job: cooperative worker exit, destroy instance, S3 cleanup, Celery revoke.
+    """
+    s = get_settings()
+    if not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée.",
+        )
+    from celery.result import AsyncResult
+
+    from worker.tasks import app as celery_app
+
+    res = AsyncResult(task_id, app=celery_app)
+    if bool(res.ready()) and res.successful():
+        raise HTTPException(
+            status_code=409,
+            detail="La tâche est déjà terminée avec succès (annulation impossible).",
+        )
+    try:
+        return cancel_vast_transcode_test(celery_app, task_id)
+    except Exception as e:
+        logger.exception("transcode vast: cancel %s", task_id)
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e

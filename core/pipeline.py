@@ -6,6 +6,7 @@ import re
 import subprocess
 import threading
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Tuple
 
@@ -55,6 +56,9 @@ def _build_ffmpeg_cmd(
     buf = f"{int(s.TRANSCODE_VIDEO_BUFSIZE_KBPS)}k"
     # Target average bitrate (VBV). No scale / no -r: resolution and fps follow the source.
     cmd += ["-b:v", br, "-maxrate", maxr, "-bufsize", buf]
+    # CPU libx264/libx265: force 8-bit 4:2:0 so 10-bit BluRay/HDR-like sources mux cleanly to MP4.
+    if enc.get("vendor") == "cpu":
+        cmd += ["-pix_fmt", "yuv420p"]
     if enc["vendor"] != "cpu" and "_vaapi" not in vcodec:
         if "_nvenc" in vcodec or "_amf" in vcodec:
             cmd += ["-rc:v", "vbr"]
@@ -96,6 +100,7 @@ def transcode_to_mp4(
     )
     assert proc.stderr is not None
     last_emit = [0.0, -1.0]  # monotonic time, last emitted fraction
+    err_tail: deque[str] = deque(maxlen=120)
 
     def emit(frac: float) -> None:
         if not progress_frac:
@@ -116,6 +121,7 @@ def transcode_to_mp4(
             for line in iter(proc.stderr.readline, ""):
                 if not line:
                     break
+                err_tail.append(line.rstrip("\n\r"))
                 t = _ffmpeg_time_to_sec(line)
                 if t < 0:
                     continue
@@ -135,9 +141,12 @@ def transcode_to_mp4(
     try:
         rc = proc.wait(timeout=86400)
     finally:
-        th.join(timeout=5)
+        th.join(timeout=12)
     if rc != 0:
-        raise RuntimeError(f"ffmpeg exited with code {rc}")
+        tail = "\n".join(err_tail).strip()
+        snippet = tail[-4000:] if tail else "(no stderr lines captured)"
+        log_event(logger, "ffmpeg_failed", returncode=rc, stderr_tail=snippet[-2000:])
+        raise RuntimeError(f"ffmpeg exited with code {rc}\n{snippet}")
     if progress_frac:
         progress_frac(1.0)
     log_event(logger, "ffmpeg_done", output=output_path)

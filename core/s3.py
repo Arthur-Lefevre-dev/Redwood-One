@@ -54,6 +54,75 @@ def presigned_stream_url(key: str, expires: int = 3600) -> str:
     )
 
 
+def presigned_put_url(
+    key: str,
+    *,
+    expires: int = 7200,
+    content_type: str = "video/mp4",
+) -> str:
+    """Presigned PUT for clients (e.g. curl on Vast) to upload an object."""
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    return client.generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": s.S3_BUCKET_NAME,
+            "Key": key,
+            "ContentType": content_type,
+        },
+        ExpiresIn=expires,
+    )
+
+
+def object_size_or_none(key: str) -> Optional[int]:
+    """Return Content-Length if the object exists, else None."""
+    from botocore.exceptions import ClientError
+
+    s = get_settings()
+    client = get_s3_client()
+    try:
+        o = client.head_object(Bucket=s.S3_BUCKET_NAME, Key=key)
+        return int(o.get("ContentLength") or 0)
+    except ClientError as e:
+        code = (e.response.get("Error") or {}).get("Code", "")
+        if code in ("404", "NoSuchKey", "NotFound"):
+            return None
+        raise
+
+
+def delete_object_key(key: str) -> None:
+    s = get_settings()
+    client = get_s3_client()
+    client.delete_object(Bucket=s.S3_BUCKET_NAME, Key=key)
+    logger.info("s3: deleted s3://%s/%s", s.S3_BUCKET_NAME, key)
+
+
+def copy_object_key(src_key: str, dst_key: str) -> None:
+    """Server-side copy within the configured bucket."""
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    client.copy_object(
+        Bucket=s.S3_BUCKET_NAME,
+        Key=dst_key,
+        CopySource={"Bucket": s.S3_BUCKET_NAME, "Key": src_key},
+    )
+    logger.info("s3: copied s3://%s/%s -> %s", s.S3_BUCKET_NAME, src_key, dst_key)
+
+
+def download_object_to_file(key: str, dest_path: str) -> None:
+    """Download full object to a local path (e.g. for ffprobe after copy)."""
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    client.download_file(s.S3_BUCKET_NAME, key, dest_path)
+    logger.info("s3: downloaded s3://%s/%s -> %s", s.S3_BUCKET_NAME, key, dest_path)
+
+
 _FILM_KEY = re.compile(r"^films/(\d+)/([^/]+)$", re.I)
 _VIDEO_EXT = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".wmv"}
 

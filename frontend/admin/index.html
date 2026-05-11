@@ -1034,6 +1034,44 @@
         border-color: var(--accent);
         background: rgba(139, 37, 0, 0.12);
       }
+      .stats-dash-kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .stats-dash-kpis .stat {
+        min-height: 88px;
+      }
+      .stats-dash-charts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .stats-chart-card {
+        background: var(--color-background-secondary);
+        border: 0.5px solid var(--color-border-tertiary);
+        border-radius: var(--border-radius-lg);
+        padding: 14px 14px 8px;
+      }
+      .stats-chart-card .stats-chart-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        margin-bottom: 8px;
+      }
+      .stats-chart-wrap {
+        position: relative;
+        height: 240px;
+      }
+      .stats-footnote {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        line-height: 1.5;
+        margin-top: 12px;
+        max-width: 920px;
+      }
     </style>
   </head>
   <body>
@@ -1057,8 +1095,12 @@
           <div class="nav-section">Principal</div>
           <div class="nav-item active" data-page="pipeline">
             <span class="nav-icon">▦</span>
-            Pipeline
+            Pipeline · Local
             <span class="nav-badge red" id="badge-queue">0</span>
+          </div>
+          <div class="nav-item" data-page="pipeline-vast">
+            <span class="nav-icon">☁</span>
+            Pipeline · Vast
           </div>
           <div class="nav-item" data-page="films">
             <span class="nav-icon">▣</span>
@@ -1073,6 +1115,10 @@
           <div class="nav-item" data-page="donations">
             <span class="nav-icon">◈</span>
             Dons (crypto)
+          </div>
+          <div class="nav-item" data-page="statistics">
+            <span class="nav-icon">⊞</span>
+            Statistiques
           </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
@@ -1108,8 +1154,8 @@
           <section class="page active" id="page-pipeline">
             <header class="topbar">
               <div>
-                <div class="page-title">Pipeline</div>
-                <div class="page-sub">Ajout et traitement des films</div>
+                <div class="page-title">Pipeline · Local</div>
+                <div class="page-sub">Ajout et traitement des films (worker sur cette machine)</div>
               </div>
               <div class="topbar-right">
                 <div class="gpu-pill" id="gpu-pill-pipeline">
@@ -1261,7 +1307,9 @@
                     >
                       Pour une série, indiquez la clé, le titre, la saison et
                       l’épisode dans <strong>Modifier</strong> une fois le
-                      traitement terminé.
+                      traitement terminé. Les magnet / .torrent ajoutés
+                      <strong>ici</strong> sont encodés sur <strong>cette machine</strong>
+                      après téléchargement (onglet Vast pour encoder sur GPU Vast).
                     </p>
                   </div>
                   <div
@@ -1371,6 +1419,465 @@
                 </div>
                 <div class="card-body" style="padding: 8px 12px">
                   <div class="queue-list" id="queue-list"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-pipeline-vast">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Pipeline · Vast</div>
+                <div class="page-sub">
+                  Ajout et traitement des films (transcodage GPU Vast.ai, worker Celery)
+                </div>
+              </div>
+              <div class="topbar-right">
+                <div class="gpu-pill" id="gpu-pill-pipeline-vast">
+                  <span class="dot dot-green"></span
+                  ><span id="gpu-pill-text-vast">GPU</span>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="stat-grid">
+                <div class="stat">
+                  <div class="stat-label">En cours</div>
+                  <div class="stat-val" id="st-running-vast">0</div>
+                  <div class="stat-sub">transcodage / file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">En attente</div>
+                  <div class="stat-val" id="st-wait-vast">0</div>
+                  <div class="stat-sub">dans la file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Bibliothèque</div>
+                  <div class="stat-val" id="st-done-vast">0</div>
+                  <div class="stat-sub">disponibles</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Erreurs</div>
+                  <div
+                    class="stat-val"
+                    id="st-err-vast"
+                    style="color: var(--color-text-danger)"
+                  >
+                    0
+                  </div>
+                  <div class="stat-sub">à traiter</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Synchroniser le stockage S3</div>
+                  <button
+                    class="btn btn-primary"
+                    type="button"
+                    id="btn-sync-s3-vast"
+                  >
+                    Importer les objets films/*
+                  </button>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.55;
+                  "
+                >
+                  Parcourt le bucket (préfixe <code>films/&lt;id&gt;/</code>) et
+                  crée ou met à jour les fiches
+                  <strong>disponibles</strong> pour les spectateurs.
+                  <span
+                    id="sync-s3-msg-vast"
+                    style="
+                      display: block;
+                      margin-top: 8px;
+                      color: var(--color-text-tertiary);
+                    "
+                  ></span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Ajouter un film</div>
+                </div>
+                <div class="card-body">
+                  <div
+                    class="ingest-kind-bar"
+                    style="
+                      margin-bottom: 16px;
+                      padding: 12px 14px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                      border: 0.5px solid var(--color-border-tertiary);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Type de contenu (upload & torrent)
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 16px 24px;
+                        align-items: center;
+                      "
+                    >
+                      <label
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        <input
+                          type="radio"
+                          name="ingest-content-kind-vast"
+                          id="ingest-kind-film-vast"
+                          value="film"
+                          checked
+                        />
+                        Film
+                      </label>
+                      <label
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        <input
+                          type="radio"
+                          name="ingest-content-kind-vast"
+                          id="ingest-kind-series-vast"
+                          value="series_episode"
+                        />
+                        Série (épisode)
+                      </label>
+                    </div>
+                    <p
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-top: 10px;
+                        line-height: 1.45;
+                      "
+                    >
+                      <strong>Upload vidéo</strong> : transcodage sur Vast (un job
+                      par fichier). <strong>Magnet / .torrent sur cet onglet</strong>
+                      : téléchargement sur ce worker puis <strong>transcodage Vast</strong>
+                      (offre ci-dessus si renseignée). Sur l’onglet
+                      <strong>Pipeline · Local</strong>, le même torrent est encodé
+                      <strong>localement</strong> après téléchargement.
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      margin-bottom: 16px;
+                      padding: 12px 14px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                      border: 0.5px solid var(--color-border-tertiary);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--color-text-secondary);
+                        margin-bottom: 8px;
+                        font-weight: 500;
+                      "
+                    >
+                      ID offre Vast (optionnel)
+                    </div>
+                    <input
+                      type="number"
+                      class="magnet-input"
+                      id="vast-offer-id"
+                      min="1"
+                      placeholder="ex. 30827347 — laisser vide pour la 1re offre .env"
+                    />
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 16px;
+                    "
+                  >
+                    <div>
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                        "
+                      >
+                        Upload direct
+                      </div>
+                      <div class="upload-zone" id="vast-drop-zone">
+                        <div class="upload-icon">↑</div>
+                        <div class="upload-title">Glisser des fichiers ici</div>
+                        <div class="upload-sub">
+                          MP4, MKV, AVI, MOV, WMV, M4V — plusieurs fichiers
+                          possibles — max 50 GB chacun
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="vast-file-input"
+                        class="hidden"
+                        accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+                      />
+                      <div
+                        id="vast-upload-row"
+                        class="upload-progress-list"
+                        style="margin-top: 12px"
+                        aria-live="polite"
+                      ></div>
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-browse-vast"
+                        type="button"
+                      >
+                        Parcourir les fichiers
+                      </button>
+                      <div
+                        id="vast-job-panel"
+                        class="hidden"
+                        style="
+                          margin-top: 18px;
+                          padding-top: 16px;
+                          border-top: 0.5px solid var(--color-border-tertiary);
+                        "
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            flex-wrap: wrap;
+                            align-items: center;
+                            gap: 10px;
+                            margin-bottom: 8px;
+                          "
+                        >
+                          <div
+                            id="vast-task-line"
+                            style="
+                              font-size: 11px;
+                              color: var(--color-text-tertiary);
+                              flex: 1;
+                              min-width: 160px;
+                            "
+                          >
+                            —
+                          </div>
+                          <button
+                            type="button"
+                            class="btn"
+                            id="vast-btn-cancel"
+                            disabled
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                        <div class="progress-bar" style="margin-bottom: 8px">
+                          <div
+                            class="progress-fill"
+                            id="vast-progress-fill"
+                            style="width: 0%"
+                          ></div>
+                        </div>
+                        <pre
+                          id="vast-meta"
+                          style="
+                            font-size: 11px;
+                            color: var(--color-text-secondary);
+                            white-space: pre-wrap;
+                            font-family: var(--font-mono);
+                            max-height: 200px;
+                            overflow: auto;
+                          "
+                        ></pre>
+                        <div
+                          id="vast-err"
+                          class="hidden"
+                          style="
+                            margin-top: 10px;
+                            padding: 10px 12px;
+                            border-radius: 8px;
+                            background: rgba(248, 113, 113, 0.1);
+                            color: var(--color-text-danger);
+                            font-size: 12px;
+                            white-space: pre-wrap;
+                          "
+                        ></div>
+                        <div id="vast-video-wrap" class="hidden" style="margin-top: 14px">
+                          <div
+                            style="
+                              font-size: 12px;
+                              color: var(--color-text-secondary);
+                              margin-bottom: 8px;
+                            "
+                          >
+                            Résultat (MP4 sur S3 après Vast)
+                          </div>
+                          <video
+                            id="vast-video"
+                            controls
+                            playsinline
+                            style="
+                              width: 100%;
+                              max-width: 720px;
+                              border-radius: 8px;
+                              background: #000;
+                            "
+                          ></video>
+                          <a
+                            id="vast-stream-link"
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style="
+                              display: inline-block;
+                              margin-top: 8px;
+                              font-size: 12px;
+                              color: #fca5a5;
+                            "
+                            >Ouvrir l’URL de lecture</a
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <div id="vast-torrent-block">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                        "
+                      >
+                        Via torrent
+                      </div>
+                      <div class="magnet-row">
+                        <input
+                          class="magnet-input"
+                          id="magnet-input-vast"
+                          placeholder="magnet:?xt=urn:btih:…"
+                        />
+                      </div>
+                      <div
+                        class="upload-zone"
+                        id="torrent-drop-vast"
+                        style="padding: 14px; margin-bottom: 8px"
+                      >
+                        <div
+                          style="
+                            font-size: 12px;
+                            color: var(--color-text-tertiary);
+                          "
+                        >
+                          Déposer un fichier .torrent
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="torrent-input-vast"
+                        class="hidden"
+                        accept=".torrent"
+                      />
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-magnet-vast"
+                        type="button"
+                      >
+                        Ajouter à la file (magnet)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">File de traitement</div>
+                </div>
+                <div class="card-body" style="padding: 8px 12px">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                      flex-wrap: wrap;
+                      gap: 8px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                      "
+                    >
+                      Pipeline (upload, torrent, encodage local)
+                    </div>
+                    <div
+                      style="font-size: 12px; color: var(--color-text-tertiary)"
+                      id="queue-meta-vast-pipeline"
+                    ></div>
+                  </div>
+                  <div
+                    class="queue-list"
+                    id="queue-list-vast-pipeline"
+                    style="margin-bottom: 18px"
+                  ></div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                      flex-wrap: wrap;
+                      gap: 8px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                      "
+                    >
+                      Transcodage Vast (Celery)
+                    </div>
+                    <div
+                      style="font-size: 12px; color: var(--color-text-tertiary)"
+                      id="queue-meta-vast"
+                    ></div>
+                  </div>
+                  <div class="queue-list" id="queue-list-vast"></div>
                 </div>
               </div>
             </div>
@@ -1717,6 +2224,108 @@
                     font-family: var(--font-mono);
                     line-height: 1.6;
                     white-space: pre-wrap;
+                  "
+                >
+                  —
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-statistics">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Statistiques</div>
+                <div class="page-sub">
+                  Vue d’ensemble catalogue, utilisateurs, stockage et Vast
+                </div>
+              </div>
+              <div class="topbar-right">
+                <button type="button" class="btn btn-refresh" id="btn-stats-refresh">
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+              </div>
+            </header>
+            <div class="content">
+              <p
+                id="stats-generated"
+                class="stats-footnote"
+                style="margin-top: 0; margin-bottom: 8px"
+              >
+                —
+              </p>
+              <div class="stats-dash-kpis">
+                <div class="stat">
+                  <div class="stat-label">Utilisateurs</div>
+                  <div class="stat-val" id="st-kpi-users-total">—</div>
+                  <div class="stat-sub" id="st-kpi-users-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Films &amp; épisodes</div>
+                  <div class="stat-val" id="st-kpi-films-total">—</div>
+                  <div class="stat-sub" id="st-kpi-films-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Stockage (catalogue)</div>
+                  <div class="stat-val" id="st-kpi-storage-gb">—</div>
+                  <div class="stat-sub" id="st-kpi-storage-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Vast (estim. max)</div>
+                  <div class="stat-val" id="st-kpi-vast-usd">—</div>
+                  <div class="stat-sub" id="st-kpi-vast-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Admins / viewers</div>
+                  <div class="stat-val" id="st-kpi-roles">—</div>
+                  <div class="stat-sub" id="st-kpi-roles-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Invitations</div>
+                  <div class="stat-val" id="st-kpi-invites">—</div>
+                  <div class="stat-sub" id="st-kpi-invites-sub">—</div>
+                </div>
+              </div>
+              <p class="stats-footnote" id="st-vast-disclaimer"></p>
+              <div class="stats-dash-charts">
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Films par statut</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-status" aria-label="Graphique statuts"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Contenus par source</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-source" aria-label="Graphique sources"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Ajouts catalogue (par mois)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-month" aria-label="Graphique ajouts films"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Inscriptions (par mois)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-users-month" aria-label="Graphique inscriptions"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="margin-top: 16px">
+                <div class="card-head">
+                  <div class="card-title">Traitement pipeline (catalogue)</div>
+                </div>
+                <div
+                  class="card-body"
+                  id="st-traitement-breakdown"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    font-family: var(--font-mono);
+                    line-height: 1.6;
                   "
                 >
                   —
@@ -2608,6 +3217,10 @@
       </div>
     </div>
 
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script>
       const $ = (s) => document.querySelector(s);
 
@@ -2854,6 +3467,249 @@
         return completion ? `${completion}\n${peers}` : peers;
       }
 
+      function pipelineVastEnterPage() {
+        void refreshGpuPill();
+        vastTestEnterRestore();
+        void refreshQueue();
+        void refreshQueueVast();
+      }
+
+      const VAST_TASK_LS = "admin_transcode_vast_task_id";
+      let vastTestTaskId = null;
+
+      function vastTestEnterRestore() {
+        const t = localStorage.getItem(VAST_TASK_LS);
+        if (t && String(t).trim()) {
+          vastTestTaskId = String(t).trim();
+          void vastTestPollTick();
+        }
+      }
+
+      async function vastTestPollTick() {
+        const page = $("#page-pipeline-vast");
+        if (!page || !page.classList.contains("active")) return;
+        const tid = vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+        if (!tid || !String(tid).trim()) return;
+        vastTestTaskId = String(tid).trim();
+        let r;
+        try {
+          r = await api(
+            "/api/admin/transcode/vast/status/" + encodeURIComponent(vastTestTaskId),
+          );
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const j = await r.json();
+        $("#vast-job-panel").classList.remove("hidden");
+        $("#vast-task-line").textContent =
+          "Celery : " +
+          (j.state || "?") +
+          (j.task_id ? " · task " + j.task_id : "");
+        const pct =
+          j.state === "SUCCESS"
+            ? 100
+            : j.state === "FAILURE"
+              ? 100
+              : j.meta && typeof j.meta.progress === "number"
+                ? Math.min(99, Math.max(0, j.meta.progress))
+                : j.state === "PENDING"
+                  ? 2
+                  : 10;
+        $("#vast-progress-fill").style.width = pct + "%";
+        const metaStr = JSON.stringify(j, null, 2);
+        const metaEl = $("#vast-meta");
+        if (metaEl && metaEl.textContent !== metaStr) metaEl.textContent = metaStr;
+        $("#vast-err").classList.add("hidden");
+        const bcan = $("#vast-btn-cancel");
+        if (bcan) {
+          const activeTid =
+            vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+          bcan.disabled = !activeTid || !!j.ready;
+        }
+        const vv = $("#vast-video");
+        const outUrl =
+          j.ready && j.result && j.result.output_url
+            ? String(j.result.output_url)
+            : "";
+
+        if (j.ready && j.error) {
+          $("#vast-video-wrap").classList.add("hidden");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+          $("#vast-err").textContent = j.error;
+          $("#vast-err").classList.remove("hidden");
+          return;
+        }
+
+        if (outUrl && vv) {
+          $("#vast-video-wrap").classList.remove("hidden");
+          const prev = vv.getAttribute("data-vast-out-url") || "";
+          if (prev !== outUrl) {
+            vv.setAttribute("data-vast-out-url", outUrl);
+            vv.src = outUrl;
+            const sl = $("#vast-stream-link");
+            if (sl) sl.href = outUrl;
+          }
+        } else {
+          $("#vast-video-wrap").classList.add("hidden");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+        }
+      }
+
+      function vastTestUpload(file) {
+        const list = $("#vast-upload-row");
+        list.innerHTML = "";
+        list.classList.add("is-active");
+        const row = document.createElement("div");
+        row.className = "upload-job";
+        row.innerHTML =
+          '<div class="upload-job-head"><span class="upload-job-name"></span><span class="upload-job-pct">0%</span></div><div class="upload-job-track"><div class="upload-job-fill" style="width:0%"></div></div><div class="upload-job-msg hidden"></div>';
+        const nameEl = row.querySelector(".upload-job-name");
+        const pctEl = row.querySelector(".upload-job-pct");
+        const fill = row.querySelector(".upload-job-fill");
+        const msgEl = row.querySelector(".upload-job-msg");
+        nameEl.textContent = file.name;
+        list.appendChild(row);
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/admin/transcode/vast");
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) {
+            pctEl.textContent = "…";
+            return;
+          }
+          const p = Math.min(100, Math.round((100 * e.loaded) / e.total));
+          fill.style.width = p + "%";
+          pctEl.textContent = p + "%";
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            fill.style.width = "100%";
+            pctEl.textContent = "100%";
+            row.classList.add("upload-job-ok");
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.task_id) {
+                vastTestTaskId = resp.task_id;
+                localStorage.setItem(VAST_TASK_LS, String(resp.task_id));
+                void vastTestPollTick();
+                void refreshQueueVast();
+              }
+            } catch (_) {}
+          } else {
+            row.classList.add("upload-job-err");
+            let msg = "Échec (HTTP " + xhr.status + ")";
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.detail)
+                msg = typeof resp.detail === "string" ? resp.detail : msg;
+            } catch (_) {}
+            msgEl.textContent = msg;
+            msgEl.classList.remove("hidden");
+            pctEl.textContent = "—";
+          }
+        };
+        xhr.onerror = () => {
+          row.classList.add("upload-job-err");
+          msgEl.textContent = "Erreur réseau";
+          msgEl.classList.remove("hidden");
+          pctEl.textContent = "—";
+        };
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        const oidRaw = ($("#vast-offer-id") && $("#vast-offer-id").value) || "";
+        const oid = parseInt(String(oidRaw).trim(), 10);
+        if (Number.isFinite(oid) && oid > 0) fd.append("offer_id", String(oid));
+        xhr.send(fd);
+      }
+
+      async function vastTestCancel() {
+        const tid = vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+        if (!tid || !String(tid).trim()) return;
+        const btn = $("#vast-btn-cancel");
+        if (btn) btn.disabled = true;
+        try {
+          const r = await api(
+            "/api/admin/transcode/vast/cancel/" +
+              encodeURIComponent(String(tid).trim()),
+            { method: "POST" },
+          );
+          const raw = await r.text();
+          if (r.status === 409) {
+            let msg = "La tâche est déjà terminée.";
+            try {
+              const j = JSON.parse(raw);
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            const errEl = $("#vast-err");
+            if (errEl) {
+              errEl.textContent = msg;
+              errEl.classList.remove("hidden");
+            }
+            if (btn) btn.disabled = false;
+            void vastTestPollTick();
+            return;
+          }
+          if (!r.ok) {
+            let msg = "Annulation impossible (HTTP " + r.status + ")";
+            try {
+              const j = JSON.parse(raw);
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            $("#vast-job-panel").classList.remove("hidden");
+            const errEl = $("#vast-err");
+            if (errEl) {
+              errEl.textContent = msg;
+              errEl.classList.remove("hidden");
+            }
+            if (btn) btn.disabled = false;
+            return;
+          }
+          let summary = {};
+          try {
+            summary = JSON.parse(raw || "{}");
+          } catch (_) {
+            summary = {};
+          }
+          vastTestTaskId = null;
+          try {
+            localStorage.removeItem(VAST_TASK_LS);
+          } catch (_) {}
+          $("#vast-job-panel").classList.remove("hidden");
+          $("#vast-task-line").textContent = "Transcodage Vast annulé";
+          $("#vast-progress-fill").style.width = "0%";
+          $("#vast-meta").textContent = JSON.stringify(summary, null, 2);
+          $("#vast-err").classList.add("hidden");
+          $("#vast-video-wrap").classList.add("hidden");
+          const vv = $("#vast-video");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+          if (btn) btn.disabled = true;
+          void refreshQueueVast();
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          if (btn) btn.disabled = false;
+        }
+      }
+
       function goPage(p) {
         document
           .querySelectorAll(".page")
@@ -2872,11 +3728,295 @@
           loadInvites(true);
         }
         if (p === "gpu") loadGpuOnce();
+        if (p === "statistics") void loadStatisticsPage();
+        if (p === "pipeline") void refreshGpuPill();
+        if (p === "pipeline-vast") pipelineVastEnterPage();
       }
 
       document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
         el.addEventListener("click", () => goPage(el.dataset.page));
       });
+
+      /** Admin statistics dashboard (Chart.js). */
+      let _adminStatsCharts = [];
+
+      function _destroyAdminStatsCharts() {
+        _adminStatsCharts.forEach((c) => {
+          try {
+            c.destroy();
+          } catch (_) {}
+        });
+        _adminStatsCharts = [];
+      }
+
+      function _statMonthLabels(monthsBack) {
+        const labels = [];
+        const now = new Date();
+        for (let i = monthsBack - 1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          labels.push(
+            d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"),
+          );
+        }
+        return labels;
+      }
+
+      function _seriesByMonth(sparse, labels) {
+        const m = Object.fromEntries((sparse || []).map((x) => [x.month, x.count]));
+        return labels.map((k) => (m[k] != null ? m[k] : 0));
+      }
+
+      async function loadStatisticsPage() {
+        const genEl = $("#stats-generated");
+        const discEl = $("#st-vast-disclaimer");
+        if (!genEl) return;
+        if (typeof Chart === "undefined") {
+          genEl.textContent =
+            "Chart.js indisponible (réseau ou blocage du CDN). Les chiffres clés ne sont pas affichés.";
+          return;
+        }
+        Chart.defaults.color = "#a3a3a3";
+        Chart.defaults.borderColor = "rgba(63, 63, 70, 0.55)";
+        genEl.textContent = "Chargement…";
+        try {
+          const r = await api("/api/admin/statistics/overview?months=14");
+          if (!r.ok) {
+            let t = "Échec du chargement.";
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            genEl.textContent = t;
+            return;
+          }
+          const data = await r.json();
+          const u = data.users || {};
+          const f = data.films || {};
+          const st = data.storage || {};
+          const v = data.vast || {};
+          const inv = data.invites || {};
+          const ts = data.timeseries || {};
+          const months = Math.min(24, Math.max(6, Number(ts.months) || 12));
+
+          genEl.textContent =
+            "Données au " +
+            new Date(data.generated_at_utc || Date.now()).toLocaleString("fr-FR", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }) +
+            " (UTC)";
+
+          const elUsersT = $("#st-kpi-users-total");
+          if (elUsersT) elUsersT.textContent = String(u.total ?? "—");
+          const elUsersS = $("#st-kpi-users-sub");
+          if (elUsersS)
+            elUsersS.textContent =
+              (u.active ?? "—") + " actifs · " + (u.inactive ?? "—") + " inactifs";
+
+          const elFilmsT = $("#st-kpi-films-total");
+          if (elFilmsT) elFilmsT.textContent = String(f.total ?? "—");
+          const elFilmsS = $("#st-kpi-films-sub");
+          if (elFilmsS)
+            elFilmsS.textContent =
+              (f.disponible ?? "—") +
+              " dispo. · " +
+              (f.series_episodes ?? "0") +
+              " ép. / " +
+              (f.feature_films ?? "0") +
+              " films";
+
+          const gbio = st.total_gb != null ? Number(st.total_gb) : NaN;
+          const elSto = $("#st-kpi-storage-gb");
+          if (elSto)
+            elSto.textContent = Number.isFinite(gbio)
+              ? gbio.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio"
+              : "—";
+          const elStoS = $("#st-kpi-storage-sub");
+          if (elStoS)
+            elStoS.textContent =
+              (st.disponible_with_size_count ?? "—") + " titres avec taille";
+
+          const nVastDone = Number(v.films_vast_disponible || 0);
+          const vastUsd = v.estimated_rental_usd_upper_bound;
+          const elV = $("#st-kpi-vast-usd");
+          if (elV) {
+            if (nVastDone > 0 && vastUsd != null) {
+              elV.textContent =
+                "≤ " +
+                Number(vastUsd).toLocaleString("fr-FR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 4,
+                }) +
+                " USD";
+            } else if ((v.films_transcode_target_vast || 0) > 0) {
+              elV.textContent = "—";
+            } else {
+              elV.textContent = "0 USD";
+            }
+          }
+          const elVS = $("#st-kpi-vast-sub");
+          if (elVS)
+            elVS.textContent =
+              (v.films_vast_disponible ?? "0") +
+              " terminés Vast · " +
+              (v.films_transcode_target_vast ?? "0") +
+              " cible Vast";
+
+          const elR = $("#st-kpi-roles");
+          if (elR) elR.textContent = (u.admins ?? "—") + " / " + (u.viewers ?? "—");
+          const elRS = $("#st-kpi-roles-sub");
+          if (elRS) elRS.textContent = "admins · viewers";
+
+          const elI = $("#st-kpi-invites");
+          if (elI) elI.textContent = String(inv.codes_total ?? "—");
+          const elIS = $("#st-kpi-invites-sub");
+          if (elIS) elIS.textContent = (inv.uses_total ?? "—") + " utilisations";
+
+          if (discEl) discEl.textContent = v.disclaimer || "";
+
+          const bt = f.by_traitement || {};
+          const tb = $("#st-traitement-breakdown");
+          if (tb) {
+            tb.textContent = Object.keys(bt).length
+              ? Object.entries(bt)
+                  .map(([k, n]) => k + ": " + n)
+                  .join(" · ")
+              : "—";
+          }
+
+          _destroyAdminStatsCharts();
+
+          const pal = ["#8b2500", "#185fa5", "#3b6d11", "#633806", "#8b5cf6", "#ca8a04"];
+          const labelsStatus = ["Disponible", "En cours", "Erreur"];
+          const valuesStatus = [f.disponible || 0, f.en_cours || 0, f.erreur || 0];
+
+          const ctxS = document.getElementById("chart-films-status");
+          if (ctxS) {
+            _adminStatsCharts.push(
+              new Chart(ctxS, {
+                type: "doughnut",
+                data: {
+                  labels: labelsStatus,
+                  datasets: [{ data: valuesStatus, backgroundColor: pal }],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: "bottom" } },
+                },
+              }),
+            );
+          }
+
+          const src = f.by_source || {};
+          const srcKeys = Object.keys(src);
+          const ctxSrc = document.getElementById("chart-films-source");
+          if (ctxSrc) {
+            if (srcKeys.length === 0) {
+              _adminStatsCharts.push(
+                new Chart(ctxSrc, {
+                  type: "doughnut",
+                  data: {
+                    labels: ["Aucune donnée"],
+                    datasets: [{ data: [1], backgroundColor: ["#3f3f46"] }],
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  },
+                }),
+              );
+            } else {
+              _adminStatsCharts.push(
+                new Chart(ctxSrc, {
+                  type: "pie",
+                  data: {
+                    labels: srcKeys,
+                    datasets: [{ data: srcKeys.map((k) => src[k]), backgroundColor: pal }],
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  },
+                }),
+              );
+            }
+          }
+
+          const monthLabels = _statMonthLabels(months);
+          const filmsMo = _seriesByMonth(ts.films_added_by_month, monthLabels);
+          const usersMo = _seriesByMonth(ts.users_registered_by_month, monthLabels);
+
+          const ctxFM = document.getElementById("chart-films-month");
+          if (ctxFM) {
+            _adminStatsCharts.push(
+              new Chart(ctxFM, {
+                type: "line",
+                data: {
+                  labels: monthLabels,
+                  datasets: [
+                    {
+                      label: "Ajouts catalogue",
+                      data: filmsMo,
+                      tension: 0.25,
+                      fill: true,
+                      borderColor: "#8b2500",
+                      backgroundColor: "rgba(139, 37, 0, 0.15)",
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45, minRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } },
+                  },
+                },
+              }),
+            );
+          }
+
+          const ctxUM = document.getElementById("chart-users-month");
+          if (ctxUM) {
+            _adminStatsCharts.push(
+              new Chart(ctxUM, {
+                type: "bar",
+                data: {
+                  labels: monthLabels,
+                  datasets: [
+                    {
+                      label: "Inscriptions",
+                      data: usersMo,
+                      backgroundColor: "rgba(24, 95, 165, 0.7)",
+                      borderColor: "#185fa5",
+                      borderWidth: 1,
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45, minRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } },
+                  },
+                },
+              }),
+            );
+          }
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          genEl.textContent = "Erreur réseau ou données invalides.";
+        }
+      }
+
+      const _btnStatsRef = document.getElementById("btn-stats-refresh");
+      if (_btnStatsRef) {
+        _btnStatsRef.addEventListener("click", () => void loadStatisticsPage());
+      }
 
       async function boot() {
         const r = await fetch("/api/auth/me", {
@@ -2901,11 +4041,25 @@
         await refreshGpuPill();
         setInterval(refreshStats, 8000);
         setInterval(() => {
-          if ($("#page-pipeline").classList.contains("active")) refreshQueue();
+          const pl = $("#page-pipeline");
+          const pv = $("#page-pipeline-vast");
+          if (
+            (pl && pl.classList.contains("active")) ||
+            (pv && pv.classList.contains("active"))
+          ) {
+            refreshQueue();
+          }
         }, 2000);
         setInterval(() => {
           if ($("#page-gpu").classList.contains("active")) loadGpuOnce();
         }, 3000);
+        setInterval(() => {
+          const pv = $("#page-pipeline-vast");
+          if (pv && pv.classList.contains("active")) {
+            void vastTestPollTick();
+            void refreshQueueVast();
+          }
+        }, 1600);
       }
 
       $("#btn-logout").addEventListener("click", async () => {
@@ -3229,6 +4383,33 @@
         }
       });
 
+      const btnSyncVast = $("#btn-sync-s3-vast");
+      if (btnSyncVast) {
+        btnSyncVast.addEventListener("click", async () => {
+          const msg = $("#sync-s3-msg-vast");
+          if (!msg) return;
+          msg.textContent = "Synchronisation…";
+          try {
+            const r = await api("/api/admin/catalog/sync-s3", { method: "POST" });
+            if (!r.ok) {
+              let t = `Erreur ${r.status}`;
+              try {
+                const j = await r.json();
+                if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+              } catch (_) {}
+              msg.textContent = t;
+              return;
+            }
+            const j = await r.json();
+            msg.textContent = `Créés: ${j.created}, mis à jour: ${j.updated}, clés bucket: ${j.keys_in_bucket}`;
+            await refreshStats();
+          } catch (e) {
+            if (e && e.message === "403-admin") return;
+            msg.textContent = "Échec (S3 non configuré ou erreur réseau).";
+          }
+        });
+      }
+
       /** Invitation codes: server-paginated GET /api/admin/invites. */
       const INVITES_PAGE_SIZE = 10;
       let invitesPage = 1;
@@ -3413,10 +4594,82 @@
           $("#st-wait").textContent = Math.max(0, s.en_cours);
           $("#st-done").textContent = s.disponible;
           $("#st-err").textContent = s.erreur;
+          const r2 = $("#st-running-vast");
+          if (r2) r2.textContent = s.en_cours;
+          const w2 = $("#st-wait-vast");
+          if (w2) w2.textContent = Math.max(0, s.en_cours);
+          const d2 = $("#st-done-vast");
+          if (d2) d2.textContent = s.disponible;
+          const e2 = $("#st-err-vast");
+          if (e2) e2.textContent = s.erreur;
           $("#badge-lib").textContent = s.disponible;
         } catch (e) {
           if (e && e.message === "403-admin") return;
         }
+      }
+
+      function fillPipelineQueueList(listEl, items) {
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        if (!items || items.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "font-size:12px;color:var(--color-text-tertiary);padding:10px;";
+          empty.textContent = "Aucune tâche";
+          listEl.appendChild(empty);
+          return;
+        }
+        items.forEach((i) => {
+          const row = document.createElement("div");
+          row.className = "queue-item";
+          const st = i.statut;
+          const pill =
+            st === "erreur"
+              ? "s-error"
+              : st === "en_cours"
+                ? "s-transcoding"
+                : "s-waiting";
+          const label =
+            st === "en_cours" ? "En cours" : st === "erreur" ? "Erreur" : st;
+          const canCancelPipeline =
+            st === "en_cours" &&
+            i.celery_task_id &&
+            String(i.celery_task_id).trim() !== "";
+          const cancelBtn = canCancelPipeline
+            ? ` <button type="button" class="btn" data-cancel-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
+            : "";
+          let progW = Math.min(100, i.progress || 0);
+          if (
+            i.source === "torrent" &&
+            i.torrent_stats &&
+            typeof i.torrent_stats === "object"
+          ) {
+            const tcp = torrentCompletionPct(i.torrent_stats);
+            if (tcp != null) progW = tcp;
+          }
+          row.innerHTML = `
+      <div class="qi-icon">▶</div>
+      <div class="qi-info">
+        <div class="qi-title"></div>
+        <div class="qi-sub"></div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
+      </div>
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}</div>`;
+          row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
+          const tline = torrentStatsLine(i.torrent_stats, i.source);
+          const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
+          let base =
+            i.erreur_message ||
+            (i.traitement || "Pipeline") + " · " + (i.source || "");
+          if (i.source === "torrent" && i.transcode_target === "vast") {
+            base += " · encodage : Vast (après téléchargement)";
+          }
+          const subParts = [base];
+          if (tx) subParts.push(tx);
+          if (tline) subParts.push(tline);
+          row.querySelector(".qi-sub").textContent = subParts.join("\n");
+          listEl.appendChild(row);
+        });
       }
 
       async function refreshQueue() {
@@ -3434,47 +4687,62 @@
           (i) => i.statut === "en_cours",
         ).length;
         $("#queue-meta").textContent = `${items.length} élément(s)`;
-        const list = $("#queue-list");
+        fillPipelineQueueList($("#queue-list"), items);
+        const listV = $("#queue-list-vast-pipeline");
+        const metaV = $("#queue-meta-vast-pipeline");
+        if (listV && metaV) {
+          metaV.textContent = `${items.length} élément(s)`;
+          fillPipelineQueueList(listV, items);
+        }
+      }
+
+      async function refreshQueueVast() {
+        const list = $("#queue-list-vast");
+        const meta = $("#queue-meta-vast");
+        if (!list || !meta) return;
+        let r;
+        try {
+          r = await api("/api/admin/transcode/vast/queue");
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const q = await r.json();
+        const items = q.items || [];
+        meta.textContent = `${items.length} tâche(s) Celery Vast`;
         list.innerHTML = "";
+        if (items.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "font-size:12px;color:var(--color-text-tertiary);padding:10px;";
+          empty.textContent =
+            q.error
+              ? "Inspect Celery indisponible : " + q.error
+              : "Aucune tâche vast_transcode active ou réservée sur les workers.";
+          list.appendChild(empty);
+          return;
+        }
         items.forEach((i) => {
           const row = document.createElement("div");
           row.className = "queue-item";
-          const st = i.statut;
-          const pill =
-            st === "erreur"
-              ? "s-error"
-              : st === "en_cours"
-                ? "s-transcoding"
-                : "s-waiting";
-          const label =
-            st === "en_cours" ? "En cours" : st === "erreur" ? "Erreur" : st;
-          let progW = Math.min(100, i.progress || 0);
-          if (
-            i.source === "torrent" &&
-            i.torrent_stats &&
-            typeof i.torrent_stats === "object"
-          ) {
-            const tcp = torrentCompletionPct(i.torrent_stats);
-            if (tcp != null) progW = tcp;
-          }
+          const pill = i.kind === "active" ? "s-transcoding" : "s-waiting";
+          const label = i.kind === "active" ? "Actif" : "Réservé";
+          const tid = i.task_id ? String(i.task_id) : "";
+          const cancelVastBtn = tid
+            ? ` <button type="button" class="btn vast-celery-cancel" data-task-id="${tid}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
+            : "";
           row.innerHTML = `
-      <div class="qi-icon">▶</div>
+      <div class="qi-icon">☁</div>
       <div class="qi-info">
         <div class="qi-title"></div>
         <div class="qi-sub"></div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
       </div>
-      <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
-          row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
-          const tline = torrentStatsLine(i.torrent_stats, i.source);
-          const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
-          const base =
-            i.erreur_message ||
-            (i.traitement || "Pipeline") + " · " + (i.source || "");
-          const subParts = [base];
-          if (tx) subParts.push(tx);
-          if (tline) subParts.push(tline);
-          row.querySelector(".qi-sub").textContent = subParts.join("\n");
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelVastBtn}</div>`;
+          row.querySelector(".qi-title").textContent =
+            String(i.task_id || "").slice(0, 8) + "…";
+          row.querySelector(".qi-sub").textContent =
+            (i.worker || "") + (i.args ? " · " + i.args : "");
           list.appendChild(row);
         });
       }
@@ -3488,6 +4756,8 @@
             (enc.vendor === "cpu" ? "⚠ CPU — " : "") +
             (s.gpu_label || enc.label || enc.vendor || "GPU");
           $("#gpu-pill-text").textContent = txt;
+          const vp = $("#gpu-pill-text-vast");
+          if (vp) vp.textContent = txt;
           $("#gpu-active").textContent = txt;
         } catch (_) {}
       }
@@ -4951,11 +6221,65 @@
         );
         return el && el.value === "series_episode" ? "series_episode" : "film";
       }
+      function getUploadContentKindVast() {
+        const el = document.querySelector(
+          'input[name="ingest-content-kind-vast"]:checked',
+        );
+        return el && el.value === "series_episode" ? "series_episode" : "film";
+      }
+      function parseVastOfferIdField() {
+        const el = $("#vast-offer-id");
+        const raw = el && el.value != null ? String(el.value).trim() : "";
+        if (!raw) return null;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
       function isVideoUploadFile(f) {
         const n = f && f.name ? f.name.toLowerCase() : "";
         const dot = n.lastIndexOf(".");
         return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
       }
+
+      $("#vast-drop-zone").addEventListener("click", () =>
+        $("#vast-file-input").click(),
+      );
+      const btnBrowseVast = $("#btn-browse-vast");
+      if (btnBrowseVast)
+        btnBrowseVast.addEventListener("click", () =>
+          $("#vast-file-input").click(),
+        );
+      $("#vast-file-input").addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f && isVideoUploadFile(f)) vastTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Choisis une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+        e.target.value = "";
+      });
+      const vastdz = $("#vast-drop-zone");
+      ["dragenter", "dragover"].forEach((ev) =>
+        vastdz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }),
+      );
+      vastdz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && isVideoUploadFile(f)) vastTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Dépose une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+      });
+      const vastCancelBtn = $("#vast-btn-cancel");
+      if (vastCancelBtn)
+        vastCancelBtn.addEventListener("click", () => void vastTestCancel());
 
       let uploadJobSeq = 0;
 
@@ -5093,6 +6417,7 @@
           body: JSON.stringify({
             magnet: m,
             content_kind: getUploadContentKind(),
+            transcode_target: "local",
           }),
         });
         if (!r.ok) {
@@ -5110,6 +6435,7 @@
         const fd = new FormData();
         fd.append("torrent", f);
         fd.append("content_kind", getUploadContentKind());
+        fd.append("transcode_target", "local");
         const r = await fetch("/api/admin/torrents/file", {
           method: "POST",
           body: fd,
@@ -5145,6 +6471,170 @@
         const f = e.dataTransfer.files[0];
         if (!f) return;
         uploadTorrentFile(f);
+      });
+
+      const btnMagnetVast = $("#btn-magnet-vast");
+      if (btnMagnetVast) {
+        btnMagnetVast.addEventListener("click", async () => {
+          const inp = $("#magnet-input-vast");
+          const m = (inp && inp.value ? inp.value : "").trim();
+          if (!m.startsWith("magnet:?")) {
+            await showAlertModal(
+              "Lien magnet invalide",
+              "Collez un lien commençant par magnet:?xt=…",
+              { okText: "OK" },
+            );
+            return;
+          }
+          const oid = parseVastOfferIdField();
+          const body = {
+            magnet: m,
+            content_kind: getUploadContentKindVast(),
+            transcode_target: "vast",
+          };
+          if (oid) body.vast_offer_id = oid;
+          const r = await api("/api/admin/torrents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!r.ok) {
+            await showAlertModal(
+              "Ajout impossible",
+              "Le magnet n’a pas pu être ajouté à la file.",
+              { okText: "Fermer" },
+            );
+            return;
+          }
+          refreshQueue();
+          void refreshQueueVast();
+        });
+      }
+
+      async function uploadTorrentFileVast(f) {
+        const fd = new FormData();
+        fd.append("torrent", f);
+        fd.append("content_kind", getUploadContentKindVast());
+        fd.append("transcode_target", "vast");
+        const oid = parseVastOfferIdField();
+        if (oid) fd.append("vast_offer_id", String(oid));
+        const r = await fetch("/api/admin/torrents/file", {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+        });
+        if (r.status === 401) window.location.href = "/login.html";
+        if (!r.ok) {
+          await showAlertModal(
+            "Envoi du .torrent impossible",
+            "Vérifiez le fichier ou réessayez.",
+            { okText: "Fermer" },
+          );
+          return;
+        }
+        refreshQueue();
+        void refreshQueueVast();
+      }
+
+      const tdzV = $("#torrent-drop-vast");
+      const tinV = $("#torrent-input-vast");
+      if (tdzV && tinV) {
+        tdzV.addEventListener("click", () => tinV.click());
+        tinV.addEventListener("change", (e) => {
+          const f = e.target.files[0];
+          if (f) void uploadTorrentFileVast(f);
+          e.target.value = "";
+        });
+        ["dragenter", "dragover"].forEach((ev) =>
+          tdzV.addEventListener(ev, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }),
+        );
+        tdzV.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if (!f) return;
+          void uploadTorrentFileVast(f);
+        });
+      }
+
+      document.body.addEventListener("click", async (e) => {
+        const vastBtn = e.target.closest(".vast-celery-cancel");
+        if (vastBtn) {
+          e.preventDefault();
+          const tid = vastBtn.getAttribute("data-task-id");
+          if (!tid) return;
+          const ok = await showConfirmModal(
+            "Annuler le transcodage Vast",
+            "Arrêter la tâche Celery, tenter de détruire l’instance Vast et de nettoyer les fichiers S3 temporaires ?",
+            { confirmText: "Annuler la tâche", cancelText: "Retour" },
+          );
+          if (!ok) return;
+          try {
+            const r = await api(
+              "/api/admin/transcode/vast/cancel/" + encodeURIComponent(tid),
+              { method: "POST" },
+            );
+            if (!r.ok) {
+              let msg = "Erreur " + r.status;
+              try {
+                const j = await r.json();
+                if (j && j.detail) msg = String(j.detail);
+              } catch (_) {
+                msg = ((await r.text()) || msg).slice(0, 500);
+              }
+              await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+              return;
+            }
+          } catch (_) {
+            await showAlertModal(
+              "Erreur",
+              "Réseau ou session expirée.",
+              { okText: "OK" },
+            );
+            return;
+          }
+          void refreshQueueVast();
+          return;
+        }
+        const pipeBtn = e.target.closest("[data-cancel-film]");
+        if (!pipeBtn) return;
+        e.preventDefault();
+        const fid = pipeBtn.getAttribute("data-cancel-film");
+        if (!fid) return;
+        const ok2 = await showConfirmModal(
+          "Annuler ce traitement",
+          "Interrompre la tâche en cours (torrent, encodage local ou transcodage Vast) ? Le film passera en erreur avec la mention « Annulé par l’administrateur ».",
+          { confirmText: "Oui, annuler", cancelText: "Retour" },
+        );
+        if (!ok2) return;
+        try {
+          const r = await api(
+            "/api/admin/queue/jobs/" + encodeURIComponent(fid) + "/cancel",
+            { method: "POST" },
+          );
+          if (!r.ok) {
+            let msg = "Erreur " + r.status;
+            try {
+              const j = await r.json();
+              if (j && j.detail) msg = String(j.detail);
+            } catch (_) {
+              msg = ((await r.text()) || msg).slice(0, 500);
+            }
+            await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+            return;
+          }
+        } catch (_) {
+          await showAlertModal(
+            "Erreur",
+            "Réseau ou session expirée.",
+            { okText: "OK" },
+          );
+          return;
+        }
+        refreshQueue();
+        void refreshQueueVast();
       });
 
       boot().catch(() => {
