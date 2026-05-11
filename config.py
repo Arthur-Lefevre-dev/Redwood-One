@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     VAST_MAX_DPH_PER_HOUR: float = 0.058
     # Max Internet bandwidth price: $ per TB (applied as inet_*_cost $/GB lte = value/1024).
     VAST_MAX_BANDWIDTH_USD_PER_TB: float = 4.0
+    # Bundles search: minimum host internet speeds (Mb/s per Vast API — see CLI docs inet_down / inet_up).
+    # Set to 0 to disable that bound. Used for auto-pick and GET /api/admin/vast/offers.
+    VAST_MIN_INET_DOWN_MBPS: float = 120.0
+    VAST_MIN_INET_UP_MBPS: float = 120.0
     # Remote transcode on Vast (Celery): Docker image on Vast (CUDA runtime + apt ffmpeg in onstart).
     VAST_TRANSCODE_DOCKER_IMAGE: str = "nvidia/cuda:12.3.1-runtime-ubuntu22.04"
     VAST_TRANSCODE_DISK_GB: int = 32

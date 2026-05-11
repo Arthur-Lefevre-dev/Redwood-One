@@ -1034,6 +1034,44 @@
         border-color: var(--accent);
         background: rgba(139, 37, 0, 0.12);
       }
+      .stats-dash-kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .stats-dash-kpis .stat {
+        min-height: 88px;
+      }
+      .stats-dash-charts {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .stats-chart-card {
+        background: var(--color-background-secondary);
+        border: 0.5px solid var(--color-border-tertiary);
+        border-radius: var(--border-radius-lg);
+        padding: 14px 14px 8px;
+      }
+      .stats-chart-card .stats-chart-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--color-text-primary);
+        margin-bottom: 8px;
+      }
+      .stats-chart-wrap {
+        position: relative;
+        height: 240px;
+      }
+      .stats-footnote {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        line-height: 1.5;
+        margin-top: 12px;
+        max-width: 920px;
+      }
     </style>
   </head>
   <body>
@@ -1077,6 +1115,10 @@
           <div class="nav-item" data-page="donations">
             <span class="nav-icon">◈</span>
             Dons (crypto)
+          </div>
+          <div class="nav-item" data-page="statistics">
+            <span class="nav-icon">⊞</span>
+            Statistiques
           </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
@@ -2190,6 +2232,108 @@
             </div>
           </section>
 
+          <section class="page" id="page-statistics">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Statistiques</div>
+                <div class="page-sub">
+                  Vue d’ensemble catalogue, utilisateurs, stockage et Vast
+                </div>
+              </div>
+              <div class="topbar-right">
+                <button type="button" class="btn btn-refresh" id="btn-stats-refresh">
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+              </div>
+            </header>
+            <div class="content">
+              <p
+                id="stats-generated"
+                class="stats-footnote"
+                style="margin-top: 0; margin-bottom: 8px"
+              >
+                —
+              </p>
+              <div class="stats-dash-kpis">
+                <div class="stat">
+                  <div class="stat-label">Utilisateurs</div>
+                  <div class="stat-val" id="st-kpi-users-total">—</div>
+                  <div class="stat-sub" id="st-kpi-users-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Films &amp; épisodes</div>
+                  <div class="stat-val" id="st-kpi-films-total">—</div>
+                  <div class="stat-sub" id="st-kpi-films-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Stockage (catalogue)</div>
+                  <div class="stat-val" id="st-kpi-storage-gb">—</div>
+                  <div class="stat-sub" id="st-kpi-storage-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Vast (estim. max)</div>
+                  <div class="stat-val" id="st-kpi-vast-usd">—</div>
+                  <div class="stat-sub" id="st-kpi-vast-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Admins / viewers</div>
+                  <div class="stat-val" id="st-kpi-roles">—</div>
+                  <div class="stat-sub" id="st-kpi-roles-sub">—</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Invitations</div>
+                  <div class="stat-val" id="st-kpi-invites">—</div>
+                  <div class="stat-sub" id="st-kpi-invites-sub">—</div>
+                </div>
+              </div>
+              <p class="stats-footnote" id="st-vast-disclaimer"></p>
+              <div class="stats-dash-charts">
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Films par statut</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-status" aria-label="Graphique statuts"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Contenus par source</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-source" aria-label="Graphique sources"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Ajouts catalogue (par mois)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-films-month" aria-label="Graphique ajouts films"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Inscriptions (par mois)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-users-month" aria-label="Graphique inscriptions"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="margin-top: 16px">
+                <div class="card-head">
+                  <div class="card-title">Traitement pipeline (catalogue)</div>
+                </div>
+                <div
+                  class="card-body"
+                  id="st-traitement-breakdown"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    font-family: var(--font-mono);
+                    line-height: 1.6;
+                  "
+                >
+                  —
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="page" id="page-films">
             <header class="topbar">
               <div>
@@ -3073,6 +3217,10 @@
       </div>
     </div>
 
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
     <script>
       const $ = (s) => document.querySelector(s);
 
@@ -3580,6 +3728,7 @@
           loadInvites(true);
         }
         if (p === "gpu") loadGpuOnce();
+        if (p === "statistics") void loadStatisticsPage();
         if (p === "pipeline") void refreshGpuPill();
         if (p === "pipeline-vast") pipelineVastEnterPage();
       }
@@ -3587,6 +3736,287 @@
       document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
         el.addEventListener("click", () => goPage(el.dataset.page));
       });
+
+      /** Admin statistics dashboard (Chart.js). */
+      let _adminStatsCharts = [];
+
+      function _destroyAdminStatsCharts() {
+        _adminStatsCharts.forEach((c) => {
+          try {
+            c.destroy();
+          } catch (_) {}
+        });
+        _adminStatsCharts = [];
+      }
+
+      function _statMonthLabels(monthsBack) {
+        const labels = [];
+        const now = new Date();
+        for (let i = monthsBack - 1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          labels.push(
+            d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"),
+          );
+        }
+        return labels;
+      }
+
+      function _seriesByMonth(sparse, labels) {
+        const m = Object.fromEntries((sparse || []).map((x) => [x.month, x.count]));
+        return labels.map((k) => (m[k] != null ? m[k] : 0));
+      }
+
+      async function loadStatisticsPage() {
+        const genEl = $("#stats-generated");
+        const discEl = $("#st-vast-disclaimer");
+        if (!genEl) return;
+        if (typeof Chart === "undefined") {
+          genEl.textContent =
+            "Chart.js indisponible (réseau ou blocage du CDN). Les chiffres clés ne sont pas affichés.";
+          return;
+        }
+        Chart.defaults.color = "#a3a3a3";
+        Chart.defaults.borderColor = "rgba(63, 63, 70, 0.55)";
+        genEl.textContent = "Chargement…";
+        try {
+          const r = await api("/api/admin/statistics/overview?months=14");
+          if (!r.ok) {
+            let t = "Échec du chargement.";
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            genEl.textContent = t;
+            return;
+          }
+          const data = await r.json();
+          const u = data.users || {};
+          const f = data.films || {};
+          const st = data.storage || {};
+          const v = data.vast || {};
+          const inv = data.invites || {};
+          const ts = data.timeseries || {};
+          const months = Math.min(24, Math.max(6, Number(ts.months) || 12));
+
+          genEl.textContent =
+            "Données au " +
+            new Date(data.generated_at_utc || Date.now()).toLocaleString("fr-FR", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }) +
+            " (UTC)";
+
+          const elUsersT = $("#st-kpi-users-total");
+          if (elUsersT) elUsersT.textContent = String(u.total ?? "—");
+          const elUsersS = $("#st-kpi-users-sub");
+          if (elUsersS)
+            elUsersS.textContent =
+              (u.active ?? "—") + " actifs · " + (u.inactive ?? "—") + " inactifs";
+
+          const elFilmsT = $("#st-kpi-films-total");
+          if (elFilmsT) elFilmsT.textContent = String(f.total ?? "—");
+          const elFilmsS = $("#st-kpi-films-sub");
+          if (elFilmsS)
+            elFilmsS.textContent =
+              (f.disponible ?? "—") +
+              " dispo. · " +
+              (f.series_episodes ?? "0") +
+              " ép. / " +
+              (f.feature_films ?? "0") +
+              " films";
+
+          const gbio = st.total_gb != null ? Number(st.total_gb) : NaN;
+          const elSto = $("#st-kpi-storage-gb");
+          if (elSto)
+            elSto.textContent = Number.isFinite(gbio)
+              ? gbio.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio"
+              : "—";
+          const elStoS = $("#st-kpi-storage-sub");
+          if (elStoS)
+            elStoS.textContent =
+              (st.disponible_with_size_count ?? "—") + " titres avec taille";
+
+          const nVastDone = Number(v.films_vast_disponible || 0);
+          const vastUsd = v.estimated_rental_usd_upper_bound;
+          const elV = $("#st-kpi-vast-usd");
+          if (elV) {
+            if (nVastDone > 0 && vastUsd != null) {
+              elV.textContent =
+                "≤ " +
+                Number(vastUsd).toLocaleString("fr-FR", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 4,
+                }) +
+                " USD";
+            } else if ((v.films_transcode_target_vast || 0) > 0) {
+              elV.textContent = "—";
+            } else {
+              elV.textContent = "0 USD";
+            }
+          }
+          const elVS = $("#st-kpi-vast-sub");
+          if (elVS)
+            elVS.textContent =
+              (v.films_vast_disponible ?? "0") +
+              " terminés Vast · " +
+              (v.films_transcode_target_vast ?? "0") +
+              " cible Vast";
+
+          const elR = $("#st-kpi-roles");
+          if (elR) elR.textContent = (u.admins ?? "—") + " / " + (u.viewers ?? "—");
+          const elRS = $("#st-kpi-roles-sub");
+          if (elRS) elRS.textContent = "admins · viewers";
+
+          const elI = $("#st-kpi-invites");
+          if (elI) elI.textContent = String(inv.codes_total ?? "—");
+          const elIS = $("#st-kpi-invites-sub");
+          if (elIS) elIS.textContent = (inv.uses_total ?? "—") + " utilisations";
+
+          if (discEl) discEl.textContent = v.disclaimer || "";
+
+          const bt = f.by_traitement || {};
+          const tb = $("#st-traitement-breakdown");
+          if (tb) {
+            tb.textContent = Object.keys(bt).length
+              ? Object.entries(bt)
+                  .map(([k, n]) => k + ": " + n)
+                  .join(" · ")
+              : "—";
+          }
+
+          _destroyAdminStatsCharts();
+
+          const pal = ["#8b2500", "#185fa5", "#3b6d11", "#633806", "#8b5cf6", "#ca8a04"];
+          const labelsStatus = ["Disponible", "En cours", "Erreur"];
+          const valuesStatus = [f.disponible || 0, f.en_cours || 0, f.erreur || 0];
+
+          const ctxS = document.getElementById("chart-films-status");
+          if (ctxS) {
+            _adminStatsCharts.push(
+              new Chart(ctxS, {
+                type: "doughnut",
+                data: {
+                  labels: labelsStatus,
+                  datasets: [{ data: valuesStatus, backgroundColor: pal }],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: { legend: { position: "bottom" } },
+                },
+              }),
+            );
+          }
+
+          const src = f.by_source || {};
+          const srcKeys = Object.keys(src);
+          const ctxSrc = document.getElementById("chart-films-source");
+          if (ctxSrc) {
+            if (srcKeys.length === 0) {
+              _adminStatsCharts.push(
+                new Chart(ctxSrc, {
+                  type: "doughnut",
+                  data: {
+                    labels: ["Aucune donnée"],
+                    datasets: [{ data: [1], backgroundColor: ["#3f3f46"] }],
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  },
+                }),
+              );
+            } else {
+              _adminStatsCharts.push(
+                new Chart(ctxSrc, {
+                  type: "pie",
+                  data: {
+                    labels: srcKeys,
+                    datasets: [{ data: srcKeys.map((k) => src[k]), backgroundColor: pal }],
+                  },
+                  options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom" } },
+                  },
+                }),
+              );
+            }
+          }
+
+          const monthLabels = _statMonthLabels(months);
+          const filmsMo = _seriesByMonth(ts.films_added_by_month, monthLabels);
+          const usersMo = _seriesByMonth(ts.users_registered_by_month, monthLabels);
+
+          const ctxFM = document.getElementById("chart-films-month");
+          if (ctxFM) {
+            _adminStatsCharts.push(
+              new Chart(ctxFM, {
+                type: "line",
+                data: {
+                  labels: monthLabels,
+                  datasets: [
+                    {
+                      label: "Ajouts catalogue",
+                      data: filmsMo,
+                      tension: 0.25,
+                      fill: true,
+                      borderColor: "#8b2500",
+                      backgroundColor: "rgba(139, 37, 0, 0.15)",
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45, minRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } },
+                  },
+                },
+              }),
+            );
+          }
+
+          const ctxUM = document.getElementById("chart-users-month");
+          if (ctxUM) {
+            _adminStatsCharts.push(
+              new Chart(ctxUM, {
+                type: "bar",
+                data: {
+                  labels: monthLabels,
+                  datasets: [
+                    {
+                      label: "Inscriptions",
+                      data: usersMo,
+                      backgroundColor: "rgba(24, 95, 165, 0.7)",
+                      borderColor: "#185fa5",
+                      borderWidth: 1,
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45, minRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0 } },
+                  },
+                },
+              }),
+            );
+          }
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          genEl.textContent = "Erreur réseau ou données invalides.";
+        }
+      }
+
+      const _btnStatsRef = document.getElementById("btn-stats-refresh");
+      if (_btnStatsRef) {
+        _btnStatsRef.addEventListener("click", () => void loadStatisticsPage());
+      }
 
       async function boot() {
         const r = await fetch("/api/auth/me", {

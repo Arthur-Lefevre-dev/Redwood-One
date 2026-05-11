@@ -45,6 +45,8 @@ def search_offers(
     num_gpus_eq: Optional[int] = None,
     max_dph_per_hour: Optional[float] = None,
     max_bandwidth_usd_per_tb: Optional[float] = None,
+    min_inet_down_mbps: Optional[float] = None,
+    min_inet_up_mbps: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
     """
     POST /bundles/ — returns a list of offer dicts (subset of fields kept as-is).
@@ -53,6 +55,9 @@ def search_offers(
     lte in $/GB (API fields), i.e. max_usd_per_tb / 1024 per GB.
 
     When num_gpus_eq is set, the bundles filter uses num_gpus eq that value (overrides num_gpus_min).
+
+    When min_inet_down_mbps / min_inet_up_mbps are > 0 (defaults from settings), adds inet_down / inet_up
+    gte filters (speeds in Mb/s per Vast API).
     """
     api_key = require_vast_api_key()
     s = get_settings()
@@ -65,6 +70,17 @@ def search_offers(
         float(max_bandwidth_usd_per_tb)
         if max_bandwidth_usd_per_tb is not None
         else float(s.VAST_MAX_BANDWIDTH_USD_PER_TB)
+    )
+
+    down_floor = (
+        float(min_inet_down_mbps)
+        if min_inet_down_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_DOWN_MBPS", 0.0) or 0.0)
+    )
+    up_floor = (
+        float(min_inet_up_mbps)
+        if min_inet_up_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_UP_MBPS", 0.0) or 0.0)
     )
 
     if num_gpus_eq is not None:
@@ -86,6 +102,10 @@ def search_offers(
         per_gb = bw_tb_cap / 1024.0
         payload["inet_down_cost"] = {"lte": per_gb}
         payload["inet_up_cost"] = {"lte": per_gb}
+    if down_floor > 0:
+        payload["inet_down"] = {"gte": down_floor}
+    if up_floor > 0:
+        payload["inet_up"] = {"gte": up_floor}
     url = f"{_api_root()}/bundles/"
     with httpx.Client(timeout=60.0) as client:
         r = client.post(url, headers=_bearer_headers(api_key), json=payload)
@@ -104,6 +124,22 @@ def search_offers(
         oid = o.get("id")
         if oid is None:
             continue
+        try:
+            idown = float(o.get("inet_down")) if o.get("inet_down") is not None else None
+        except (TypeError, ValueError):
+            idown = None
+        try:
+            iup = float(o.get("inet_up")) if o.get("inet_up") is not None else None
+        except (TypeError, ValueError):
+            iup = None
+        if down_floor > 0 and idown is not None and idown < down_floor:
+            continue
+        if up_floor > 0 and iup is not None and iup < up_floor:
+            continue
+        if down_floor > 0 and idown is None:
+            continue
+        if up_floor > 0 and iup is None:
+            continue
         out.append(
             {
                 "id": oid,
@@ -111,6 +147,7 @@ def search_offers(
                 "num_gpus": o.get("num_gpus"),
                 "dph_total": o.get("dph_total"),
                 "reliability": o.get("reliability"),
+                "verified": o.get("verified"),
                 "inet_down": o.get("inet_down"),
                 "inet_up": o.get("inet_up"),
                 "inet_down_cost": o.get("inet_down_cost"),
@@ -191,7 +228,7 @@ def default_gpu_name_list() -> List[str]:
 def pick_first_verified_bundle_offer(
     gpu_names: List[str],
     *,
-    search_limit: int = 48,
+    search_limit: int = 64,
 ) -> Dict[str, Any]:
     """
     Auto-pick the first GPU offer that is verified (API filter + client-side skip if verified=false).
@@ -220,9 +257,10 @@ def pick_first_verified_bundle_offer(
             return o
     raise RuntimeError(
         "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
-        "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_DEFAULT_GPU_NAMES"
+        "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_MIN_INET_DOWN_MBPS, "
+        "VAST_MIN_INET_UP_MBPS, VAST_DEFAULT_GPU_NAMES"
         + (", une seule GPU requise (VAST_TRANSCODE_SINGLE_GPU_ONLY)" if single_gpu else "")
-        + "). Élargissez les noms de GPU ou augmentez le plafond $/h"
+        + "). Élargissez les noms de GPU, relevez les plafonds $/h ou réseau, ou baissez les débits min. (Mb/s)"
         + (" ou désactivez VAST_TRANSCODE_SINGLE_GPU_ONLY si l'API n'a aucune offre 1×GPU" if single_gpu else "")
         + "."
     )

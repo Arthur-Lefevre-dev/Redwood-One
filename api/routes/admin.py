@@ -8,11 +8,11 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, case, cast, func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
@@ -36,6 +36,7 @@ from db.models import (
     Film,
     FilmSource,
     FilmStatut,
+    FilmTraitement,
     InvitationCode,
     SeriesSeasonMeta,
     SeriesShowMeta,
@@ -838,6 +839,179 @@ def admin_cancel_pipeline_job(
     return {"ok": True, "film_id": film_id}
 
 
+def _month_bucket_expr(column, dialect_name: str):
+    if dialect_name == "postgresql":
+        return func.date_trunc("month", column)
+    return func.strftime("%Y-%m", column)
+
+
+def _monthly_counts(db: Session, column, since: datetime) -> List[Dict[str, Any]]:
+    dialect = db.get_bind().dialect.name
+    bucket = _month_bucket_expr(column, dialect)
+    rows = (
+        db.query(bucket, func.count(1))
+        .filter(column.isnot(None), column >= since)
+        .group_by(bucket)
+        .order_by(bucket)
+        .all()
+    )
+    out: List[Dict[str, Any]] = []
+    for b, cnt in rows:
+        if b is None:
+            continue
+        if dialect == "postgresql":
+            try:
+                label = b.date().isoformat()[:7]  # type: ignore[union-attr]
+            except Exception:
+                label = str(b)[:7]
+        else:
+            label = str(b)[:7]
+        out.append({"month": label, "count": int(cnt)})
+    return out
+
+
+@router.get("/statistics/overview")
+def admin_statistics_overview(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    months: int = Query(12, ge=1, le=36, description="Months of history for time series."),
+):
+    """
+    Aggregated metrics for the admin dashboard: users, films, storage (catalog taille_octets),
+    Vast-related counts and a rough spend upper bound from settings (not live Vast billing).
+    """
+    s = get_settings()
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=32 * months)
+
+    total_users = int(db.query(func.count(User.id)).scalar() or 0)
+    active_users = int(
+        db.query(func.count(User.id)).filter(User.is_active.is_(True)).scalar() or 0
+    )
+    admins_count = int(db.query(func.count(User.id)).filter(User.role == UserRole.admin).scalar() or 0)
+    viewers_count = int(db.query(func.count(User.id)).filter(User.role == UserRole.viewer).scalar() or 0)
+
+    total_films = int(db.query(func.count(Film.id)).scalar() or 0)
+    ok = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.disponible).scalar() or 0)
+    err = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.erreur).scalar() or 0)
+    pending = int(db.query(func.count(Film.id)).filter(Film.statut == FilmStatut.en_cours).scalar() or 0)
+
+    films_feature = int(
+        db.query(func.count(Film.id)).filter(Film.content_kind == ContentKind.film).scalar() or 0
+    )
+    episodes = int(
+        db.query(func.count(Film.id)).filter(Film.content_kind == ContentKind.series_episode).scalar() or 0
+    )
+
+    by_source: dict[str, int] = {}
+    for src, n in db.query(Film.source, func.count(Film.id)).group_by(Film.source).all():
+        key = getattr(src, "value", str(src))
+        by_source[key] = int(n)
+
+    trait_label = case(
+        (Film.traitement == FilmTraitement.direct, "direct"),
+        (Film.traitement == FilmTraitement.optimise, "optimise"),
+        (Film.traitement == FilmTraitement.transcode, "transcode"),
+        else_="unknown",
+    )
+    by_traitement: dict[str, int] = {}
+    for lab, n in db.query(trait_label, func.count(Film.id)).group_by(trait_label).all():
+        by_traitement[str(lab)] = int(n)
+
+    sum_bytes_row = (
+        db.query(func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+        )
+        .scalar()
+    )
+    total_bytes = int(sum_bytes_row or 0)
+    sized_count = int(
+        db.query(func.count(Film.id))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+        )
+        .scalar()
+        or 0
+    )
+    total_gb = round(total_bytes / (1024.0**3), 3) if total_bytes else 0.0
+
+    vast_target = int(
+        db.query(func.count(Film.id))
+        .filter(Film.transcode_target == "vast")
+        .scalar()
+        or 0
+    )
+    vast_done = int(
+        db.query(func.count(Film.id))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+        or 0
+    )
+    dph_cap = float(s.VAST_MAX_DPH_PER_HOUR)
+    minutes_sum_row = (
+        db.query(func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+    )
+    total_minutes_vast_done = int(minutes_sum_row or 0)
+    est_hours = total_minutes_vast_done / 60.0
+    est_usd_upper = round(est_hours * dph_cap, 4) if vast_done else 0.0
+
+    invites_total = int(db.query(func.count(InvitationCode.id)).scalar() or 0)
+    invites_uses = int(db.query(func.coalesce(func.sum(InvitationCode.uses), 0)).scalar() or 0)
+
+    films_by_month = _monthly_counts(db, Film.date_ajout, since)
+    users_by_month = _monthly_counts(db, User.date_creation, since)
+
+    return {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "users": {
+            "total": total_users,
+            "active": active_users,
+            "inactive": max(0, total_users - active_users),
+            "admins": admins_count,
+            "viewers": viewers_count,
+        },
+        "films": {
+            "total": total_films,
+            "disponible": ok,
+            "en_cours": pending,
+            "erreur": err,
+            "feature_films": films_feature,
+            "series_episodes": episodes,
+            "by_source": by_source,
+            "by_traitement": by_traitement,
+        },
+        "storage": {
+            "total_bytes": total_bytes,
+            "total_gb": total_gb,
+            "disponible_with_size_count": sized_count,
+            "note": "Somme des taille_octets des contenus disponibles (métadonnées catalogue, pas un audit S3 byte-par-byte).",
+        },
+        "vast": {
+            "films_transcode_target_vast": vast_target,
+            "films_vast_disponible": vast_done,
+            "estimated_gpu_hours_from_film_duration": round(est_hours, 2),
+            "estimated_rental_usd_upper_bound": est_usd_upper,
+            "pricing_dph_usd_assumption": dph_cap,
+            "disclaimer": (
+                "Estimation indicative : durée des titres (duree_min) × VAST_MAX_DPH_PER_HOUR. "
+                "La facturation réelle Vast.ai dépend des offres, du temps réel de VM et du trafic."
+            ),
+        },
+        "invites": {"codes_total": invites_total, "uses_total": invites_uses},
+        "timeseries": {
+            "months": months,
+            "films_added_by_month": films_by_month,
+            "users_registered_by_month": users_by_month,
+        },
+    }
+
+
 @router.get("/system/stats")
 def system_stats(_: User = Depends(require_admin)):
     enc = encoder_dict_for_api()
@@ -1482,6 +1656,18 @@ def admin_vast_offers(
         True,
         description="Si true, ne retourne que les offres explicitement vérifiées (verified ≠ false).",
     ),
+    min_inet_down_mbps: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=20000.0,
+        description="Débit descendant min. (Mb/s, API Vast). Omis = env VAST_MIN_INET_DOWN_MBPS ; 0 = sans filtre.",
+    ),
+    min_inet_up_mbps: Optional[float] = Query(
+        None,
+        ge=0.0,
+        le=20000.0,
+        description="Débit montant min. (Mb/s). Omis = env VAST_MIN_INET_UP_MBPS ; 0 = sans filtre.",
+    ),
     _: User = Depends(require_admin),
 ):
     """Search rentable GPU offers on Vast.ai (test / ops). Requires VAST_API_KEY."""
@@ -1506,6 +1692,8 @@ def admin_vast_offers(
             max_dph_per_hour=max_dph,
             max_bandwidth_usd_per_tb=max_bandwidth_usd_per_tb,
             verified=True,
+            min_inet_down_mbps=min_inet_down_mbps,
+            min_inet_up_mbps=min_inet_up_mbps,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -1521,6 +1709,16 @@ def admin_vast_offers(
         if max_bandwidth_usd_per_tb is not None
         else float(s.VAST_MAX_BANDWIDTH_USD_PER_TB)
     )
+    eff_down = (
+        float(min_inet_down_mbps)
+        if min_inet_down_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_DOWN_MBPS", 0.0) or 0.0)
+    )
+    eff_up = (
+        float(min_inet_up_mbps)
+        if min_inet_up_mbps is not None
+        else float(getattr(s, "VAST_MIN_INET_UP_MBPS", 0.0) or 0.0)
+    )
     return {
         "offers": rows,
         "count": len(rows),
@@ -1529,6 +1727,8 @@ def admin_vast_offers(
             "max_bandwidth_usd_per_tb": bw_applied,
             "inet_cost_cap_usd_per_gb": (bw_applied / 1024.0) if bw_applied > 0 else None,
             "verified_only": verified_only,
+            "min_inet_down_mbps": eff_down,
+            "min_inet_up_mbps": eff_up,
         },
     }
 

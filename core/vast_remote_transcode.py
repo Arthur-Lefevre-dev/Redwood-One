@@ -107,7 +107,7 @@ def run_vast_transcode_test(
         else:
             first = vast_ai.pick_first_verified_bundle_offer(
                 vast_ai.default_gpu_name_list(),
-                search_limit=48,
+                search_limit=64,
             )
             oid = int(first["id"])
             picked_gpu_name = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
