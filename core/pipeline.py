@@ -208,6 +208,24 @@ def process_film_file(
                 progress_frac=tx_progress,
             )
             work_path = tmp_out
+            out_data = probe(work_path)
+            out_meta = summarize(out_data)
+            film.codec_video = out_meta.get("codec_video")
+            film.codec_audio = out_meta.get("codec_audio")
+            film.resolution = out_meta.get("resolution")
+            film.bitrate_kbps = out_meta.get("bitrate_kbps")
+            sz = int(out_meta.get("size_bytes") or 0)
+            if sz <= 0:
+                sz = int(Path(work_path).stat().st_size)
+            film.taille_octets = sz if sz > 0 else None
+            film.duree_min = out_meta.get("duration_min")
+            db.commit()
+            log_event(
+                logger,
+                "pipeline_post_transcode_probe",
+                film_id=film.id,
+                taille_octets=film.taille_octets,
+            )
             if progress:
                 progress(75)
 

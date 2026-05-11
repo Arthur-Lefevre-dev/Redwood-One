@@ -234,6 +234,52 @@
       }
       .lib-pager .btn {
         min-width: 92px;
+        transition:
+          background 0.18s ease,
+          border-color 0.18s ease,
+          color 0.18s ease,
+          transform 0.15s ease,
+          box-shadow 0.18s ease;
+      }
+      .lib-pager .btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+        color: var(--color-text-primary);
+        background: rgba(139, 37, 0, 0.18);
+        box-shadow: 0 2px 8px rgba(139, 37, 0, 0.22);
+      }
+      .lib-pager .btn:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 1px 3px rgba(139, 37, 0, 0.12);
+      }
+      .lib-pager .btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+      .lib-pager .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      @keyframes admin-reload-pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.68;
+        }
+      }
+      .admin-reload-active {
+        animation: admin-reload-pulse 0.85s ease-in-out infinite;
+        filter: brightness(0.96);
+        border-radius: var(--border-radius-lg, 10px);
+        transition: filter 0.2s ease;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .admin-reload-active {
+          animation: none;
+          opacity: 0.88;
+        }
       }
       .btn {
         font-size: 12px;
@@ -1724,7 +1770,7 @@
                 </div>
               </div>
             </header>
-            <div class="content">
+            <div class="content" id="lib-refresh-root">
               <div class="card">
                 <div class="card-head"><div class="card-title">Films</div></div>
                 <div class="card-body library-card-body">
@@ -1778,7 +1824,7 @@
                 </button>
               </div>
             </header>
-            <div class="content">
+            <div class="content" id="users-refresh-root">
               <div
                 class="stat-grid"
                 style="grid-template-columns: repeat(3, 1fr)"
@@ -1869,6 +1915,7 @@
                     </thead>
                     <tbody id="invites-body"></tbody>
                   </table>
+                  <div id="invites-pager" class="lib-pager"></div>
                 </div>
               </div>
               <div class="card">
@@ -1917,6 +1964,7 @@
                     </thead>
                     <tbody id="users-body"></tbody>
                   </table>
+                  <div id="users-pager" class="lib-pager"></div>
                 </div>
               </div>
             </div>
@@ -2089,6 +2137,19 @@
           minlength="12"
           maxlength="128"
           title="12+ caractères, sans espace : min., maj., chiffre, symbole"
+          autocomplete="new-password"
+        />
+        <label for="nu-pass2" style="display: block; font-size: 12px; margin: 10px 0 4px"
+          >Confirmer le mot de passe</label
+        >
+        <input
+          id="nu-pass2"
+          placeholder="confirmer le mot de passe"
+          type="password"
+          required
+          minlength="12"
+          maxlength="128"
+          title="Identique au mot de passe ci-dessus"
           autocomplete="new-password"
         />
         <label
@@ -2807,8 +2868,8 @@
         if (p === "donations") loadDonationsAdmin();
         if (p === "films") loadLibrary();
         if (p === "users") {
-          loadUsers();
-          loadInvites();
+          loadUsers(true);
+          loadInvites(true);
         }
         if (p === "gpu") loadGpuOnce();
       }
@@ -3168,8 +3229,9 @@
         }
       });
 
-      /** Full invite list from last GET /api/admin/invites; table shows a filtered subset. */
-      let adminInvitesCache = null;
+      /** Invitation codes: server-paginated GET /api/admin/invites. */
+      const INVITES_PAGE_SIZE = 10;
+      let invitesPage = 1;
 
       function syncInvitesSearchClearBtn() {
         const inp = $("#invites-search");
@@ -3178,36 +3240,10 @@
         btn.hidden = !inp.value.trim();
       }
 
-      function applyInvitesFilterAndRender() {
-        const rows = adminInvitesCache;
-        if (!rows) return;
-        const qRaw = ($("#invites-search") && $("#invites-search").value) || "";
-        const q = qRaw.trim().toLowerCase();
-        const filtered = !q
-          ? rows
-          : rows.filter((x) => {
-              const code = x.code != null ? String(x.code).toLowerCase() : "";
-              const note = x.note != null ? String(x.note).toLowerCase() : "";
-              const exp =
-                x.expires_at != null ? String(x.expires_at).toLowerCase() : "";
-              const uses =
-                `${x.uses ?? ""} / ${x.max_uses ?? ""}`.toLowerCase();
-              return (
-                code.includes(q) ||
-                note.includes(q) ||
-                exp.includes(q) ||
-                uses.includes(q)
-              );
-            });
-        const sub = $("#invites-sub");
-        if (sub) {
-          sub.textContent = q
-            ? `${filtered.length} résultat(s) sur ${rows.length} code(s)`
-            : `${rows.length} code(s)`;
-        }
+      function renderInvitesRows(items) {
         const tb = $("#invites-body");
         tb.innerHTML = "";
-        filtered.forEach((x) => {
+        (items || []).forEach((x) => {
           const tr = document.createElement("tr");
           tr.innerHTML = `<td style="padding-left:16px;font-family:var(--font-mono)">${x.code}</td><td>${x.uses} / ${x.max_uses}</td><td>${x.note || "—"}</td><td>${x.expires_at || "—"}</td><td><button type="button" class="action-btn danger" data-del="${x.id}">Suppr.</button></td>`;
           tr.querySelector("button").onclick = async () => {
@@ -3218,23 +3254,70 @@
             );
             if (!ok) return;
             await api("/api/admin/invites/" + x.id, { method: "DELETE" });
-            loadInvites();
+            loadInvites(false);
           };
           tb.appendChild(tr);
         });
       }
 
-      async function loadInvites() {
-        const r = await api("/api/admin/invites");
-        adminInvitesCache = await r.json();
+      async function loadInvites(resetPage = false) {
+        if (resetPage) invitesPage = 1;
+        const qRaw = ($("#invites-search") && $("#invites-search").value) || "";
+        const q = qRaw.trim();
+        const qParam = q ? "&q=" + encodeURIComponent(q) : "";
+        const r = await api(
+          `/api/admin/invites?page=${invitesPage}&page_size=${INVITES_PAGE_SIZE}${qParam}`,
+        );
+        if (!r.ok) {
+          const tb = $("#invites-body");
+          if (tb)
+            tb.innerHTML =
+              '<tr><td colspan="5" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Impossible de charger les codes.</td></tr>';
+          const pg = $("#invites-pager");
+          if (pg) pg.innerHTML = "";
+          return;
+        }
+        const data = await r.json();
+        const totalFiltered = Number(data.total) || 0;
+        const reportedPage = Number(data.page) || invitesPage;
+        invitesPage = Math.max(1, reportedPage);
+        const tp = Math.max(1, Math.ceil(totalFiltered / INVITES_PAGE_SIZE));
+        if (totalFiltered > 0 && invitesPage > tp) {
+          invitesPage = tp;
+          await loadInvites(false);
+          return;
+        }
+        if (totalFiltered > 0 && (data.items || []).length === 0 && invitesPage > 1) {
+          invitesPage -= 1;
+          await loadInvites(false);
+          return;
+        }
+        const totalAll = Number(data.total_all) || 0;
+        const sub = $("#invites-sub");
+        if (sub) {
+          if (q)
+            sub.textContent = `${totalFiltered} résultat(s) sur ${totalAll} code(s)`;
+          else sub.textContent = `${totalFiltered} code(s)`;
+        }
+        renderAdminLibPager(
+          $("#invites-pager"),
+          "Codes",
+          invitesPage,
+          totalFiltered,
+          (p) => {
+            invitesPage = p;
+            loadInvites(false);
+          },
+          INVITES_PAGE_SIZE,
+        );
+        renderInvitesRows(data.items || []);
         syncInvitesSearchClearBtn();
-        applyInvitesFilterAndRender();
       }
 
       $("#invites-search").addEventListener("input", () => {
         syncInvitesSearchClearBtn();
         clearTimeout(window._invSearchT);
-        window._invSearchT = setTimeout(applyInvitesFilterAndRender, 250);
+        window._invSearchT = setTimeout(() => loadInvites(true), 250);
       });
       $("#invites-search-clear").addEventListener("click", () => {
         const inp = $("#invites-search");
@@ -3242,7 +3325,7 @@
         syncInvitesSearchClearBtn();
         inp.focus();
         clearTimeout(window._invSearchT);
-        applyInvitesFilterAndRender();
+        loadInvites(true);
       });
 
       function openInviteModal() {
@@ -3314,7 +3397,7 @@
           okEl.textContent =
             "Code créé : " + j.code + " (copiez-le avant de fermer)";
           okEl.style.display = "block";
-          loadInvites();
+          loadInvites(true);
         } catch (_) {
           errEl.textContent = "Erreur réseau";
           errEl.style.display = "block";
@@ -3606,9 +3689,12 @@
       let libFilmsPage = 1;
       let libEpsPage = 1;
 
-      function renderAdminLibPager(host, label, page, total, onPage) {
+      function renderAdminLibPager(host, label, page, total, onPage, pageSizeOpt) {
         if (!host) return;
-        const pageSize = LIB_PAGE_SIZE;
+        const pageSize =
+          pageSizeOpt != null && Number.isFinite(pageSizeOpt) && pageSizeOpt > 0
+            ? pageSizeOpt
+            : LIB_PAGE_SIZE;
         const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
         const safe = Math.min(Math.max(1, page), totalPages);
         host.innerHTML = "";
@@ -4172,24 +4258,42 @@
       syncLibSearchClearBtn();
       $("#btn-refresh-lib").addEventListener("click", async () => {
         const b = document.getElementById("btn-refresh-lib");
+        const root = document.getElementById("lib-refresh-root");
         b.classList.add("is-refreshing");
         b.disabled = true;
+        if (root) {
+          root.classList.add("admin-reload-active");
+          root.setAttribute("aria-busy", "true");
+        }
         try {
           await loadLibrary();
         } finally {
           b.classList.remove("is-refreshing");
           b.disabled = false;
+          if (root) {
+            root.classList.remove("admin-reload-active");
+            root.removeAttribute("aria-busy");
+          }
         }
       });
       $("#btn-refresh-users").addEventListener("click", async () => {
         const b = document.getElementById("btn-refresh-users");
+        const root = document.getElementById("users-refresh-root");
         b.classList.add("is-refreshing");
         b.disabled = true;
+        if (root) {
+          root.classList.add("admin-reload-active");
+          root.setAttribute("aria-busy", "true");
+        }
         try {
-          await Promise.all([loadUsers(), loadInvites()]);
+          await Promise.all([loadUsers(false), loadInvites(false)]);
         } finally {
           b.classList.remove("is-refreshing");
           b.disabled = false;
+          if (root) {
+            root.classList.remove("admin-reload-active");
+            root.removeAttribute("aria-busy");
+          }
         }
       });
 
@@ -4458,8 +4562,9 @@
         }
       });
 
-      /** Full user list from last GET /api/admin/users; table shows a filtered subset. */
-      let adminUsersCache = null;
+      /** Users list: server-paginated GET /api/admin/users. */
+      const USERS_PAGE_SIZE = 10;
+      let usersPage = 1;
 
       function syncUsersSearchClearBtn() {
         const inp = $("#users-search");
@@ -4502,41 +4607,10 @@
         };
       }
 
-      function applyUsersFilterAndRender() {
-        const rows = adminUsersCache;
-        if (!rows) return;
-        let na = 0;
-        let nv = 0;
-        rows.forEach((u) => {
-          if (u.role === "admin") na++;
-          else nv++;
-        });
-        $("#u-total").textContent = rows.length;
-        $("#u-adm").textContent = na;
-        $("#u-view").textContent = nv;
-        const qRaw = ($("#users-search") && $("#users-search").value) || "";
-        const q = qRaw.trim().toLowerCase();
-        const filtered = !q
-          ? rows
-          : rows.filter((u) => {
-              const su = adminUserSignupLabel(u);
-              return (
-                (u.username && String(u.username).toLowerCase().includes(q)) ||
-                (u.email && String(u.email).toLowerCase().includes(q)) ||
-                (u.registered_invite_code &&
-                  String(u.registered_invite_code).toLowerCase().includes(q)) ||
-                (su.text && String(su.text).toLowerCase().includes(q))
-              );
-            });
-        const sub = $("#users-sub");
-        if (sub) {
-          sub.textContent = q
-            ? `Gestion des accès — ${filtered.length} résultat(s) sur ${rows.length}`
-            : `Gestion des accès — ${rows.length} compte(s)`;
-        }
+      function renderUsersRows(items) {
         const tb = $("#users-body");
         tb.innerHTML = "";
-        filtered.forEach((u) => {
+        (items || []).forEach((u) => {
           const tr = document.createElement("tr");
           tr.innerHTML = `
       <td style="padding-left:16px;max-width:320px">
@@ -4621,14 +4695,35 @@
           const act = document.createElement("div");
           act.className = "film-actions";
           const b0 = document.createElement("button");
-          b0.className = "action-btn danger";
-          b0.textContent = "Désactiver";
-          b0.onclick = async () => {
-            await api(`/api/admin/users/${u.id}/deactivate`, {
-              method: "PATCH",
-            });
-            loadUsers();
-          };
+          if (u.is_active) {
+            b0.className = "action-btn danger";
+            b0.textContent = "Désactiver";
+            b0.onclick = async () => {
+              await api(`/api/admin/users/${u.id}/deactivate`, {
+                method: "PATCH",
+              });
+              loadUsers(false);
+            };
+          } else {
+            b0.className = "action-btn";
+            b0.textContent = "Réactiver";
+            b0.title = "Permettre à nouveau la connexion pour ce compte.";
+            b0.onclick = async () => {
+              const r = await api(`/api/admin/users/${u.id}/activate`, {
+                method: "PATCH",
+              });
+              if (!r.ok) {
+                const detail = await fastApiErrorDetail(r.clone());
+                await showAlertModal(
+                  "Réactivation impossible",
+                  detail || "La demande a échoué.",
+                  { okText: "Fermer" },
+                );
+                return;
+              }
+              loadUsers(false);
+            };
+          }
           const bResetInv = document.createElement("button");
           bResetInv.className = "action-btn";
           bResetInv.textContent = "Réinit. quota inv.";
@@ -4656,8 +4751,8 @@
               return;
             }
             const j = await r.json().catch(() => ({}));
-            loadUsers();
-            loadInvites();
+            loadUsers(false);
+            loadInvites(false);
             await showAlertModal(
               "Quota réinitialisé",
               typeof j.deleted_invites === "number"
@@ -4678,7 +4773,7 @@
             );
             if (!ok) return;
             await api(`/api/admin/users/${u.id}`, { method: "DELETE" });
-            loadUsers();
+            loadUsers(false);
           };
           act.appendChild(b0);
           act.appendChild(bResetInv);
@@ -4688,17 +4783,67 @@
         });
       }
 
-      async function loadUsers() {
-        const r = await api("/api/admin/users");
-        adminUsersCache = await r.json();
+      async function loadUsers(resetPage = false) {
+        if (resetPage) usersPage = 1;
+        const qRaw = ($("#users-search") && $("#users-search").value) || "";
+        const q = qRaw.trim();
+        const qParam = q ? "&q=" + encodeURIComponent(q) : "";
+        const r = await api(
+          `/api/admin/users?page=${usersPage}&page_size=${USERS_PAGE_SIZE}${qParam}`,
+        );
+        if (!r.ok) {
+          const tb = $("#users-body");
+          if (tb)
+            tb.innerHTML =
+              '<tr><td colspan="7" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Impossible de charger les comptes.</td></tr>';
+          const pg = $("#users-pager");
+          if (pg) pg.innerHTML = "";
+          return;
+        }
+        const data = await r.json();
+        const st = data.stats || { total: 0, admins: 0, viewers: 0 };
+        $("#u-total").textContent = st.total;
+        $("#u-adm").textContent = st.admins;
+        $("#u-view").textContent = st.viewers;
+        const totalFiltered = Number(data.total) || 0;
+        const reportedPage = Number(data.page) || usersPage;
+        usersPage = Math.max(1, reportedPage);
+        const tp = Math.max(1, Math.ceil(totalFiltered / USERS_PAGE_SIZE));
+        if (totalFiltered > 0 && usersPage > tp) {
+          usersPage = tp;
+          await loadUsers(false);
+          return;
+        }
+        if (totalFiltered > 0 && (data.items || []).length === 0 && usersPage > 1) {
+          usersPage -= 1;
+          await loadUsers(false);
+          return;
+        }
+        const sub = $("#users-sub");
+        if (sub) {
+          if (q)
+            sub.textContent = `Gestion des accès — ${totalFiltered} résultat(s) sur ${st.total}`;
+          else sub.textContent = `Gestion des accès — ${st.total} compte(s)`;
+        }
+        renderAdminLibPager(
+          $("#users-pager"),
+          "Comptes",
+          usersPage,
+          totalFiltered,
+          (p) => {
+            usersPage = p;
+            loadUsers(false);
+          },
+          USERS_PAGE_SIZE,
+        );
+        renderUsersRows(data.items || []);
         syncUsersSearchClearBtn();
-        applyUsersFilterAndRender();
       }
 
       $("#users-search").addEventListener("input", () => {
         syncUsersSearchClearBtn();
         clearTimeout(window._us);
-        window._us = setTimeout(applyUsersFilterAndRender, 250);
+        window._us = setTimeout(() => loadUsers(true), 250);
       });
       $("#users-search-clear").addEventListener("click", () => {
         const inp = $("#users-search");
@@ -4706,7 +4851,7 @@
         syncUsersSearchClearBtn();
         inp.focus();
         clearTimeout(window._us);
-        applyUsersFilterAndRender();
+        loadUsers(true);
       });
 
       function syncNuRankVisibility() {
@@ -4725,12 +4870,15 @@
       $("#nu-role").addEventListener("change", syncNuRankVisibility);
       $("#nu-cancel").addEventListener("click", () => {
         $("#modal-user").classList.remove("show");
+        const p2 = $("#nu-pass2");
+        if (p2) p2.value = "";
       });
       $("#nu-save").addEventListener("click", async () => {
         const role = $("#nu-role").value;
         const uEl = $("#nu-user");
         const eEl = $("#nu-email");
         const pEl = $("#nu-pass");
+        const p2El = $("#nu-pass2");
         if (uEl && !uEl.checkValidity()) {
           uEl.reportValidity();
           return;
@@ -4743,10 +4891,25 @@
           pEl.reportValidity();
           return;
         }
+        if (p2El && !p2El.checkValidity()) {
+          p2El.reportValidity();
+          return;
+        }
+        const pw = $("#nu-pass").value;
+        const pw2 = p2El ? p2El.value : "";
+        if (pw !== pw2) {
+          await showAlertModal(
+            "Création impossible",
+            "Les mots de passe ne correspondent pas.",
+            { okText: "Fermer" },
+          );
+          return;
+        }
         const body = {
           username: $("#nu-user").value.trim(),
           email: $("#nu-email").value.trim(),
-          password: $("#nu-pass").value,
+          password: pw,
+          password_confirm: pw2,
           role,
         };
         if (role === "viewer" && $("#nu-rank"))
@@ -4770,7 +4933,8 @@
         if (uEl) uEl.value = "";
         if (eEl) eEl.value = "";
         if (pEl) pEl.value = "";
-        loadUsers();
+        if (p2El) p2El.value = "";
+        loadUsers(true);
       });
 
       const VIDEO_UPLOAD_EXT = new Set([

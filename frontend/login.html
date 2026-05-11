@@ -150,14 +150,27 @@
         body: JSON.stringify(body),
       });
       if (!r.ok) {
+        let j = null;
+        try {
+          j = await r.json();
+        } catch (_) {}
+        const d = j && j.detail;
+        if (
+          r.status === 403 &&
+          d &&
+          typeof d === 'object' &&
+          d.code === 'account_inactive'
+        ) {
+          const u = new URL('/compte-desactive.html', window.location.origin);
+          if (d.deactivated_at) u.searchParams.set('deactivated_at', d.deactivated_at);
+          window.location.href = u.pathname + u.search;
+          return;
+        }
         if (r.status === 429) {
           err.textContent = 'Trop de tentatives. Patientez une minute puis réessayez.';
         } else {
           let msg = 'Identifiants invalides';
-          try {
-            const j = await r.json();
-            if (j.detail) msg = typeof j.detail === 'string' ? j.detail : msg;
-          } catch (_) {}
+          if (d) msg = typeof d === 'string' ? d : msg;
           err.textContent = msg;
         }
         err.style.display = 'block';

@@ -41,6 +41,7 @@ class RegisterBody(BaseModel):
     username: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(max_length=128)
+    password_confirm: str = Field(max_length=128)
     invite_code: Optional[str] = None
 
 
@@ -75,7 +76,20 @@ def login(
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        deactivated_iso: Optional[str] = None
+        if user.deactivated_at is not None:
+            dt = user.deactivated_at
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            deactivated_iso = dt.isoformat()
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "account_inactive",
+                "message": "Compte désactivé.",
+                "deactivated_at": deactivated_iso,
+            },
+        )
 
     settings = get_settings()
     access = create_access_token({"sub": str(user.id), "role": user.role.value})
@@ -140,6 +154,12 @@ def register(request: Request, body: RegisterBody, db: Session = Depends(get_db)
         .first()
     ):
         raise HTTPException(status_code=400, detail="Email already registered")
+
+    if body.password != body.password_confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Les mots de passe ne correspondent pas.",
+        )
 
     pw_err = validate_password_strength(
         body.password,

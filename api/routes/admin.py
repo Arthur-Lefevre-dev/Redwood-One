@@ -5,13 +5,13 @@ import logging
 import os
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, or_
+from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session
 
 from api.deps import require_admin
@@ -509,21 +509,87 @@ class CreateInviteBody(BaseModel):
     expires_days: Optional[int] = None
 
 
-@router.get("/invites")
-def list_invites(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    rows = db.query(InvitationCode).order_by(InvitationCode.created_at.desc()).all()
-    return [
-        {
-            "id": r.id,
-            "code": r.code,
-            "max_uses": r.max_uses,
-            "uses": r.uses,
-            "note": r.note,
-            "expires_at": r.expires_at.isoformat() if r.expires_at else None,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
+class InviteListItemOut(BaseModel):
+    id: int
+    code: str
+    max_uses: int
+    uses: int
+    note: Optional[str] = None
+    expires_at: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class PaginatedInvitesOut(BaseModel):
+    items: List[InviteListItemOut]
+    total: int
+    total_all: int
+    page: int
+    page_size: int
+
+
+@router.get("/invites", response_model=PaginatedInvitesOut)
+def list_invites(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+):
+    qn = (q or "").strip().lower()
+
+    def _filtered_invites_query():
+        bq = db.query(InvitationCode)
+        if not qn:
+            return bq
+        like = f"%{qn}%"
+        uses_pair = func.lower(
+            func.concat(
+                cast(InvitationCode.uses, String),
+                "/",
+                cast(InvitationCode.max_uses, String),
+            )
+        )
+        exp_str = func.lower(func.coalesce(cast(InvitationCode.expires_at, String), ""))
+        return bq.filter(
+            or_(
+                func.lower(InvitationCode.code).like(like),
+                func.lower(func.coalesce(InvitationCode.note, "")).like(like),
+                uses_pair.like(like),
+                exp_str.like(like),
+            )
+        )
+
+    filtered_q = _filtered_invites_query()
+    filtered_total = int(filtered_q.count())
+    total_all = int(db.query(func.count(InvitationCode.id)).scalar() or 0)
+    total_pages = max(1, (filtered_total + page_size - 1) // page_size)
+    safe_page = min(max(1, page), total_pages)
+    rows = (
+        _filtered_invites_query()
+        .order_by(InvitationCode.created_at.desc())
+        .offset((safe_page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    items = [
+        InviteListItemOut(
+            id=r.id,
+            code=r.code,
+            max_uses=r.max_uses,
+            uses=r.uses,
+            note=r.note,
+            expires_at=r.expires_at.isoformat() if r.expires_at else None,
+            created_at=r.created_at.isoformat() if r.created_at else None,
+        )
         for r in rows
     ]
+    return PaginatedInvitesOut(
+        items=items,
+        total=filtered_total,
+        total_all=total_all,
+        page=safe_page,
+        page_size=page_size,
+    )
 
 
 @router.post("/invites")
@@ -627,9 +693,69 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
-@router.get("/users", response_model=List[UserOut])
-def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    rows = db.query(User).order_by(User.id.asc()).all()
+class UsersListStatsOut(BaseModel):
+    total: int
+    admins: int
+    viewers: int
+
+
+class PaginatedUsersOut(BaseModel):
+    items: List[UserOut]
+    total: int
+    page: int
+    page_size: int
+    stats: UsersListStatsOut
+
+
+@router.get("/users", response_model=PaginatedUsersOut)
+def list_users(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    q: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+):
+    admins_count = int(
+        db.query(func.count(User.id)).filter(User.role == UserRole.admin).scalar() or 0
+    )
+    viewers_count = int(
+        db.query(func.count(User.id)).filter(User.role == UserRole.viewer).scalar() or 0
+    )
+    total_all = int(db.query(func.count(User.id)).scalar() or 0)
+    stats = UsersListStatsOut(total=total_all, admins=admins_count, viewers=viewers_count)
+
+    qn = (q or "").strip().lower()
+
+    def _filtered_users_query():
+        bq = db.query(User).outerjoin(
+            InvitationCode,
+            User.registered_via_invite_code_id == InvitationCode.id,
+        )
+        if qn:
+            like = f"%{qn}%"
+            bq = bq.filter(
+                or_(
+                    func.lower(User.username).like(like),
+                    func.lower(User.email).like(like),
+                    func.lower(func.coalesce(InvitationCode.code, "")).like(like),
+                    func.lower(func.coalesce(InvitationCode.note, "")).like(like),
+                    func.lower(func.coalesce(User.signup_channel, "")).like(like),
+                )
+            )
+        return bq
+
+    filtered_q = _filtered_users_query()
+    filtered_total = int(filtered_q.count())
+    total_pages = max(1, (filtered_total + page_size - 1) // page_size)
+    safe_page = min(max(1, page), total_pages)
+    rows = (
+        _filtered_users_query()
+        .order_by(User.id.asc())
+        .offset((safe_page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
     inv_ids = {u.registered_via_invite_code_id for u in rows if u.registered_via_invite_code_id}
     inv_map: dict[int, InvitationCode] = {}
     if inv_ids:
@@ -656,13 +782,20 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
                 registered_invite_note=ic.note if ic else None,
             )
         )
-    return out
+    return PaginatedUsersOut(
+        items=out,
+        total=filtered_total,
+        page=safe_page,
+        page_size=page_size,
+        stats=stats,
+    )
 
 
 class CreateUserBody(BaseModel):
     username: str = Field(min_length=2, max_length=80)
     email: EmailStr
     password: str = Field(max_length=128)
+    password_confirm: str = Field(max_length=128)
     role: UserRole = UserRole.viewer
     viewer_rank: Optional[str] = None
 
@@ -686,6 +819,11 @@ def create_user(body: CreateUserBody, db: Session = Depends(get_db), _: User = D
         .first()
     ):
         raise HTTPException(status_code=400, detail="Cette adresse e-mail est déjà utilisée.")
+    if body.password != body.password_confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Les mots de passe ne correspondent pas.",
+        )
     from core.password_policy import validate_password_strength
     from core.security import hash_password
 
@@ -775,6 +913,22 @@ def deactivate(
     if not u:
         raise HTTPException(404, "Not found")
     u.is_active = False
+    u.deactivated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True}
+
+
+@router.patch("/users/{user_id}/activate")
+def activate_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    u = db.get(User, user_id)
+    if not u:
+        raise HTTPException(404, "Not found")
+    u.is_active = True
+    u.deactivated_at = None
     db.commit()
     return {"ok": True}
 

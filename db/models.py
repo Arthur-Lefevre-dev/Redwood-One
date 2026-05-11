@@ -74,6 +74,8 @@ class User(Base):
         default=UserRole.viewer,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Set when an admin deactivates the account (shown on login attempt).
+    deactivated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     derniere_connexion: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     # Last time this user generated a guest invite code (one per calendar month, UTC).

@@ -31,9 +31,10 @@
       <input id="u" name="username" autocomplete="username" required minlength="2" />
       <label for="e">E-mail</label>
       <input id="e" name="email" type="email" autocomplete="email" required />
-      <p class="sub" style="margin-top:-8px;margin-bottom:12px;font-size:12px;opacity:.88">Utilisez une adresse réelle : domaines inventés, injoignables ou « jetables » (Yopmail, etc.) sont refusés — sans envoi de mail de vérification.</p>
       <label for="p">Mot de passe</label>
       <input id="p" name="password" type="password" autocomplete="new-password" required minlength="12" maxlength="128" />
+      <label for="p2">Confirmer le mot de passe</label>
+      <input id="p2" name="password_confirm" type="password" autocomplete="new-password" required minlength="12" maxlength="128" />
       <p class="sub" style="margin-top:-6px;margin-bottom:12px;font-size:13px;opacity:.9">Au moins 12 caractères, sans espace : une minuscule, une majuscule, un chiffre et un symbole (! # @ …).</p>
       <button type="submit">S’inscrire</button>
     </form>
@@ -47,10 +48,19 @@
       document.getElementById('err').style.display = 'none';
       document.getElementById('ok').style.display = 'none';
       const code = document.getElementById('code').value.trim();
+      const pw = document.getElementById('p').value;
+      const pw2 = document.getElementById('p2').value;
+      if (pw !== pw2) {
+        const errEl = document.getElementById('err');
+        errEl.textContent = 'Les mots de passe ne correspondent pas.';
+        errEl.style.display = 'block';
+        return;
+      }
       const body = {
         username: document.getElementById('u').value.trim(),
         email: document.getElementById('e').value.trim(),
-        password: document.getElementById('p').value,
+        password: pw,
+        password_confirm: pw2,
         invite_code: code || null,
       };
       const r = await fetch('/api/auth/register', {

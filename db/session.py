@@ -129,6 +129,24 @@ def _ensure_user_invite_column() -> None:
     logger.info("database schema: ensured users.last_invite_at (sqlite)")
 
 
+def _ensure_user_deactivated_at_column() -> None:
+    """Timestamp when account was deactivated (admin); shown if user tries to log in."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP"))
+        logger.info("database schema: ensured users.deactivated_at (postgresql)")
+        return
+    insp = inspect(engine)
+    if "users" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    if "deactivated_at" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN deactivated_at DATETIME"))
+    logger.info("database schema: ensured users.deactivated_at (sqlite)")
+
+
 def _ensure_films_imdb_title_id_column() -> None:
     """Optional IMDb id for imdbapi.dev enrichment."""
     if engine.dialect.name == "postgresql":
@@ -454,6 +472,7 @@ def init_db() -> None:
     _ensure_films_trailer_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
+    _ensure_user_deactivated_at_column()
     _ensure_user_signup_origin_columns()
     _ensure_user_viewer_rank_column()
     _ensure_invitation_created_by_column()
