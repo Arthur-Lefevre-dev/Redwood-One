@@ -59,6 +59,28 @@ class Settings(BaseSettings):
     # slowapi limit for POST /api/auth/login (e.g. "60/minute", "20/minute").
     AUTH_LOGIN_RATE_LIMIT: str = "60/minute"
 
+    # Vast.ai GPU marketplace (optional — test / future remote transcode workers).
+    # API key: https://cloud.vast.ai/manage-keys/
+    VAST_API_KEY: str = ""
+    VAST_API_BASE_URL: str = "https://console.vast.ai/api/v0"
+    # Comma-separated GPU names for offer search — must match Vast bundle `gpu_name` strings.
+    VAST_DEFAULT_GPU_NAMES: str = (
+        "RTX 3060,RTX 4060,GTX 1070 Ti,RTX 3060 Ti,GTX 1080,RTX 3070,GTX 1060,RTX 3050,"
+        "Titan Xp,GTX 1660 S,GTX 1080 Ti,GTX 1660"
+    )
+    # Bundles search: max total $/hour (dph_total).
+    VAST_MAX_DPH_PER_HOUR: float = 0.058
+    # Max Internet bandwidth price: $ per TB (applied as inet_*_cost $/GB lte = value/1024).
+    VAST_MAX_BANDWIDTH_USD_PER_TB: float = 4.0
+    # Remote transcode on Vast (Celery): Docker image on Vast (CUDA runtime + apt ffmpeg in onstart).
+    VAST_TRANSCODE_DOCKER_IMAGE: str = "nvidia/cuda:12.3.1-runtime-ubuntu22.04"
+    VAST_TRANSCODE_DISK_GB: int = 32
+    VAST_TRANSCODE_URL_TTL_SEC: int = 7200
+    VAST_TRANSCODE_POLL_INTERVAL_SEC: int = 15
+    VAST_TRANSCODE_MAX_WAIT_SEC: int = 7200
+    # Seconds to wait in onstart for /dev/nvidia0 (Vast can attach GPU nodes slightly after boot).
+    VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC: int = 90
+
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@redwoodplus.local"

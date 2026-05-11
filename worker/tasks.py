@@ -188,6 +188,14 @@ def process_film_task(self, film_id: int, local_path: str):
         db.close()
 
 
+@app.task(name="worker.tasks.vast_transcode_test_task", bind=True, max_retries=0)
+def vast_transcode_test_task(self, job_token: str, src_ext: str, offer_id: Optional[int] = None):
+    """Transcode one file on a Vast GPU instance (S3 presigned URLs + onstart). Costs Vast rental until destroyed."""
+    from core.vast_remote_transcode import run_vast_transcode_test
+
+    return run_vast_transcode_test(self, job_token, src_ext, offer_id)
+
+
 @app.task(name="worker.tasks.refresh_donation_balances_snapshot")
 def refresh_donation_balances_snapshot() -> None:
     """Refresh cached crypto balances + EUR snapshot for donation bar (CoinGecko + chain RPC)."""

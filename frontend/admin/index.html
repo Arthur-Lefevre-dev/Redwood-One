@@ -1060,6 +1060,15 @@
             Pipeline
             <span class="nav-badge red" id="badge-queue">0</span>
           </div>
+          <div class="nav-section">Transcodage</div>
+          <div class="nav-item" data-page="transcode-local">
+            <span class="nav-icon">⏱</span>
+            Sur la machine
+          </div>
+          <div class="nav-item" data-page="transcode-vast">
+            <span class="nav-icon">☁</span>
+            Sur Vast
+          </div>
           <div class="nav-item" data-page="films">
             <span class="nav-icon">▣</span>
             Bibliothèque
@@ -1376,6 +1385,409 @@
             </div>
           </section>
 
+          <section class="page" id="page-transcode-local">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Transcodage · Sur la machine</div>
+                <div class="page-sub">
+                  Upload → worker Celery sur ce serveur (ffprobe / ffmpeg / S3), suivi du film
+                  et lecture dès statut disponible.
+                </div>
+              </div>
+              <div class="topbar-right">
+                <div class="gpu-pill" id="gpu-pill-local">
+                  <span class="dot dot-green"></span
+                  ><span id="gpu-pill-text-local">GPU</span>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Envoyer une vidéo</div>
+                  <button type="button" class="btn" id="btn-tt-reset">
+                    Réinitialiser
+                  </button>
+                </div>
+                <div class="card-body">
+                  <p
+                    style="
+                      font-size: 12px;
+                      color: var(--color-text-secondary);
+                      line-height: 1.55;
+                      margin-bottom: 14px;
+                      max-width: 720px;
+                    "
+                  >
+                    Même principe que le Pipeline : un film est créé et mis en file Celery.
+                    Tu suis <strong>un job</strong> (progression, métadonnées, lecteur une fois
+                    <strong>disponible</strong>). L’estimation USD compare la durée du titre au
+                    plafond <code style="font-size: 11px">VAST_MAX_DPH_PER_HOUR</code> (ordre de
+                    grandeur type location GPU, indicatif).
+                  </p>
+                  <div class="upload-zone" id="tt-drop-zone" style="max-width: 520px">
+                    <div class="upload-icon">↑</div>
+                    <div class="upload-title">Glisser-déposer ou cliquer</div>
+                    <div class="upload-sub">
+                      MP4, MKV, AVI, MOV, WMV, M4V — un fichier — max 50 GB
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    id="tt-file-input"
+                    class="hidden"
+                    accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+                  />
+                  <div
+                    id="tt-upload-row"
+                    class="upload-progress-list"
+                    style="margin-top: 12px; max-width: 520px"
+                    aria-live="polite"
+                  ></div>
+                  <div id="tt-job-panel" class="hidden" style="margin-top: 20px">
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 6px;
+                      "
+                    >
+                      Film #
+                      <span id="tt-film-id">—</span>
+                    </div>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: 10px;
+                        flex-wrap: wrap;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      <span
+                        class="status-pill s-transcoding"
+                        id="tt-statut-pill"
+                        >—</span
+                      >
+                      <span
+                        id="tt-traitement"
+                        style="font-size: 12px; color: var(--color-text-secondary)"
+                        >—</span
+                      >
+                    </div>
+                    <div class="progress-bar" style="margin-bottom: 8px">
+                      <div
+                        class="progress-fill"
+                        id="tt-progress-fill"
+                        style="width: 0%"
+                      ></div>
+                    </div>
+                    <div
+                      id="tt-progress-label"
+                      style="font-size: 12px; color: var(--color-text-secondary)"
+                    ></div>
+                    <div
+                      id="tt-meta"
+                      style="
+                        font-size: 12px;
+                        color: var(--color-text-tertiary);
+                        margin-top: 10px;
+                        white-space: pre-wrap;
+                        font-family: var(--font-mono);
+                      "
+                    ></div>
+                    <div
+                      id="tt-price-box"
+                      class="hidden"
+                      style="
+                        margin-top: 14px;
+                        padding: 12px 14px;
+                        border-radius: var(--border-radius-md);
+                        border: 0.5px solid var(--color-border-secondary);
+                        background: var(--color-background-secondary);
+                        max-width: 560px;
+                      "
+                    >
+                      <div
+                        style="
+                          font-size: 11px;
+                          color: var(--color-text-tertiary);
+                          text-transform: uppercase;
+                          letter-spacing: 0.06em;
+                          margin-bottom: 6px;
+                        "
+                      >
+                        Estimation fin de transcodage
+                      </div>
+                      <div
+                        id="tt-price-val"
+                        style="
+                          font-size: 18px;
+                          font-weight: 600;
+                          color: var(--color-text-primary);
+                        "
+                      >
+                        —
+                      </div>
+                      <div
+                        id="tt-price-note"
+                        style="
+                          font-size: 11px;
+                          color: var(--color-text-tertiary);
+                          margin-top: 8px;
+                          line-height: 1.45;
+                        "
+                      ></div>
+                    </div>
+                    <div
+                      id="tt-err"
+                      class="hidden"
+                      style="
+                        margin-top: 12px;
+                        padding: 10px 12px;
+                        border-radius: 8px;
+                        background: rgba(248, 113, 113, 0.1);
+                        color: var(--color-text-danger);
+                        font-size: 12px;
+                        white-space: pre-wrap;
+                      "
+                    ></div>
+                    <div id="tt-video-wrap" class="hidden" style="margin-top: 16px">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                        "
+                      >
+                        Résultat (MP4 servi depuis S3)
+                      </div>
+                      <video
+                        id="tt-video"
+                        controls
+                        playsinline
+                        style="
+                          width: 100%;
+                          max-width: 720px;
+                          border-radius: 8px;
+                          background: #000;
+                        "
+                      ></video>
+                      <a
+                        id="tt-stream-link"
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="
+                          display: inline-block;
+                          margin-top: 8px;
+                          font-size: 12px;
+                          color: #fca5a5;
+                        "
+                        >Ouvrir l’URL de lecture dans un nouvel onglet</a
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-transcode-vast">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Transcodage · Sur Vast</div>
+                <div class="page-sub">
+                  S3 → Celery → GPU Vast (ffmpeg), MP4 sur S3, destruction de l’instance.
+                </div>
+              </div>
+              <div class="topbar-right">
+                <div class="gpu-pill" id="gpu-pill-vast">
+                  <span class="dot dot-green"></span
+                  ><span id="gpu-pill-text-vast">GPU</span>
+                </div>
+              </div>
+            </header>
+            <div class="content">
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Pipeline Vast.ai</div>
+                </div>
+                <div class="card-body">
+                  <p
+                    style="
+                      font-size: 12px;
+                      color: var(--color-text-secondary);
+                      line-height: 1.55;
+                      margin-bottom: 14px;
+                      max-width: 720px;
+                    "
+                  >
+                    Le fichier est envoyé sur <strong>S3</strong>, puis un worker
+                    <strong>Celery</strong> loue une machine Vast, exécute
+                    <strong>ffmpeg NVENC</strong> dans le conteneur (script
+                    <code>onstart</code>), renvoie le MP4 sur S3 et
+                    <strong>détruit l’instance</strong>. Coût = temps de location
+                    Vast. Prérequis :
+                    <code>VAST_API_KEY</code>, S3, Redis, worker actif.
+                  </p>
+                  <label
+                    for="vast-offer-id"
+                    style="
+                      font-size: 12px;
+                      color: var(--color-text-secondary);
+                      display: block;
+                      margin-bottom: 6px;
+                    "
+                    >ID offre Vast (optionnel — laisse vide pour prendre la 1re
+                    offre des filtres .env)</label
+                  >
+                  <input
+                    type="number"
+                    id="vast-offer-id"
+                    min="1"
+                    placeholder="ex. 36172191"
+                    style="
+                      width: 220px;
+                      margin-bottom: 12px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                    "
+                  />
+                  <div
+                    class="upload-zone"
+                    id="vast-drop-zone"
+                    style="max-width: 520px"
+                  >
+                    <div class="upload-icon">☁</div>
+                    <div class="upload-title">Vidéo → Vast + S3</div>
+                    <div class="upload-sub">
+                      Un fichier — MP4, MKV, AVI, MOV, WMV, M4V
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    id="vast-file-input"
+                    class="hidden"
+                    accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+                  />
+                  <div
+                    id="vast-upload-row"
+                    class="upload-progress-list"
+                    style="margin-top: 12px; max-width: 520px"
+                  ></div>
+                  <div id="vast-job-panel" class="hidden" style="margin-top: 16px">
+                    <div
+                      style="
+                        display: flex;
+                        flex-wrap: wrap;
+                        align-items: center;
+                        gap: 10px;
+                        margin-bottom: 8px;
+                      "
+                    >
+                      <div
+                        id="vast-task-line"
+                        style="
+                          font-size: 11px;
+                          color: var(--color-text-tertiary);
+                          flex: 1;
+                          min-width: 160px;
+                        "
+                      >
+                        —
+                      </div>
+                      <button
+                        type="button"
+                        id="vast-btn-cancel"
+                        disabled
+                        style="
+                          font-size: 12px;
+                          padding: 6px 12px;
+                          border-radius: 8px;
+                          border: 1px solid var(--color-border-secondary);
+                          background: #1a1a1a;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                    <div class="progress-bar" style="margin-bottom: 8px">
+                      <div
+                        class="progress-fill"
+                        id="vast-progress-fill"
+                        style="width: 0%"
+                      ></div>
+                    </div>
+                    <pre
+                      id="vast-meta"
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-secondary);
+                        white-space: pre-wrap;
+                        font-family: var(--font-mono);
+                        max-height: 200px;
+                        overflow: auto;
+                      "
+                    ></pre>
+                    <div
+                      id="vast-err"
+                      class="hidden"
+                      style="
+                        margin-top: 10px;
+                        padding: 10px 12px;
+                        border-radius: 8px;
+                        background: rgba(248, 113, 113, 0.1);
+                        color: var(--color-text-danger);
+                        font-size: 12px;
+                        white-space: pre-wrap;
+                      "
+                    ></div>
+                    <div id="vast-video-wrap" class="hidden" style="margin-top: 14px">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                        "
+                      >
+                        Résultat (MP4 sur S3 après Vast)
+                      </div>
+                      <video
+                        id="vast-video"
+                        controls
+                        playsinline
+                        style="
+                          width: 100%;
+                          max-width: 720px;
+                          border-radius: 8px;
+                          background: #000;
+                        "
+                      ></video>
+                      <a
+                        id="vast-stream-link"
+                        href="#"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="
+                          display: inline-block;
+                          margin-top: 8px;
+                          font-size: 12px;
+                          color: #fca5a5;
+                        "
+                        >Ouvrir l’URL de lecture</a
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
           <section class="page" id="page-announcement">
             <header class="topbar">
               <div>
@@ -2854,6 +3266,444 @@
         return completion ? `${completion}\n${peers}` : peers;
       }
 
+      const TT_FILM_LS = "admin_transcode_local_film_id";
+      let transcodeTestFilmId = null;
+
+      function transcodeLocalEnterPage() {
+        void refreshGpuPill();
+        const raw = localStorage.getItem(TT_FILM_LS);
+        const id = raw ? parseInt(raw, 10) : NaN;
+        if (Number.isFinite(id) && id > 0) {
+          transcodeTestFilmId = id;
+          void transcodeTestPollTick();
+        }
+      }
+
+      function transcodeVastEnterPage() {
+        void refreshGpuPill();
+        vastTestEnterRestore();
+      }
+
+      function transcodePipelinesLeavePage() {}
+
+      async function transcodeTestPollTick() {
+        const page = $("#page-transcode-local");
+        if (!page || !page.classList.contains("active")) return;
+        const raw = transcodeTestFilmId || localStorage.getItem(TT_FILM_LS);
+        const id = raw ? parseInt(String(raw), 10) : NaN;
+        if (!Number.isFinite(id) || id <= 0) return;
+        transcodeTestFilmId = id;
+        let r;
+        try {
+          r = await api("/api/admin/films/" + id + "/processing-state");
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (r.status === 404) {
+          localStorage.removeItem(TT_FILM_LS);
+          transcodeTestFilmId = null;
+          $("#tt-job-panel").classList.add("hidden");
+          return;
+        }
+        if (!r.ok) return;
+        const j = await r.json();
+        transcodeTestRenderState(j);
+      }
+
+      function transcodeTestRenderState(j) {
+        $("#tt-job-panel").classList.remove("hidden");
+        $("#tt-film-id").textContent = String(j.id);
+        const pill = $("#tt-statut-pill");
+        pill.textContent =
+          j.statut === "disponible"
+            ? "Disponible"
+            : j.statut === "erreur"
+              ? "Erreur"
+              : "En cours";
+        pill.className =
+          "status-pill " +
+          (j.statut === "disponible"
+            ? "s-done"
+            : j.statut === "erreur"
+              ? "s-error"
+              : "s-transcoding");
+        $("#tt-traitement").textContent = j.traitement
+          ? "Traitement : " + j.traitement
+          : "Traitement : …";
+        const pct = Math.min(100, Math.max(0, Number(j.pipeline_progress) || 0));
+        $("#tt-progress-fill").style.width = pct + "%";
+        const tx = transcodeProgressLabel(pct, j.traitement, j.statut);
+        $("#tt-progress-label").textContent =
+          "Progression pipeline : " + pct + " %" + (tx ? " · " + tx : "");
+        const lines = [];
+        if (j.duree_min != null) lines.push("Durée : " + j.duree_min + " min");
+        if (j.codec_video) lines.push("Vidéo : " + j.codec_video);
+        if (j.codec_audio) lines.push("Audio : " + j.codec_audio);
+        if (j.resolution) lines.push("Résolution : " + j.resolution);
+        if (j.taille_octets != null)
+          lines.push("Taille : " + fmtBytes(Number(j.taille_octets)));
+        $("#tt-meta").textContent = lines.join("\n") || "—";
+
+        $("#tt-err").classList.add("hidden");
+        const vid = $("#tt-video");
+        const streamUrl =
+          j.statut === "disponible" && j.url_streaming
+            ? String(j.url_streaming)
+            : "";
+
+        if (j.statut === "erreur") {
+          $("#tt-video-wrap").classList.add("hidden");
+          if (vid) {
+            vid.removeAttribute("src");
+            vid.removeAttribute("data-tt-stream-url");
+            try {
+              vid.load();
+            } catch (_) {}
+          }
+          $("#tt-err").textContent = j.erreur_message || "Erreur inconnue";
+          $("#tt-err").classList.remove("hidden");
+          $("#tt-price-box").classList.add("hidden");
+          return;
+        }
+
+        const est = j.estimated_gpu_rental_usd;
+        if (est != null && j.duree_min != null) {
+          const dph = j.pricing_dph_usd != null ? Number(j.pricing_dph_usd) : null;
+          $("#tt-price-val").textContent =
+            "~ " +
+            est +
+            " USD" +
+            (dph != null && !Number.isNaN(dph)
+              ? " (base " + dph + " $/h × durée film)"
+              : "");
+          $("#tt-price-note").textContent = j.pricing_note_fr || "";
+          $("#tt-price-box").classList.remove("hidden");
+        } else {
+          $("#tt-price-box").classList.add("hidden");
+        }
+
+        if (streamUrl && vid) {
+          $("#tt-video-wrap").classList.remove("hidden");
+          const prev = vid.getAttribute("data-tt-stream-url") || "";
+          if (prev !== streamUrl) {
+            vid.setAttribute("data-tt-stream-url", streamUrl);
+            vid.src = streamUrl;
+            $("#tt-stream-link").href = streamUrl;
+          }
+        } else {
+          $("#tt-video-wrap").classList.add("hidden");
+          if (vid) {
+            vid.removeAttribute("src");
+            vid.removeAttribute("data-tt-stream-url");
+            try {
+              vid.load();
+            } catch (_) {}
+          }
+        }
+      }
+
+      function transcodeTestUpload(file) {
+        const list = $("#tt-upload-row");
+        list.innerHTML = "";
+        list.classList.add("is-active");
+        const row = document.createElement("div");
+        row.className = "upload-job";
+        row.innerHTML =
+          '<div class="upload-job-head"><span class="upload-job-name"></span><span class="upload-job-pct">0%</span></div><div class="upload-job-track"><div class="upload-job-fill" style="width:0%"></div></div><div class="upload-job-msg hidden"></div>';
+        const nameEl = row.querySelector(".upload-job-name");
+        const pctEl = row.querySelector(".upload-job-pct");
+        const fill = row.querySelector(".upload-job-fill");
+        const msgEl = row.querySelector(".upload-job-msg");
+        nameEl.textContent = file.name;
+        list.appendChild(row);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/admin/upload");
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) {
+            pctEl.textContent = "…";
+            return;
+          }
+          const p = Math.min(100, Math.round((100 * e.loaded) / e.total));
+          fill.style.width = p + "%";
+          pctEl.textContent = p + "%";
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            fill.style.width = "100%";
+            pctEl.textContent = "100%";
+            row.classList.add("upload-job-ok");
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.job_id) {
+                transcodeTestFilmId = resp.job_id;
+                localStorage.setItem(TT_FILM_LS, String(resp.job_id));
+                void transcodeTestPollTick();
+                void refreshQueue();
+                void refreshStats();
+              }
+            } catch (_) {}
+          } else {
+            row.classList.add("upload-job-err");
+            let msg = "Échec upload (HTTP " + xhr.status + ")";
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.detail)
+                msg = typeof resp.detail === "string" ? resp.detail : msg;
+            } catch (_) {}
+            msgEl.textContent = msg;
+            msgEl.classList.remove("hidden");
+            pctEl.textContent = "—";
+          }
+        };
+        xhr.onerror = () => {
+          row.classList.add("upload-job-err");
+          msgEl.textContent = "Erreur réseau";
+          msgEl.classList.remove("hidden");
+          pctEl.textContent = "—";
+        };
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        fd.append("content_kind", "film");
+        xhr.send(fd);
+      }
+
+      const VAST_TASK_LS = "admin_transcode_vast_task_id";
+      let vastTestTaskId = null;
+
+      function vastTestEnterRestore() {
+        const t = localStorage.getItem(VAST_TASK_LS);
+        if (t && String(t).trim()) {
+          vastTestTaskId = String(t).trim();
+          void vastTestPollTick();
+        }
+      }
+
+      async function vastTestPollTick() {
+        const page = $("#page-transcode-vast");
+        if (!page || !page.classList.contains("active")) return;
+        const tid = vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+        if (!tid || !String(tid).trim()) return;
+        vastTestTaskId = String(tid).trim();
+        let r;
+        try {
+          r = await api(
+            "/api/admin/transcode/vast/status/" + encodeURIComponent(vastTestTaskId),
+          );
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const j = await r.json();
+        $("#vast-job-panel").classList.remove("hidden");
+        $("#vast-task-line").textContent =
+          "Celery : " +
+          (j.state || "?") +
+          (j.task_id ? " · task " + j.task_id : "");
+        const pct =
+          j.state === "SUCCESS"
+            ? 100
+            : j.state === "FAILURE"
+              ? 100
+              : j.meta && typeof j.meta.progress === "number"
+                ? Math.min(99, Math.max(0, j.meta.progress))
+                : j.state === "PENDING"
+                  ? 2
+                  : 10;
+        $("#vast-progress-fill").style.width = pct + "%";
+        const metaStr = JSON.stringify(j, null, 2);
+        const metaEl = $("#vast-meta");
+        if (metaEl && metaEl.textContent !== metaStr) metaEl.textContent = metaStr;
+        $("#vast-err").classList.add("hidden");
+        const bcan = $("#vast-btn-cancel");
+        if (bcan) {
+          const activeTid =
+            vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+          bcan.disabled = !activeTid || !!j.ready;
+        }
+        const vv = $("#vast-video");
+        const outUrl =
+          j.ready && j.result && j.result.output_url
+            ? String(j.result.output_url)
+            : "";
+
+        if (j.ready && j.error) {
+          $("#vast-video-wrap").classList.add("hidden");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+          $("#vast-err").textContent = j.error;
+          $("#vast-err").classList.remove("hidden");
+          return;
+        }
+
+        if (outUrl && vv) {
+          $("#vast-video-wrap").classList.remove("hidden");
+          const prev = vv.getAttribute("data-vast-out-url") || "";
+          if (prev !== outUrl) {
+            vv.setAttribute("data-vast-out-url", outUrl);
+            vv.src = outUrl;
+            const sl = $("#vast-stream-link");
+            if (sl) sl.href = outUrl;
+          }
+        } else {
+          $("#vast-video-wrap").classList.add("hidden");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+        }
+      }
+
+      function vastTestUpload(file) {
+        const list = $("#vast-upload-row");
+        list.innerHTML = "";
+        list.classList.add("is-active");
+        const row = document.createElement("div");
+        row.className = "upload-job";
+        row.innerHTML =
+          '<div class="upload-job-head"><span class="upload-job-name"></span><span class="upload-job-pct">0%</span></div><div class="upload-job-track"><div class="upload-job-fill" style="width:0%"></div></div><div class="upload-job-msg hidden"></div>';
+        const nameEl = row.querySelector(".upload-job-name");
+        const pctEl = row.querySelector(".upload-job-pct");
+        const fill = row.querySelector(".upload-job-fill");
+        const msgEl = row.querySelector(".upload-job-msg");
+        nameEl.textContent = file.name;
+        list.appendChild(row);
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/admin/transcode/vast");
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = (e) => {
+          if (!e.lengthComputable) {
+            pctEl.textContent = "…";
+            return;
+          }
+          const p = Math.min(100, Math.round((100 * e.loaded) / e.total));
+          fill.style.width = p + "%";
+          pctEl.textContent = p + "%";
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            fill.style.width = "100%";
+            pctEl.textContent = "100%";
+            row.classList.add("upload-job-ok");
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.task_id) {
+                vastTestTaskId = resp.task_id;
+                localStorage.setItem(VAST_TASK_LS, String(resp.task_id));
+                void vastTestPollTick();
+              }
+            } catch (_) {}
+          } else {
+            row.classList.add("upload-job-err");
+            let msg = "Échec (HTTP " + xhr.status + ")";
+            try {
+              const resp = JSON.parse(xhr.responseText || "{}");
+              if (resp.detail)
+                msg = typeof resp.detail === "string" ? resp.detail : msg;
+            } catch (_) {}
+            msgEl.textContent = msg;
+            msgEl.classList.remove("hidden");
+            pctEl.textContent = "—";
+          }
+        };
+        xhr.onerror = () => {
+          row.classList.add("upload-job-err");
+          msgEl.textContent = "Erreur réseau";
+          msgEl.classList.remove("hidden");
+          pctEl.textContent = "—";
+        };
+        const fd = new FormData();
+        fd.append("file", file, file.name);
+        const oidRaw = ($("#vast-offer-id") && $("#vast-offer-id").value) || "";
+        const oid = parseInt(String(oidRaw).trim(), 10);
+        if (Number.isFinite(oid) && oid > 0) fd.append("offer_id", String(oid));
+        xhr.send(fd);
+      }
+
+      async function vastTestCancel() {
+        const tid = vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
+        if (!tid || !String(tid).trim()) return;
+        const btn = $("#vast-btn-cancel");
+        if (btn) btn.disabled = true;
+        try {
+          const r = await api(
+            "/api/admin/transcode/vast/cancel/" +
+              encodeURIComponent(String(tid).trim()),
+            { method: "POST" },
+          );
+          const raw = await r.text();
+          if (r.status === 409) {
+            let msg = "La tâche est déjà terminée.";
+            try {
+              const j = JSON.parse(raw);
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            const errEl = $("#vast-err");
+            if (errEl) {
+              errEl.textContent = msg;
+              errEl.classList.remove("hidden");
+            }
+            if (btn) btn.disabled = false;
+            void vastTestPollTick();
+            return;
+          }
+          if (!r.ok) {
+            let msg = "Annulation impossible (HTTP " + r.status + ")";
+            try {
+              const j = JSON.parse(raw);
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
+            } catch (_) {}
+            $("#vast-job-panel").classList.remove("hidden");
+            const errEl = $("#vast-err");
+            if (errEl) {
+              errEl.textContent = msg;
+              errEl.classList.remove("hidden");
+            }
+            if (btn) btn.disabled = false;
+            return;
+          }
+          let summary = {};
+          try {
+            summary = JSON.parse(raw || "{}");
+          } catch (_) {
+            summary = {};
+          }
+          vastTestTaskId = null;
+          try {
+            localStorage.removeItem(VAST_TASK_LS);
+          } catch (_) {}
+          $("#vast-job-panel").classList.remove("hidden");
+          $("#vast-task-line").textContent = "Test Vast annulé";
+          $("#vast-progress-fill").style.width = "0%";
+          $("#vast-meta").textContent = JSON.stringify(summary, null, 2);
+          $("#vast-err").classList.add("hidden");
+          $("#vast-video-wrap").classList.add("hidden");
+          const vv = $("#vast-video");
+          if (vv) {
+            vv.removeAttribute("src");
+            vv.removeAttribute("data-vast-out-url");
+            try {
+              vv.load();
+            } catch (_) {}
+          }
+          if (btn) btn.disabled = true;
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          if (btn) btn.disabled = false;
+        }
+      }
+
       function goPage(p) {
         document
           .querySelectorAll(".page")
@@ -2872,6 +3722,9 @@
           loadInvites(true);
         }
         if (p === "gpu") loadGpuOnce();
+        if (p === "transcode-local") transcodeLocalEnterPage();
+        else if (p === "transcode-vast") transcodeVastEnterPage();
+        else transcodePipelinesLeavePage();
       }
 
       document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
@@ -2906,6 +3759,12 @@
         setInterval(() => {
           if ($("#page-gpu").classList.contains("active")) loadGpuOnce();
         }, 3000);
+        setInterval(() => {
+          const pl = $("#page-transcode-local");
+          if (pl && pl.classList.contains("active")) void transcodeTestPollTick();
+          const pv = $("#page-transcode-vast");
+          if (pv && pv.classList.contains("active")) void vastTestPollTick();
+        }, 1600);
       }
 
       $("#btn-logout").addEventListener("click", async () => {
@@ -3488,6 +4347,10 @@
             (enc.vendor === "cpu" ? "⚠ CPU — " : "") +
             (s.gpu_label || enc.label || enc.vendor || "GPU");
           $("#gpu-pill-text").textContent = txt;
+          const lp = $("#gpu-pill-text-local");
+          if (lp) lp.textContent = txt;
+          const vp = $("#gpu-pill-text-vast");
+          if (vp) vp.textContent = txt;
           $("#gpu-active").textContent = txt;
         } catch (_) {}
       }
@@ -4956,6 +5819,91 @@
         const dot = n.lastIndexOf(".");
         return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
       }
+
+      $("#btn-tt-reset").addEventListener("click", () => {
+        localStorage.removeItem(TT_FILM_LS);
+        transcodeTestFilmId = null;
+        $("#tt-job-panel").classList.add("hidden");
+        $("#tt-upload-row").innerHTML = "";
+        $("#tt-upload-row").classList.remove("is-active");
+        const vid = $("#tt-video");
+        if (vid) {
+          vid.removeAttribute("src");
+          vid.removeAttribute("data-tt-stream-url");
+          try {
+            vid.load();
+          } catch (_) {}
+        }
+      });
+
+      $("#tt-drop-zone").addEventListener("click", () =>
+        $("#tt-file-input").click(),
+      );
+      $("#tt-file-input").addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f && isVideoUploadFile(f)) transcodeTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Choisis une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+        e.target.value = "";
+      });
+      const ttdz = $("#tt-drop-zone");
+      ["dragenter", "dragover"].forEach((ev) =>
+        ttdz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }),
+      );
+      ttdz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && isVideoUploadFile(f)) transcodeTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Dépose une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+      });
+
+      $("#vast-drop-zone").addEventListener("click", () =>
+        $("#vast-file-input").click(),
+      );
+      $("#vast-file-input").addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f && isVideoUploadFile(f)) vastTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Choisis une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+        e.target.value = "";
+      });
+      const vastdz = $("#vast-drop-zone");
+      ["dragenter", "dragover"].forEach((ev) =>
+        vastdz.addEventListener(ev, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }),
+      );
+      vastdz.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f && isVideoUploadFile(f)) vastTestUpload(f);
+        else if (f)
+          void showAlertModal(
+            "Fichier non pris en charge",
+            "Dépose une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
+            { okText: "OK" },
+          );
+      });
+      const vastCancelBtn = $("#vast-btn-cancel");
+      if (vastCancelBtn)
+        vastCancelBtn.addEventListener("click", () => void vastTestCancel());
 
       let uploadJobSeq = 0;
 
