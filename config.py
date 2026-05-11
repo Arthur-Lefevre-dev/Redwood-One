@@ -47,6 +47,12 @@ class Settings(BaseSettings):
     # GPU: auto | amd | nvidia | intel | cpu — "amd" forces VAAPI if /dev/dri + ffmpeg vaapi (see docker-compose /dev/dri)
     REDWOOD_GPU_VENDOR: str = ""
 
+    # Transcode pipeline (ffmpeg): target average video bitrate in kbit/s (e.g. 6000 ≈ 6 Mbit/s).
+    # VBV maxrate/bufsize cap peaks; no -vf scale / no -r so resolution and frame rate follow the source.
+    TRANSCODE_VIDEO_BITRATE_KBPS: int = 6000
+    TRANSCODE_VIDEO_MAXRATE_KBPS: int = 7200
+    TRANSCODE_VIDEO_BUFSIZE_KBPS: int = 12000
+
     # If True, POST /api/auth/register accepts users without an invite code (dev only).
     REGISTRATION_OPEN: bool = False
 

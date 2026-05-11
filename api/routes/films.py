@@ -156,6 +156,17 @@ def list_films(
     actor: Optional[str] = None,
     director: Optional[str] = None,
     tmdb_id: Optional[int] = Query(None, description="Filter by stored TMDB id (movie or TV ref)."),
+    exclude_id: Optional[int] = Query(
+        None,
+        description="Exclude this film id (e.g. current title on film page).",
+    ),
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        le=100,
+        description="When set, return a page of at most `limit` rows after `offset`.",
+    ),
+    offset: int = Query(0, ge=0, description="Skip this many rows when `limit` is set."),
 ):
     query = db.query(Film).filter(
         Film.statut == FilmStatut.disponible,
@@ -163,6 +174,8 @@ def list_films(
     )
     if tmdb_id is not None:
         query = query.filter(Film.tmdb_id == tmdb_id)
+    if exclude_id is not None:
+        query = query.filter(Film.id != exclude_id)
     if director and director.strip():
         query = query.filter(Film.realisateur.ilike(f"%{director.strip()}%"))
     if actor and actor.strip():
@@ -180,8 +193,10 @@ def list_films(
             cast(Film.genres, Text).ilike(like),
         ]
         query = query.filter(or_(*clauses))
-    films = query.order_by(Film.date_ajout.desc()).all()
-    return films
+    query = query.order_by(Film.date_ajout.desc())
+    if limit is not None:
+        return query.offset(offset).limit(limit).all()
+    return query.all()
 
 
 @router.get("/featured", response_model=List[FilmOut])

@@ -163,8 +163,18 @@ def list_series(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     q: Optional[str] = None,
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        le=100,
+        description="When set, return at most `limit` items after `offset` (stable title sort).",
+    ),
+    offset: int = Query(0, ge=0, description="Skip this many catalog items when `limit` is set."),
 ):
-    return _build_series_catalog(db, q)
+    rows = _build_series_catalog(db, q)
+    if limit is not None:
+        return rows[offset : offset + limit]
+    return rows
 
 
 @router.get("/recent")

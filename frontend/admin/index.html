@@ -214,6 +214,25 @@
       .lib-search-clear[hidden] {
         display: none !important;
       }
+      .lib-pager {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 10px 16px;
+        border-top: 0.5px solid var(--color-border-tertiary);
+        background: var(--color-background-secondary);
+      }
+      .lib-pager-info {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin-right: auto;
+        line-height: 1.4;
+      }
+      .lib-pager .btn {
+        min-width: 92px;
+      }
       .btn {
         font-size: 12px;
         padding: 6px 14px;
@@ -1712,6 +1731,7 @@
                     </thead>
                     <tbody id="lib-body-films"></tbody>
                   </table>
+                  <div id="lib-films-pager" class="lib-pager"></div>
                 </div>
               </div>
               <div class="card" style="margin-top: 16px">
@@ -1720,6 +1740,7 @@
                 </div>
                 <div class="card-body" style="padding: 0; overflow: auto">
                   <div id="lib-series-root" class="lib-series-root"></div>
+                  <div id="lib-series-pager" class="lib-pager"></div>
                 </div>
               </div>
             </div>
@@ -3570,19 +3591,104 @@
         tb.appendChild(tr);
       }
 
-      async function loadLibrary() {
+      const LIB_PAGE_SIZE = 10;
+      let libFilmsPage = 1;
+      let libEpsPage = 1;
+
+      function renderAdminLibPager(host, label, page, total, onPage) {
+        if (!host) return;
+        const pageSize = LIB_PAGE_SIZE;
+        const totalPages = Math.max(1, Math.ceil((total || 0) / pageSize));
+        const safe = Math.min(Math.max(1, page), totalPages);
+        host.innerHTML = "";
+        const info = document.createElement("span");
+        info.className = "lib-pager-info";
+        info.textContent =
+          label +
+          " · page " +
+          safe +
+          " / " +
+          totalPages +
+          (total ? " (" + total + " entrées)" : "");
+        const prev = document.createElement("button");
+        prev.type = "button";
+        prev.className = "btn";
+        prev.textContent = "Précédent";
+        prev.disabled = safe <= 1;
+        prev.onclick = () => onPage(safe - 1);
+        const next = document.createElement("button");
+        next.type = "button";
+        next.className = "btn";
+        next.textContent = "Suivant";
+        next.disabled = safe >= totalPages;
+        next.onclick = () => onPage(safe + 1);
+        host.appendChild(info);
+        host.appendChild(prev);
+        host.appendChild(next);
+      }
+
+      async function loadLibrary(resetPages = true) {
+        if (resetPages) {
+          libFilmsPage = 1;
+          libEpsPage = 1;
+        }
         const q = $("#lib-search").value.trim();
-        const url =
-          "/api/admin/films" + (q ? "?q=" + encodeURIComponent(q) : "");
-        const r = await api(url);
-        const rows = await r.json();
-        const episodes = rows.filter((x) => libraryRowIsSeriesEpisode(x));
-        const films = rows.filter((x) => !libraryRowIsSeriesEpisode(x));
-        const showLabels = episodes.map(adminSeriesShowLabel);
-        const nShows = new Set(showLabels).size;
+        const qParam = q ? "&q=" + encodeURIComponent(q) : "";
+        const qMeta = q ? "?q=" + encodeURIComponent(q) : "";
+        const metaR = await api("/api/admin/library-meta" + qMeta);
+        if (!metaR.ok) {
+          $("#lib-sub").textContent = "Impossible de charger les totaux.";
+          return;
+        }
+        const meta = await metaR.json();
+        const filmsTotalMeta = meta.films_total ?? 0;
+        const epsTotalMeta = meta.episodes_total ?? 0;
+        const tpF = Math.max(1, Math.ceil(filmsTotalMeta / LIB_PAGE_SIZE));
+        const tpE = Math.max(1, Math.ceil(epsTotalMeta / LIB_PAGE_SIZE));
+        if (resetPages) {
+          libFilmsPage = 1;
+          libEpsPage = 1;
+        } else {
+          libFilmsPage = Math.min(Math.max(1, libFilmsPage), tpF);
+          libEpsPage = Math.min(Math.max(1, libEpsPage), tpE);
+        }
         $("#lib-sub").textContent =
-          `${films.length} film(s) · ${episodes.length} épisode(s)` +
-          (nShows ? ` · ${nShows} série(s)` : "");
+          filmsTotalMeta +
+          " film(s) · " +
+          epsTotalMeta +
+          " épisode(s)" +
+          ((meta.series_shows_total ?? 0) > 0
+            ? " · " + meta.series_shows_total + " série(s)"
+            : "");
+
+        const filmUrl =
+          "/api/admin/films?content_kind=film&page=" +
+          libFilmsPage +
+          "&page_size=" +
+          LIB_PAGE_SIZE +
+          qParam;
+        const epUrl =
+          "/api/admin/films?content_kind=series_episode&page=" +
+          libEpsPage +
+          "&page_size=" +
+          LIB_PAGE_SIZE +
+          qParam;
+
+        const [filmR, epR] = await Promise.all([api(filmUrl), api(epUrl)]);
+        if (!filmR.ok || !epR.ok) {
+          $("#lib-body-films").innerHTML = `<tr><td colspan="7" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Erreur de chargement de la bibliothèque.</td></tr>`;
+          $("#lib-series-root").innerHTML = "";
+          $("#lib-films-pager").innerHTML = "";
+          $("#lib-series-pager").innerHTML = "";
+          return;
+        }
+        const filmPack = await filmR.json();
+        const epPack = await epR.json();
+        const filmsTotal = filmPack.total ?? 0;
+        const epsTotal = epPack.total ?? 0;
+
+        const films = filmPack.items || [];
+        const episodes = epPack.items || [];
 
         const tbFilms = $("#lib-body-films");
         tbFilms.innerHTML = "";
@@ -3595,6 +3701,17 @@
             appendLibraryRow(tbFilms, f, f.titre, f.realisateur || "");
           });
         }
+
+        renderAdminLibPager(
+          $("#lib-films-pager"),
+          "Films",
+          libFilmsPage,
+          filmsTotal,
+          (p) => {
+            libFilmsPage = p;
+            loadLibrary(false);
+          },
+        );
 
         const root = $("#lib-series-root");
         root.innerHTML = "";
@@ -3728,6 +3845,17 @@
             root.appendChild(block);
           }
         }
+
+        renderAdminLibPager(
+          $("#lib-series-pager"),
+          "Épisodes (séries)",
+          libEpsPage,
+          epsTotal,
+          (p) => {
+            libEpsPage = p;
+            loadLibrary(false);
+          },
+        );
       }
 
       function smGetSeriesKey() {

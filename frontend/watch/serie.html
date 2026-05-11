@@ -94,6 +94,7 @@
     .ep-num{flex:0 0 52px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
     .ep-title{flex:1;color:#e5e5e5}
     .empty{color:var(--muted);padding:40px;text-align:center}
+    .series-list-sentinel{height:4px;margin:0;pointer-events:none;opacity:0}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
   </style>
 </head>
@@ -125,6 +126,8 @@
   <main id="main-list">
     <h1>Séries</h1>
     <div class="grid" id="series-grid"></div>
+    <div id="series-sentinel" class="series-list-sentinel" aria-hidden="true"></div>
+    <p class="empty" id="series-loading-more" style="display:none;margin-top:8px">Chargement…</p>
     <p class="empty" id="empty-list" style="display:none">Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.</p>
   </main>
   <main id="main-detail" style="display:none">
@@ -169,18 +172,99 @@
       document.getElementById('main-detail').style.display = 'none';
     }
     function showDetail() {
+      disconnectSeriesListObserver();
       document.getElementById('main-list').style.display = 'none';
       document.getElementById('main-detail').style.display = 'block';
     }
 
+    const SERIES_PAGE = 24;
+    let seriesListState = { offset: 0, needle: '', loading: false, done: false };
+    let seriesListIo = null;
+
+    function disconnectSeriesListObserver() {
+      if (seriesListIo) {
+        seriesListIo.disconnect();
+        seriesListIo = null;
+      }
+    }
+
+    function appendSeriesListCard(s) {
+      const g = document.getElementById('series-grid');
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.onclick = () => {
+        location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key);
+      };
+      const img = s.poster_path ? posterUrl(s.poster_path) : '';
+      el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
+      const nEp = Number(s.episode_count) || 0;
+      const nSe = Number(s.season_count) || 0;
+      const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
+      const seLabel = nSe === 1 ? '1 saison' : nSe + ' saisons';
+      el.querySelector('.t').textContent = s.title + ' · ' + epLabel + ' · ' + seLabel;
+      g.appendChild(el);
+    }
+
+    async function fetchSeriesListPage() {
+      let url = '/api/series?limit=' + SERIES_PAGE + '&offset=' + seriesListState.offset;
+      if (seriesListState.needle) url += '&q=' + encodeURIComponent(seriesListState.needle);
+      return apiJson(url);
+    }
+
+    async function loadSeriesListAppend() {
+      if (seriesListState.loading || seriesListState.done) return;
+      if (document.getElementById('main-list').style.display === 'none') return;
+      const loadMore = document.getElementById('series-loading-more');
+      seriesListState.loading = true;
+      loadMore.style.display = 'block';
+      try {
+        const rows = await fetchSeriesListPage();
+        rows.forEach(appendSeriesListCard);
+        seriesListState.offset += rows.length;
+        if (rows.length < SERIES_PAGE) seriesListState.done = true;
+      } finally {
+        seriesListState.loading = false;
+        loadMore.style.display = 'none';
+      }
+    }
+
+    function setupSeriesListObserver() {
+      disconnectSeriesListObserver();
+      const sentinel = document.getElementById('series-sentinel');
+      if (!sentinel) return;
+      seriesListIo = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((en) => {
+            if (!en.isIntersecting || seriesListState.loading || seriesListState.done) return;
+            loadSeriesListAppend().catch((e) => {
+              if (e && e.message === '401') { location.href = '/login.html'; return; }
+              console.error(e);
+              seriesListState.done = true;
+            });
+          });
+        },
+        { root: null, rootMargin: '280px', threshold: 0 },
+      );
+      seriesListIo.observe(sentinel);
+    }
+
     async function bootList(q) {
+      disconnectSeriesListObserver();
       const needle = (q || '').trim();
-      const url = '/api/series' + (needle ? '?q=' + encodeURIComponent(needle) : '');
-      const rows = await apiJson(url);
+      seriesListState = { offset: 0, needle, loading: false, done: false };
       const g = document.getElementById('series-grid');
       const empty = document.getElementById('empty-list');
+      const loadMore = document.getElementById('series-loading-more');
       const h1 = document.querySelector('#main-list h1');
       g.innerHTML = '';
+      loadMore.style.display = 'none';
+      seriesListState.loading = true;
+      let rows;
+      try {
+        rows = await fetchSeriesListPage();
+      } finally {
+        seriesListState.loading = false;
+      }
       if (!rows.length) {
         empty.style.display = 'block';
         empty.textContent = needle
@@ -191,21 +275,10 @@
       }
       empty.style.display = 'none';
       if (h1) h1.textContent = needle ? ('Résultats : « ' + needle + ' »') : 'Séries';
-      rows.forEach((s) => {
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.onclick = () => {
-          location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key);
-        };
-        const img = s.poster_path ? posterUrl(s.poster_path) : '';
-        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
-        const nEp = Number(s.episode_count) || 0;
-        const nSe = Number(s.season_count) || 0;
-        const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
-        const seLabel = nSe === 1 ? '1 saison' : nSe + ' saisons';
-        el.querySelector('.t').textContent = s.title + ' · ' + epLabel + ' · ' + seLabel;
-        g.appendChild(el);
-      });
+      rows.forEach(appendSeriesListCard);
+      seriesListState.offset += rows.length;
+      if (rows.length < SERIES_PAGE) seriesListState.done = true;
+      setupSeriesListObserver();
     }
 
     function applySerieTmdbScore(note) {

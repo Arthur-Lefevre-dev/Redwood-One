@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, List, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
@@ -141,16 +141,10 @@ def _enqueue_download_torrent_or_raise(
         )
 
 
-@router.get("/films")
-def admin_list_films(
-    db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
-    q: Optional[str] = None,
-):
-    query = db.query(Film).order_by(Film.date_ajout.desc())
-    if q:
-        like = f"%{q}%"
-        query = query.filter(
+def _apply_admin_library_q(query, q: Optional[str]):
+    if q and str(q).strip():
+        like = f"%{str(q).strip()}%"
+        return query.filter(
             or_(
                 Film.titre.ilike(like),
                 Film.realisateur.ilike(like),
@@ -158,30 +152,87 @@ def admin_list_films(
                 Film.series_key.ilike(like),
             )
         )
-    rows = query.limit(500).all()
-    return [
-        {
-            "id": f.id,
-            "titre": f.titre,
-            "titre_original": f.titre_original,
-            "realisateur": f.realisateur,
-            "annee": f.annee,
-            "taille_octets": f.taille_octets,
-            "codec_video": f.codec_video,
-            "traitement": f.traitement.value if f.traitement else None,
-            "statut": f.statut.value,
-            "poster_path": f.poster_path,
-            "source": f.source.value,
-            "erreur_message": f.erreur_message,
-            "content_kind": f.content_kind.value,
-            "series_title": f.series_title,
-            "series_key": f.series_key,
-            "season_number": f.season_number,
-            "episode_number": f.episode_number,
-            "s3_key": f.s3_key,
-        }
-        for f in rows
-    ]
+    return query
+
+
+def _admin_film_row_dict(f: Film) -> dict[str, Any]:
+    return {
+        "id": f.id,
+        "titre": f.titre,
+        "titre_original": f.titre_original,
+        "realisateur": f.realisateur,
+        "annee": f.annee,
+        "taille_octets": f.taille_octets,
+        "codec_video": f.codec_video,
+        "traitement": f.traitement.value if f.traitement else None,
+        "statut": f.statut.value,
+        "poster_path": f.poster_path,
+        "source": f.source.value,
+        "erreur_message": f.erreur_message,
+        "content_kind": f.content_kind.value,
+        "series_title": f.series_title,
+        "series_key": f.series_key,
+        "season_number": f.season_number,
+        "episode_number": f.episode_number,
+        "s3_key": f.s3_key,
+    }
+
+
+@router.get("/library-meta")
+def admin_library_meta(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    q: Optional[str] = None,
+):
+    """Totals for the admin library header (same search filter as list endpoints)."""
+    base = _apply_admin_library_q(db.query(Film), q)
+    films_total = base.filter(Film.content_kind == ContentKind.film).count()
+    ep_q = base.filter(Film.content_kind == ContentKind.series_episode)
+    episodes_total = ep_q.count()
+    subq = (
+        ep_q.order_by(None)
+        .with_entities(Film.series_key)
+        .filter(Film.series_key.isnot(None))
+        .filter(Film.series_key != "")
+        .distinct()
+        .subquery()
+    )
+    series_shows_total = int(db.query(func.count()).select_from(subq).scalar() or 0)
+    return {
+        "films_total": films_total,
+        "episodes_total": episodes_total,
+        "series_shows_total": series_shows_total,
+    }
+
+
+@router.get("/films")
+def admin_list_films(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    q: Optional[str] = None,
+    content_kind: str = Query(
+        ...,
+        description="film — longs métrages; series_episode — épisodes regroupés côté UI.",
+    ),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+):
+    if content_kind not in ("film", "series_episode"):
+        raise HTTPException(400, "content_kind must be 'film' or 'series_episode'")
+    kind = ContentKind.film if content_kind == "film" else ContentKind.series_episode
+    query = (
+        _apply_admin_library_q(db.query(Film), q)
+        .filter(Film.content_kind == kind)
+        .order_by(Film.date_ajout.desc())
+    )
+    total = query.count()
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "items": [_admin_film_row_dict(f) for f in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 def _film_to_admin_detail(f: Film) -> dict[str, Any]:

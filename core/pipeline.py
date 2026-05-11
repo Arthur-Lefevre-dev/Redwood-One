@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from config import get_settings
 from core.ffprobe import FFprobeError, probe, summarize
 from core.gpu_detect import get_encoder
 from core.logging_json import log_event
@@ -48,13 +49,16 @@ def _build_ffmpeg_cmd(
     cmd += ["-i", input_path]
     vcodec = enc["h265"] if use_h265 else enc["h264"]
     cmd += ["-c:v", vcodec]
-    if enc["vendor"] == "cpu":
-        cmd += ["-crf", "23", "-maxrate", "4M", "-bufsize", "8M"]
-    elif "_vaapi" in vcodec:
-        cmd += ["-qp", "23", "-maxrate", "4M", "-bufsize", "8M"]
-    else:
-        cmd += ["-cq", "23", "-maxrate", "4M", "-bufsize", "8M"]
-    cmd += ["-c:a", "aac", "-b:a", "128k", str(output_path)]
+    s = get_settings()
+    br = f"{int(s.TRANSCODE_VIDEO_BITRATE_KBPS)}k"
+    maxr = f"{int(s.TRANSCODE_VIDEO_MAXRATE_KBPS)}k"
+    buf = f"{int(s.TRANSCODE_VIDEO_BUFSIZE_KBPS)}k"
+    # Target average bitrate (VBV). No scale / no -r: resolution and fps follow the source.
+    cmd += ["-b:v", br, "-maxrate", maxr, "-bufsize", buf]
+    if enc["vendor"] != "cpu" and "_vaapi" not in vcodec:
+        if "_nvenc" in vcodec or "_amf" in vcodec:
+            cmd += ["-rc:v", "vbr"]
+    cmd += ["-c:a", "aac", "-b:a", "128k", "-fps_mode", "passthrough", str(output_path)]
     return cmd
 
 

@@ -507,17 +507,67 @@
       });
       setTimeout(() => { if (video.readyState >= 2) hideLoader(); }, 8000);
 
-      const films = await apiJson('/api/films');
       const sim = document.getElementById('sim');
-      films.filter(x => String(x.id) !== String(id)).slice(0, 12).forEach(x => {
+      const SIM_PAGE = 24;
+      const simState = { offset: 0, loading: false, done: false, io: null, sentinel: null };
+
+      function appendSimilarFilmCard(x) {
         const c = document.createElement('div');
         c.className = 'c';
-        c.onclick = () => location.href = '/watch/film.html?id=' + x.id;
+        c.onclick = () => { location.href = '/watch/film.html?id=' + x.id; };
         const img = x.poster_path ? posterUrl(x.poster_path) : '';
-        c.innerHTML = `<img src="${img}" alt="" loading="lazy" /><div class="t"></div>`;
+        c.innerHTML = '<img src="' + img + '" alt="" loading="lazy" /><div class="t"></div>';
         c.querySelector('.t').textContent = x.titre;
         sim.appendChild(c);
-      });
+      }
+
+      function ensureSimSentinel() {
+        if (!simState.sentinel) {
+          simState.sentinel = document.createElement('div');
+          simState.sentinel.id = 'sim-sentinel';
+          simState.sentinel.setAttribute('aria-hidden', 'true');
+          simState.sentinel.style.cssText =
+            'flex:0 0 12px;width:12px;min-height:120px;align-self:stretch;pointer-events:none;opacity:0';
+          simState.io = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting || simState.loading || simState.done) return;
+                loadSimilarFilmsPage();
+              });
+            },
+            { root: sim, rootMargin: '320px 0px', threshold: 0 },
+          );
+          simState.io.observe(simState.sentinel);
+        }
+        sim.appendChild(simState.sentinel);
+      }
+
+      async function loadSimilarFilmsPage() {
+        if (simState.loading || simState.done) return;
+        simState.loading = true;
+        try {
+          var q =
+            '/api/films?exclude_id=' +
+            encodeURIComponent(String(id)) +
+            '&limit=' +
+            SIM_PAGE +
+            '&offset=' +
+            simState.offset;
+          var films = await apiJson(q);
+          simState.offset += films.length;
+          if (films.length < SIM_PAGE) simState.done = true;
+          films.forEach(appendSimilarFilmCard);
+          ensureSimSentinel();
+        } catch (err) {
+          console.error(err);
+          simState.done = true;
+        } finally {
+          simState.loading = false;
+        }
+      }
+
+      sim.innerHTML = '';
+      loadSimilarFilmsPage();
     }
     boot().catch((e) => {
       if (e && e.message === '401') { location.href = '/login.html'; return; }
