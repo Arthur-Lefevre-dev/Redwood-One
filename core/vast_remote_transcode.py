@@ -56,6 +56,7 @@ def run_vast_transcode_test(
     job_token: str,
     src_ext: str,
     offer_id: Optional[int] = None,
+    film_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Pick a Vast offer, create an instance whose onstart downloads the input from S3 (presigned GET),
@@ -104,13 +105,10 @@ def run_vast_transcode_test(
         if offer_id is not None and int(offer_id) > 0:
             oid = int(offer_id)
         else:
-            offers = vast_ai.search_offers(vast_ai.default_gpu_name_list(), limit=5)
-            if not offers:
-                raise RuntimeError(
-                    "No Vast offer matched your filters (try raising VAST_MAX_DPH_PER_HOUR "
-                    "or VAST_DEFAULT_GPU_NAMES)."
-                )
-            first = offers[0]
+            first = vast_ai.pick_first_verified_bundle_offer(
+                vast_ai.default_gpu_name_list(),
+                search_limit=48,
+            )
             oid = int(first["id"])
             picked_gpu_name = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
 
@@ -201,6 +199,19 @@ def run_vast_transcode_test(
 
         view_url = presigned_stream_url(output_key, expires=86400)
         dph = float(s.VAST_MAX_DPH_PER_HOUR)
+        if film_id is not None and int(film_id) > 0:
+            from core.vast_film_finalize import finalize_film_from_vast_s3_output
+            from db.models import Film as FilmRow
+            from db.session import SessionLocal
+
+            finalize_film_from_vast_s3_output(int(film_id), output_key)
+            dbf = SessionLocal()
+            try:
+                frow = dbf.get(FilmRow, int(film_id))
+                if frow and frow.s3_key:
+                    view_url = presigned_stream_url(frow.s3_key, expires=86400)
+            finally:
+                dbf.close()
         if rid:
             clear_cancel_flag(rid)
         return {
@@ -211,6 +222,7 @@ def run_vast_transcode_test(
             "offer_id": oid,
             "vast_instance_id": int(inst_id),
             "pricing_dph_usd": dph,
+            "film_id": int(film_id) if film_id is not None and int(film_id) > 0 else None,
         }
     finally:
         if inst_id is not None:

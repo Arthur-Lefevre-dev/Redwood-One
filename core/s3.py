@@ -99,6 +99,30 @@ def delete_object_key(key: str) -> None:
     logger.info("s3: deleted s3://%s/%s", s.S3_BUCKET_NAME, key)
 
 
+def copy_object_key(src_key: str, dst_key: str) -> None:
+    """Server-side copy within the configured bucket."""
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    client.copy_object(
+        Bucket=s.S3_BUCKET_NAME,
+        Key=dst_key,
+        CopySource={"Bucket": s.S3_BUCKET_NAME, "Key": src_key},
+    )
+    logger.info("s3: copied s3://%s/%s -> %s", s.S3_BUCKET_NAME, src_key, dst_key)
+
+
+def download_object_to_file(key: str, dest_path: str) -> None:
+    """Download full object to a local path (e.g. for ffprobe after copy)."""
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    client.download_file(s.S3_BUCKET_NAME, key, dest_path)
+    logger.info("s3: downloaded s3://%s/%s -> %s", s.S3_BUCKET_NAME, key, dest_path)
+
+
 _FILM_KEY = re.compile(r"^films/(\d+)/([^/]+)$", re.I)
 _VIDEO_EXT = {".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".wmv"}
 

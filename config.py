@@ -80,6 +80,8 @@ class Settings(BaseSettings):
     VAST_TRANSCODE_MAX_WAIT_SEC: int = 7200
     # Seconds to wait in onstart for /dev/nvidia0 (Vast can attach GPU nodes slightly after boot).
     VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC: int = 90
+    # If True, bundle search for auto-picked transcode uses num_gpus eq 1 only (reduces CDI gpu=N failures on some hosts).
+    VAST_TRANSCODE_SINGLE_GPU_ONLY: bool = True
 
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"

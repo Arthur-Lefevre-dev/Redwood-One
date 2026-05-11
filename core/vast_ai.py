@@ -42,6 +42,7 @@ def search_offers(
     min_reliability: float = 0.95,
     verified: bool = True,
     num_gpus_min: int = 1,
+    num_gpus_eq: Optional[int] = None,
     max_dph_per_hour: Optional[float] = None,
     max_bandwidth_usd_per_tb: Optional[float] = None,
 ) -> List[Dict[str, Any]]:
@@ -50,6 +51,8 @@ def search_offers(
 
     When max_bandwidth_usd_per_tb is set, applies inet_down_cost / inet_up_cost
     lte in $/GB (API fields), i.e. max_usd_per_tb / 1024 per GB.
+
+    When num_gpus_eq is set, the bundles filter uses num_gpus eq that value (overrides num_gpus_min).
     """
     api_key = require_vast_api_key()
     s = get_settings()
@@ -64,9 +67,14 @@ def search_offers(
         else float(s.VAST_MAX_BANDWIDTH_USD_PER_TB)
     )
 
+    if num_gpus_eq is not None:
+        num_gpus_filter: Dict[str, Any] = {"eq": int(num_gpus_eq)}
+    else:
+        num_gpus_filter = {"gte": int(num_gpus_min)}
+
     payload: Dict[str, Any] = {
         "gpu_name": {"in": names},
-        "num_gpus": {"gte": num_gpus_min},
+        "num_gpus": num_gpus_filter,
         "reliability": {"gte": min_reliability},
         "verified": {"eq": verified},
         "rentable": {"eq": True},
@@ -178,3 +186,43 @@ def default_gpu_name_list() -> List[str]:
     if not raw:
         return ["RTX 3060", "RTX 4060"]
     return [x.strip() for x in raw.split(",") if x.strip()]
+
+
+def pick_first_verified_bundle_offer(
+    gpu_names: List[str],
+    *,
+    search_limit: int = 48,
+) -> Dict[str, Any]:
+    """
+    Auto-pick the first GPU offer that is verified (API filter + client-side skip if verified=false).
+    Raises RuntimeError if none match.
+    """
+    s = get_settings()
+    single_gpu = bool(getattr(s, "VAST_TRANSCODE_SINGLE_GPU_ONLY", True))
+    search_kw: Dict[str, Any] = {"verified": True, "limit": search_limit}
+    if single_gpu:
+        search_kw["num_gpus_eq"] = 1
+    raw = search_offers(gpu_names, **search_kw)
+    for o in raw:
+        if not isinstance(o, dict):
+            continue
+        if o.get("verified") is False:
+            continue
+        if single_gpu:
+            ng = o.get("num_gpus")
+            try:
+                if ng is not None and int(ng) != 1:
+                    continue
+            except (TypeError, ValueError):
+                continue
+        oid = o.get("id")
+        if oid is not None:
+            return o
+    raise RuntimeError(
+        "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
+        "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_DEFAULT_GPU_NAMES"
+        + (", une seule GPU requise (VAST_TRANSCODE_SINGLE_GPU_ONLY)" if single_gpu else "")
+        + "). Élargissez les noms de GPU ou augmentez le plafond $/h"
+        + (" ou désactivez VAST_TRANSCODE_SINGLE_GPU_ONLY si l'API n'a aucune offre 1×GPU" if single_gpu else "")
+        + "."
+    )

@@ -1265,7 +1265,9 @@
                     >
                       Pour une série, indiquez la clé, le titre, la saison et
                       l’épisode dans <strong>Modifier</strong> une fois le
-                      traitement terminé.
+                      traitement terminé. Les magnet / .torrent ajoutés
+                      <strong>ici</strong> sont encodés sur <strong>cette machine</strong>
+                      après téléchargement (onglet Vast pour encoder sur GPU Vast).
                     </p>
                   </div>
                   <div
@@ -1537,9 +1539,11 @@
                       "
                     >
                       <strong>Upload vidéo</strong> : transcodage sur Vast (un job
-                      par fichier). <strong>Magnet / .torrent</strong> : même file
-                      que le pipeline local (téléchargement sur ce worker), puis
-                      traitement habituel.
+                      par fichier). <strong>Magnet / .torrent sur cet onglet</strong>
+                      : téléchargement sur ce worker puis <strong>transcodage Vast</strong>
+                      (offre ci-dessus si renseignée). Sur l’onglet
+                      <strong>Pipeline · Local</strong>, le même torrent est encodé
+                      <strong>localement</strong> après téléchargement.
                     </p>
                   </div>
                   <div
@@ -4197,6 +4201,13 @@
                 : "s-waiting";
           const label =
             st === "en_cours" ? "En cours" : st === "erreur" ? "Erreur" : st;
+          const canCancelPipeline =
+            st === "en_cours" &&
+            i.celery_task_id &&
+            String(i.celery_task_id).trim() !== "";
+          const cancelBtn = canCancelPipeline
+            ? ` <button type="button" class="btn" data-cancel-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
+            : "";
           let progW = Math.min(100, i.progress || 0);
           if (
             i.source === "torrent" &&
@@ -4213,13 +4224,16 @@
         <div class="qi-sub"></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
       </div>
-      <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}</div>`;
           row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
           const tline = torrentStatsLine(i.torrent_stats, i.source);
           const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
-          const base =
+          let base =
             i.erreur_message ||
             (i.traitement || "Pipeline") + " · " + (i.source || "");
+          if (i.source === "torrent" && i.transcode_target === "vast") {
+            base += " · encodage : Vast (après téléchargement)";
+          }
           const subParts = [base];
           if (tx) subParts.push(tx);
           if (tline) subParts.push(tline);
@@ -4284,13 +4298,17 @@
           row.className = "queue-item";
           const pill = i.kind === "active" ? "s-transcoding" : "s-waiting";
           const label = i.kind === "active" ? "Actif" : "Réservé";
+          const tid = i.task_id ? String(i.task_id) : "";
+          const cancelVastBtn = tid
+            ? ` <button type="button" class="btn vast-celery-cancel" data-task-id="${tid}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
+            : "";
           row.innerHTML = `
       <div class="qi-icon">☁</div>
       <div class="qi-info">
         <div class="qi-title"></div>
         <div class="qi-sub"></div>
       </div>
-      <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelVastBtn}</div>`;
           row.querySelector(".qi-title").textContent =
             String(i.task_id || "").slice(0, 8) + "…";
           row.querySelector(".qi-sub").textContent =
@@ -5779,6 +5797,13 @@
         );
         return el && el.value === "series_episode" ? "series_episode" : "film";
       }
+      function parseVastOfferIdField() {
+        const el = $("#vast-offer-id");
+        const raw = el && el.value != null ? String(el.value).trim() : "";
+        if (!raw) return null;
+        const n = parseInt(raw, 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      }
       function isVideoUploadFile(f) {
         const n = f && f.name ? f.name.toLowerCase() : "";
         const dot = n.lastIndexOf(".");
@@ -5962,6 +5987,7 @@
           body: JSON.stringify({
             magnet: m,
             content_kind: getUploadContentKind(),
+            transcode_target: "local",
           }),
         });
         if (!r.ok) {
@@ -5979,6 +6005,7 @@
         const fd = new FormData();
         fd.append("torrent", f);
         fd.append("content_kind", getUploadContentKind());
+        fd.append("transcode_target", "local");
         const r = await fetch("/api/admin/torrents/file", {
           method: "POST",
           body: fd,
@@ -6029,13 +6056,17 @@
             );
             return;
           }
+          const oid = parseVastOfferIdField();
+          const body = {
+            magnet: m,
+            content_kind: getUploadContentKindVast(),
+            transcode_target: "vast",
+          };
+          if (oid) body.vast_offer_id = oid;
           const r = await api("/api/admin/torrents", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              magnet: m,
-              content_kind: getUploadContentKindVast(),
-            }),
+            body: JSON.stringify(body),
           });
           if (!r.ok) {
             await showAlertModal(
@@ -6054,6 +6085,9 @@
         const fd = new FormData();
         fd.append("torrent", f);
         fd.append("content_kind", getUploadContentKindVast());
+        fd.append("transcode_target", "vast");
+        const oid = parseVastOfferIdField();
+        if (oid) fd.append("vast_offer_id", String(oid));
         const r = await fetch("/api/admin/torrents/file", {
           method: "POST",
           body: fd,
@@ -6094,6 +6128,84 @@
           void uploadTorrentFileVast(f);
         });
       }
+
+      document.body.addEventListener("click", async (e) => {
+        const vastBtn = e.target.closest(".vast-celery-cancel");
+        if (vastBtn) {
+          e.preventDefault();
+          const tid = vastBtn.getAttribute("data-task-id");
+          if (!tid) return;
+          const ok = await showConfirmModal(
+            "Annuler le transcodage Vast",
+            "Arrêter la tâche Celery, tenter de détruire l’instance Vast et de nettoyer les fichiers S3 temporaires ?",
+            { confirmText: "Annuler la tâche", cancelText: "Retour" },
+          );
+          if (!ok) return;
+          try {
+            const r = await api(
+              "/api/admin/transcode/vast/cancel/" + encodeURIComponent(tid),
+              { method: "POST" },
+            );
+            if (!r.ok) {
+              let msg = "Erreur " + r.status;
+              try {
+                const j = await r.json();
+                if (j && j.detail) msg = String(j.detail);
+              } catch (_) {
+                msg = ((await r.text()) || msg).slice(0, 500);
+              }
+              await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+              return;
+            }
+          } catch (_) {
+            await showAlertModal(
+              "Erreur",
+              "Réseau ou session expirée.",
+              { okText: "OK" },
+            );
+            return;
+          }
+          void refreshQueueVast();
+          return;
+        }
+        const pipeBtn = e.target.closest("[data-cancel-film]");
+        if (!pipeBtn) return;
+        e.preventDefault();
+        const fid = pipeBtn.getAttribute("data-cancel-film");
+        if (!fid) return;
+        const ok2 = await showConfirmModal(
+          "Annuler ce traitement",
+          "Interrompre la tâche en cours (torrent, encodage local ou transcodage Vast) ? Le film passera en erreur avec la mention « Annulé par l’administrateur ».",
+          { confirmText: "Oui, annuler", cancelText: "Retour" },
+        );
+        if (!ok2) return;
+        try {
+          const r = await api(
+            "/api/admin/queue/jobs/" + encodeURIComponent(fid) + "/cancel",
+            { method: "POST" },
+          );
+          if (!r.ok) {
+            let msg = "Erreur " + r.status;
+            try {
+              const j = await r.json();
+              if (j && j.detail) msg = String(j.detail);
+            } catch (_) {
+              msg = ((await r.text()) || msg).slice(0, 500);
+            }
+            await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+            return;
+          }
+        } catch (_) {
+          await showAlertModal(
+            "Erreur",
+            "Réseau ou session expirée.",
+            { okText: "OK" },
+          );
+          return;
+        }
+        refreshQueue();
+        void refreshQueueVast();
+      });
 
       boot().catch(() => {
         window.location.href = "/login.html";

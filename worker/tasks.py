@@ -3,6 +3,7 @@
 import base64
 import binascii
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -39,6 +40,22 @@ app.conf.update(
 
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
 TORRENT_DIR = Path("/tmp/redwood/torrents")
+
+
+def _set_film_pipeline_task(film_id: int, task_id: Optional[str], kind: Optional[str]) -> None:
+    """Persist active Celery task id for admin cancel (English comments in worker)."""
+    from db.models import Film
+    from db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        f = db.get(Film, film_id)
+        if f:
+            f.pipeline_celery_task_id = task_id
+            f.pipeline_celery_task_kind = kind
+            db.commit()
+    finally:
+        db.close()
 
 
 def _find_video_file(root: Path) -> Optional[str]:
@@ -127,9 +144,11 @@ def download_torrent_task(
         _fail_film(film_id, "no video file found after torrent download")
         return
 
-    from db.models import Film
+    from db.models import Film, FilmTraitement
     from db.session import SessionLocal
 
+    target = "local"
+    vast_oid: Optional[int] = None
     db = SessionLocal()
     try:
         f = db.get(Film, film_id)
@@ -138,10 +157,70 @@ def download_torrent_task(
             f.pipeline_progress = 10
             f.torrent_stats = None
             db.commit()
+            target = (f.transcode_target or "local").lower().strip()
+            if target not in ("local", "vast"):
+                target = "local"
+            vast_oid = f.vast_offer_id
     finally:
         db.close()
 
-    process_film_task.delay(film_id, video)
+    if target == "vast":
+        if not (settings.VAST_API_KEY or "").strip():
+            _fail_film(
+                film_id,
+                "VAST_API_KEY manquante : impossible d’exécuter le transcodage Vast après le torrent.",
+            )
+            return
+        ext = Path(video).suffix.lower()
+        if ext not in VIDEO_EXTS:
+            _fail_film(
+                film_id,
+                f"Extension non prise en charge pour Vast après torrent : {ext}",
+            )
+            return
+        import uuid as uuid_mod
+
+        from core.s3 import upload_file
+        from core.vast_transcode_cancel import store_job_envelope
+
+        job_token = uuid_mod.uuid4().hex
+        s3_in = f"vast-test/{job_token}/input{ext}"
+        try:
+            upload_file(video, s3_in)
+        except Exception as e:
+            logger.exception("torrent->vast S3 upload film_id=%s", film_id)
+            _fail_film(film_id, str(e)[:8000])
+            return
+        finally:
+            try:
+                os.remove(video)
+            except OSError:
+                pass
+            shutil.rmtree(job_dir, ignore_errors=True)
+
+        oid = int(vast_oid) if vast_oid is not None and int(vast_oid) > 0 else None
+        try:
+            async_res = vast_transcode_test_task.delay(job_token, ext, oid, film_id)
+        except Exception as e:
+            logger.exception("torrent->vast Celery enqueue film_id=%s", film_id)
+            _fail_film(film_id, str(e)[:8000])
+            return
+        store_job_envelope(async_res.id, job_token, ext)
+        db2 = SessionLocal()
+        try:
+            f2 = db2.get(Film, film_id)
+            if f2:
+                f2.pipeline_progress = 12
+                f2.traitement = FilmTraitement.transcode
+                f2.pipeline_celery_task_id = async_res.id
+                f2.pipeline_celery_task_kind = "vast_transcode"
+                db2.commit()
+        finally:
+            db2.close()
+        return
+
+    arp = process_film_task.delay(film_id, video)
+    _set_film_pipeline_task(film_id, arp.id, "process_film")
 
 
 def _fail_film(film_id: int, message: str) -> None:
@@ -155,6 +234,8 @@ def _fail_film(film_id: int, message: str) -> None:
             f.statut = FilmStatut.erreur
             f.erreur_message = message[:8000]
             f.torrent_stats = None
+            f.pipeline_celery_task_id = None
+            f.pipeline_celery_task_kind = None
             db.commit()
     finally:
         db.close()
@@ -186,14 +267,31 @@ def process_film_task(self, film_id: int, local_path: str):
         process_film_file(db, film, local_path, progress=prog)
     finally:
         db.close()
+        s3 = SessionLocal()
+        try:
+            s3.query(Film).filter(Film.id == film_id).update(
+                {
+                    "pipeline_celery_task_id": None,
+                    "pipeline_celery_task_kind": None,
+                }
+            )
+            s3.commit()
+        finally:
+            s3.close()
 
 
 @app.task(name="worker.tasks.vast_transcode_test_task", bind=True, max_retries=0)
-def vast_transcode_test_task(self, job_token: str, src_ext: str, offer_id: Optional[int] = None):
+def vast_transcode_test_task(
+    self,
+    job_token: str,
+    src_ext: str,
+    offer_id: Optional[int] = None,
+    film_id: Optional[int] = None,
+):
     """Transcode one file on a Vast GPU instance (S3 presigned URLs + onstart). Costs Vast rental until destroyed."""
     from core.vast_remote_transcode import run_vast_transcode_test
 
-    return run_vast_transcode_test(self, job_token, src_ext, offer_id)
+    return run_vast_transcode_test(self, job_token, src_ext, offer_id, film_id=film_id)
 
 
 @app.task(name="worker.tasks.refresh_donation_balances_snapshot")

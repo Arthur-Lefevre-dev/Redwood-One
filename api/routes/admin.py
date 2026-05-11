@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,26 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
+def _parse_torrent_transcode_target(raw: Optional[str]) -> str:
+    v = (raw or "local").lower().strip()
+    if v not in ("local", "vast"):
+        raise HTTPException(400, "transcode_target doit être local ou vast")
+    return v
+
+
+def _parse_optional_positive_int_form(raw: Optional[str]) -> Optional[int]:
+    if raw is None:
+        return None
+    t = str(raw).strip()
+    if not t:
+        return None
+    try:
+        n = int(t)
+    except ValueError:
+        return None
+    return n if n > 0 else None
+
+
 def _viewer_rank_for_new_viewer(value: Optional[str]) -> str:
     if value is None or not str(value).strip():
         return ViewerRank.bronze.value
@@ -87,7 +107,12 @@ def _parse_upload_content_kind(raw: Optional[str]) -> ContentKind:
 def _enqueue_process_film_or_raise(film_id: int, local_path: str, db: Session) -> None:
     """Queue Celery pipeline; on broker failure, remove temp file and mark film failed."""
     try:
-        process_film_task.delay(film_id, local_path)
+        async_res = process_film_task.delay(film_id, local_path)
+        row = db.get(Film, film_id)
+        if row:
+            row.pipeline_celery_task_id = async_res.id
+            row.pipeline_celery_task_kind = "process_film"
+            db.commit()
     except Exception:
         logger.exception(
             "enqueue process_film_task failed (Redis/Celery?). film_id=%s",
@@ -122,7 +147,12 @@ def _enqueue_download_torrent_or_raise(
     torrent_b64: Optional[str] = None,
 ) -> None:
     try:
-        download_torrent_task.delay(film_id, magnet, torrent_b64)
+        async_res = download_torrent_task.delay(film_id, magnet, torrent_b64)
+        row = db.get(Film, film_id)
+        if row:
+            row.pipeline_celery_task_id = async_res.id
+            row.pipeline_celery_task_kind = "download_torrent"
+            db.commit()
     except Exception:
         logger.exception(
             "enqueue download_torrent_task failed (Redis/Celery?). film_id=%s",
@@ -491,6 +521,16 @@ async def admin_upload(
 class TorrentMagnetBody(BaseModel):
     magnet: str
     content_kind: ContentKind = ContentKind.film
+    transcode_target: str = "local"
+    vast_offer_id: Optional[int] = None
+
+    @field_validator("transcode_target")
+    @classmethod
+    def _validate_transcode_target(cls, v: str) -> str:
+        s = (v or "local").lower().strip()
+        if s not in ("local", "vast"):
+            raise ValueError("transcode_target must be local or vast")
+        return s
 
 
 @router.post("/torrents")
@@ -501,12 +541,21 @@ def admin_torrent_magnet(
 ):
     if not body.magnet.startswith("magnet:?"):
         raise HTTPException(400, "Invalid magnet link")
+    s = get_settings()
+    if body.transcode_target == "vast" and not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY requise pour enchaîner torrent → transcodage Vast.",
+        )
+    vast_oid = body.vast_offer_id if body.vast_offer_id and body.vast_offer_id > 0 else None
     film = Film(
         titre="Torrent",
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
         content_kind=body.content_kind,
+        transcode_target=body.transcode_target,
+        vast_offer_id=vast_oid if body.transcode_target == "vast" else None,
     )
     db.add(film)
     db.commit()
@@ -519,19 +568,31 @@ def admin_torrent_magnet(
 async def admin_torrent_file(
     torrent: UploadFile = File(...),
     content_kind: str = Form("film"),
+    transcode_target: str = Form("local"),
+    vast_offer_id: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     if not torrent.filename or not torrent.filename.lower().endswith(".torrent"):
         raise HTTPException(400, "Expected .torrent file")
+    tt = _parse_torrent_transcode_target(transcode_target)
+    s = get_settings()
+    if tt == "vast" and not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY requise pour enchaîner torrent → transcodage Vast.",
+        )
     data = await torrent.read()
     ck = _parse_upload_content_kind(content_kind)
+    v_oid = _parse_optional_positive_int_form(vast_offer_id) if tt == "vast" else None
     film = Film(
         titre=Path(torrent.filename).stem,
         source=FilmSource.torrent,
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
         content_kind=ck,
+        transcode_target=tt,
+        vast_offer_id=v_oid,
     )
     db.add(film)
     db.commit()
@@ -718,9 +779,63 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
                 "erreur_message": f.erreur_message,
                 "source": f.source.value,
                 "torrent_stats": f.torrent_stats,
+                "transcode_target": getattr(f, "transcode_target", None) or "local",
+                "celery_task_id": getattr(f, "pipeline_celery_task_id", None),
+                "celery_task_kind": getattr(f, "pipeline_celery_task_kind", None),
             }
         )
     return {"items": out}
+
+
+@router.post("/queue/jobs/{film_id}/cancel")
+def admin_cancel_pipeline_job(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Revoke the worker's active Celery task for this film (torrent download, local encode, or Vast transcode)."""
+    from worker.tasks import app as celery_app
+
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film introuvable")
+    if f.statut != FilmStatut.en_cours:
+        raise HTTPException(
+            status_code=409,
+            detail="Seuls les films en cours peuvent être annulés depuis la file.",
+        )
+    tid = (getattr(f, "pipeline_celery_task_id", None) or "").strip()
+    kind = (getattr(f, "pipeline_celery_task_kind", None) or "").strip()
+    if not tid:
+        raise HTTPException(
+            status_code=409,
+            detail="Aucune tâche Celery n’est encore enregistrée pour ce film. Réessayez après rafraîchissement.",
+        )
+    try:
+        if kind == "vast_transcode":
+            s = get_settings()
+            if not (s.VAST_API_KEY or "").strip():
+                raise HTTPException(
+                    status_code=503,
+                    detail="VAST_API_KEY requise pour annuler le transcodage Vast.",
+                )
+            cancel_vast_transcode_test(celery_app, tid)
+        else:
+            celery_app.control.revoke(tid, terminate=True, signal="SIGTERM")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("admin_cancel_pipeline_job film_id=%s", film_id)
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+
+    f.statut = FilmStatut.erreur
+    f.erreur_message = "Annulé par l’administrateur."[:8000]
+    f.pipeline_celery_task_id = None
+    f.pipeline_celery_task_kind = None
+    f.torrent_stats = None
+    f.pipeline_progress = None
+    db.commit()
+    return {"ok": True, "film_id": film_id}
 
 
 @router.get("/system/stats")
@@ -1363,6 +1478,10 @@ def admin_vast_offers(
         le=500.0,
         description="Override VAST_MAX_BANDWIDTH_USD_PER_TB; 0 = no inet cost cap in query.",
     ),
+    verified_only: bool = Query(
+        True,
+        description="Si true, ne retourne que les offres explicitement vérifiées (verified ≠ false).",
+    ),
     _: User = Depends(require_admin),
 ):
     """Search rentable GPU offers on Vast.ai (test / ops). Requires VAST_API_KEY."""
@@ -1386,12 +1505,15 @@ def admin_vast_offers(
             limit=limit,
             max_dph_per_hour=max_dph,
             max_bandwidth_usd_per_tb=max_bandwidth_usd_per_tb,
+            verified=True,
         )
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
         logger.exception("admin_vast_offers")
         raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    if verified_only:
+        rows = [r for r in rows if isinstance(r, dict) and r.get("verified") is not False]
     s = get_settings()
     dph_applied = float(max_dph) if max_dph is not None else float(s.VAST_MAX_DPH_PER_HOUR)
     bw_applied = (
@@ -1406,6 +1528,7 @@ def admin_vast_offers(
             "max_dph_per_hour": dph_applied,
             "max_bandwidth_usd_per_tb": bw_applied,
             "inet_cost_cap_usd_per_gb": (bw_applied / 1024.0) if bw_applied > 0 else None,
+            "verified_only": verified_only,
         },
     }
 
