@@ -86,11 +86,39 @@
         }),
       });
       if (!r.ok) {
+        let j = null;
+        try {
+          j = await r.json();
+        } catch (_) {}
+        const d = j && j.detail;
+        const inactive =
+          d &&
+          typeof d === 'object' &&
+          !Array.isArray(d) &&
+          d.code === 'account_inactive';
+        if (inactive) {
+          const u = new URL('/compte-desactive.html', window.location.origin);
+          if (d.deactivated_at) u.searchParams.set('deactivated_at', d.deactivated_at);
+          window.location.href = u.pathname + u.search;
+          return;
+        }
         err.textContent = 'Identifiants invalides';
+        if (r.status === 429) {
+          err.textContent = 'Trop de tentatives. Patientez une minute puis réessayez.';
+        } else if (d && typeof d === 'string') {
+          err.textContent = d;
+        }
         err.style.display = 'block';
         return;
       }
-      const j = await r.json();
+      let j;
+      try {
+        j = await r.json();
+      } catch (_) {
+        err.textContent = 'Réponse serveur invalide.';
+        err.style.display = 'block';
+        return;
+      }
       if (j.role !== 'admin') {
         err.textContent = 'Ce compte n’est pas administrateur. Utilisez la page spectateur.';
         err.style.display = 'block';

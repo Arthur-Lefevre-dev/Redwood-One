@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -35,6 +35,11 @@ _LOGIN_LIMIT = get_settings().AUTH_LOGIN_RATE_LIMIT
 class LoginBody(BaseModel):
     username: str
     password: str
+
+    @field_validator("username")
+    @classmethod
+    def strip_username(cls, v: str) -> str:
+        return (v or "").strip()
 
 
 class RegisterBody(BaseModel):
@@ -72,7 +77,11 @@ def login(
     response: Response,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.username == body.username).first()
+    user = (
+        db.query(User)
+        .filter(func.lower(User.username) == func.lower(body.username))
+        .first()
+    )
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:

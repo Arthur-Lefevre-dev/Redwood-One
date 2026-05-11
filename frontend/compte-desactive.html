@@ -29,8 +29,22 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 28px;
+      text-align: center;
     }
-    h1 { font-size: 1.25rem; margin-bottom: 12px; }
+    .deactivated-header {
+      margin-bottom: 18px;
+    }
+    .hero-emoji {
+      display: block;
+      font-size: clamp(2.75rem, 14vw, 4.25rem);
+      line-height: 1;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      margin: 0;
+      font-weight: 600;
+    }
     p { color: var(--muted); font-size: 0.9rem; line-height: 1.55; margin-bottom: 10px; }
     .date-line {
       color: var(--text);
@@ -47,7 +61,10 @@
 </head>
 <body>
   <div class="card">
-    <h1>Compte désactivé</h1>
+    <div class="deactivated-header">
+      <span class="hero-emoji" aria-hidden="true">😢</span>
+      <h1>Compte désactivé</h1>
+    </div>
     <p>Ce compte ne peut plus se connecter. Si vous pensez qu’il s’agit d’une erreur, contactez un administrateur.</p>
     <div class="date-line" id="dateLine" aria-live="polite"></div>
     <p class="links"><a href="/login.html">Retour à la connexion</a></p>

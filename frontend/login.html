@@ -155,12 +155,12 @@
           j = await r.json();
         } catch (_) {}
         const d = j && j.detail;
-        if (
-          r.status === 403 &&
+        const inactive =
           d &&
           typeof d === 'object' &&
-          d.code === 'account_inactive'
-        ) {
+          !Array.isArray(d) &&
+          d.code === 'account_inactive';
+        if (inactive) {
           const u = new URL('/compte-desactive.html', window.location.origin);
           if (d.deactivated_at) u.searchParams.set('deactivated_at', d.deactivated_at);
           window.location.href = u.pathname + u.search;
