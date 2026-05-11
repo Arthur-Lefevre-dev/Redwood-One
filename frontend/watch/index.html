@@ -91,6 +91,43 @@
     .row-head{display:flex;align-items:center;justify-content:space-between;margin:28px 28px 12px;flex-wrap:wrap;gap:10px}
     .row-head h2{font-size:1rem;color:#ddd}
     .row-scroll{display:flex;gap:12px;overflow-x:auto;padding:0 28px 28px;scroll-snap-type:x mandatory}
+    .row-carousel{
+      position:relative;margin:0 28px 28px;
+    }
+    .row-carousel--nested{margin-left:0;margin-right:0;margin-bottom:20px}
+    .row-carousel-viewport{
+      overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;
+      padding:0 44px;
+      scrollbar-width:none;
+    }
+    .row-carousel-viewport::-webkit-scrollbar{display:none;width:0;height:0}
+    .row-carousel .row-scroll{
+      display:flex;gap:12px;padding:0;overflow:visible;scroll-snap-type:x mandatory;
+      min-width:min-content;
+    }
+    .row-carousel-btn{
+      position:absolute;top:50%;transform:translateY(-50%);z-index:3;
+      width:40px;height:40px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.22);
+      background:rgba(0,0,0,.52);color:#fff;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      font-family:inherit;padding:0;
+      transition:background .2s,border-color .2s,opacity .2s;
+    }
+    .row-carousel-btn svg{display:block;width:20px;height:20px;flex-shrink:0}
+    .row-carousel-btn:hover:not(:disabled){background:rgba(139,37,0,.55);border-color:rgba(255,255,255,.38)}
+    .row-carousel-btn:focus-visible{outline:2px solid #fecaca;outline-offset:2px}
+    .row-carousel-btn:disabled{opacity:.22;cursor:default;pointer-events:none}
+    .row-carousel-prev{left:2px}
+    .row-carousel-next{right:2px}
+    @media (prefers-reduced-motion:reduce){
+      .row-carousel-viewport{scroll-behavior:auto}
+    }
+    @media (max-width:560px){
+      .row-carousel{margin-left:16px;margin-right:16px}
+      .row-carousel--nested{margin-left:0;margin-right:0}
+    }
     .card{
       flex:0 0 160px;scroll-snap-align:start;background:#141414;border:1px solid #222;border-radius:10px;
       overflow:hidden;cursor:pointer;
@@ -267,6 +304,79 @@
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return false;
       return (Date.now() - d.getTime()) / 864e5 <= 45;
+    }
+
+    var ROW_CAROUSEL_SVG_PREV =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M14 18l-6-6 6-6"/></svg>';
+    var ROW_CAROUSEL_SVG_NEXT =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M10 18l6-6-6-6"/></svg>';
+
+    /** Wrap horizontal card rows: hide scrollbar, prev/next scroll. */
+    function initRowCarousels() {
+      document.querySelectorAll('.row-scroll').forEach(function (track) {
+        if (track.closest('.row-carousel')) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'row-carousel';
+        if (track.closest('.home-search-panel')) wrap.classList.add('row-carousel--nested');
+        var view = document.createElement('div');
+        view.className = 'row-carousel-viewport';
+        var prev = document.createElement('button');
+        prev.type = 'button';
+        prev.className = 'row-carousel-btn row-carousel-prev';
+        prev.setAttribute('aria-label', 'Défiler vers la gauche');
+        prev.innerHTML = ROW_CAROUSEL_SVG_PREV;
+        var next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'row-carousel-btn row-carousel-next';
+        next.setAttribute('aria-label', 'Défiler vers la droite');
+        next.innerHTML = ROW_CAROUSEL_SVG_NEXT;
+        var parent = track.parentNode;
+        parent.insertBefore(wrap, track);
+        view.appendChild(track);
+        wrap.appendChild(prev);
+        wrap.appendChild(view);
+        wrap.appendChild(next);
+
+        function prefersReducedMotion() {
+          return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+
+        function scrollStep() {
+          return Math.max(200, Math.floor(view.clientWidth * 0.72));
+        }
+
+        function updateArrows() {
+          var sl = view.scrollLeft;
+          var max = view.scrollWidth - view.clientWidth - 2;
+          var overflow = max > 4;
+          prev.toggleAttribute('hidden', !overflow);
+          next.toggleAttribute('hidden', !overflow);
+          if (!overflow) return;
+          prev.disabled = sl <= 2;
+          next.disabled = sl >= max;
+        }
+
+        prev.addEventListener('click', function () {
+          view.scrollBy({
+            left: -scrollStep(),
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          });
+        });
+        next.addEventListener('click', function () {
+          view.scrollBy({
+            left: scrollStep(),
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          });
+        });
+        view.addEventListener('scroll', updateArrows, { passive: true });
+        window.addEventListener('resize', updateArrows);
+        if (typeof ResizeObserver !== 'undefined') {
+          var ro = new ResizeObserver(updateArrows);
+          ro.observe(view);
+          ro.observe(track);
+        }
+        updateArrows();
+      });
     }
 
     let homeLatest = [];
@@ -873,6 +983,7 @@
         });
       } catch (_) {}
     }
+    initRowCarousels();
     boot().catch((e) => {
       if (e && e.message === '401') { location.href = '/login.html'; return; }
       console.error(e);
