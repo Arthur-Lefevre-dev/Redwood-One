@@ -1057,17 +1057,12 @@
           <div class="nav-section">Principal</div>
           <div class="nav-item active" data-page="pipeline">
             <span class="nav-icon">▦</span>
-            Pipeline
+            Pipeline · Local
             <span class="nav-badge red" id="badge-queue">0</span>
           </div>
-          <div class="nav-section">Transcodage</div>
-          <div class="nav-item" data-page="transcode-local">
-            <span class="nav-icon">⏱</span>
-            Sur la machine
-          </div>
-          <div class="nav-item" data-page="transcode-vast">
+          <div class="nav-item" data-page="pipeline-vast">
             <span class="nav-icon">☁</span>
-            Sur Vast
+            Pipeline · Vast
           </div>
           <div class="nav-item" data-page="films">
             <span class="nav-icon">▣</span>
@@ -1117,8 +1112,8 @@
           <section class="page active" id="page-pipeline">
             <header class="topbar">
               <div>
-                <div class="page-title">Pipeline</div>
-                <div class="page-sub">Ajout et traitement des films</div>
+                <div class="page-title">Pipeline · Local</div>
+                <div class="page-sub">Ajout et traitement des films (worker sur cette machine)</div>
               </div>
               <div class="topbar-right">
                 <div class="gpu-pill" id="gpu-pill-pipeline">
@@ -1385,409 +1380,463 @@
             </div>
           </section>
 
-          <section class="page" id="page-transcode-local">
+          <section class="page" id="page-pipeline-vast">
             <header class="topbar">
               <div>
-                <div class="page-title">Transcodage · Sur la machine</div>
+                <div class="page-title">Pipeline · Vast</div>
                 <div class="page-sub">
-                  Upload → worker Celery sur ce serveur (ffprobe / ffmpeg / S3), suivi du film
-                  et lecture dès statut disponible.
+                  Ajout et traitement des films (transcodage GPU Vast.ai, worker Celery)
                 </div>
               </div>
               <div class="topbar-right">
-                <div class="gpu-pill" id="gpu-pill-local">
-                  <span class="dot dot-green"></span
-                  ><span id="gpu-pill-text-local">GPU</span>
-                </div>
-              </div>
-            </header>
-            <div class="content">
-              <div class="card">
-                <div class="card-head">
-                  <div class="card-title">Envoyer une vidéo</div>
-                  <button type="button" class="btn" id="btn-tt-reset">
-                    Réinitialiser
-                  </button>
-                </div>
-                <div class="card-body">
-                  <p
-                    style="
-                      font-size: 12px;
-                      color: var(--color-text-secondary);
-                      line-height: 1.55;
-                      margin-bottom: 14px;
-                      max-width: 720px;
-                    "
-                  >
-                    Même principe que le Pipeline : un film est créé et mis en file Celery.
-                    Tu suis <strong>un job</strong> (progression, métadonnées, lecteur une fois
-                    <strong>disponible</strong>). L’estimation USD compare la durée du titre au
-                    plafond <code style="font-size: 11px">VAST_MAX_DPH_PER_HOUR</code> (ordre de
-                    grandeur type location GPU, indicatif).
-                  </p>
-                  <div class="upload-zone" id="tt-drop-zone" style="max-width: 520px">
-                    <div class="upload-icon">↑</div>
-                    <div class="upload-title">Glisser-déposer ou cliquer</div>
-                    <div class="upload-sub">
-                      MP4, MKV, AVI, MOV, WMV, M4V — un fichier — max 50 GB
-                    </div>
-                  </div>
-                  <input
-                    type="file"
-                    id="tt-file-input"
-                    class="hidden"
-                    accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
-                  />
-                  <div
-                    id="tt-upload-row"
-                    class="upload-progress-list"
-                    style="margin-top: 12px; max-width: 520px"
-                    aria-live="polite"
-                  ></div>
-                  <div id="tt-job-panel" class="hidden" style="margin-top: 20px">
-                    <div
-                      style="
-                        font-size: 11px;
-                        color: var(--color-text-tertiary);
-                        margin-bottom: 6px;
-                      "
-                    >
-                      Film #
-                      <span id="tt-film-id">—</span>
-                    </div>
-                    <div
-                      style="
-                        display: flex;
-                        align-items: center;
-                        gap: 10px;
-                        flex-wrap: wrap;
-                        margin-bottom: 8px;
-                      "
-                    >
-                      <span
-                        class="status-pill s-transcoding"
-                        id="tt-statut-pill"
-                        >—</span
-                      >
-                      <span
-                        id="tt-traitement"
-                        style="font-size: 12px; color: var(--color-text-secondary)"
-                        >—</span
-                      >
-                    </div>
-                    <div class="progress-bar" style="margin-bottom: 8px">
-                      <div
-                        class="progress-fill"
-                        id="tt-progress-fill"
-                        style="width: 0%"
-                      ></div>
-                    </div>
-                    <div
-                      id="tt-progress-label"
-                      style="font-size: 12px; color: var(--color-text-secondary)"
-                    ></div>
-                    <div
-                      id="tt-meta"
-                      style="
-                        font-size: 12px;
-                        color: var(--color-text-tertiary);
-                        margin-top: 10px;
-                        white-space: pre-wrap;
-                        font-family: var(--font-mono);
-                      "
-                    ></div>
-                    <div
-                      id="tt-price-box"
-                      class="hidden"
-                      style="
-                        margin-top: 14px;
-                        padding: 12px 14px;
-                        border-radius: var(--border-radius-md);
-                        border: 0.5px solid var(--color-border-secondary);
-                        background: var(--color-background-secondary);
-                        max-width: 560px;
-                      "
-                    >
-                      <div
-                        style="
-                          font-size: 11px;
-                          color: var(--color-text-tertiary);
-                          text-transform: uppercase;
-                          letter-spacing: 0.06em;
-                          margin-bottom: 6px;
-                        "
-                      >
-                        Estimation fin de transcodage
-                      </div>
-                      <div
-                        id="tt-price-val"
-                        style="
-                          font-size: 18px;
-                          font-weight: 600;
-                          color: var(--color-text-primary);
-                        "
-                      >
-                        —
-                      </div>
-                      <div
-                        id="tt-price-note"
-                        style="
-                          font-size: 11px;
-                          color: var(--color-text-tertiary);
-                          margin-top: 8px;
-                          line-height: 1.45;
-                        "
-                      ></div>
-                    </div>
-                    <div
-                      id="tt-err"
-                      class="hidden"
-                      style="
-                        margin-top: 12px;
-                        padding: 10px 12px;
-                        border-radius: 8px;
-                        background: rgba(248, 113, 113, 0.1);
-                        color: var(--color-text-danger);
-                        font-size: 12px;
-                        white-space: pre-wrap;
-                      "
-                    ></div>
-                    <div id="tt-video-wrap" class="hidden" style="margin-top: 16px">
-                      <div
-                        style="
-                          font-size: 12px;
-                          color: var(--color-text-secondary);
-                          margin-bottom: 8px;
-                        "
-                      >
-                        Résultat (MP4 servi depuis S3)
-                      </div>
-                      <video
-                        id="tt-video"
-                        controls
-                        playsinline
-                        style="
-                          width: 100%;
-                          max-width: 720px;
-                          border-radius: 8px;
-                          background: #000;
-                        "
-                      ></video>
-                      <a
-                        id="tt-stream-link"
-                        href="#"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style="
-                          display: inline-block;
-                          margin-top: 8px;
-                          font-size: 12px;
-                          color: #fca5a5;
-                        "
-                        >Ouvrir l’URL de lecture dans un nouvel onglet</a
-                      >
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section class="page" id="page-transcode-vast">
-            <header class="topbar">
-              <div>
-                <div class="page-title">Transcodage · Sur Vast</div>
-                <div class="page-sub">
-                  S3 → Celery → GPU Vast (ffmpeg), MP4 sur S3, destruction de l’instance.
-                </div>
-              </div>
-              <div class="topbar-right">
-                <div class="gpu-pill" id="gpu-pill-vast">
+                <div class="gpu-pill" id="gpu-pill-pipeline-vast">
                   <span class="dot dot-green"></span
                   ><span id="gpu-pill-text-vast">GPU</span>
                 </div>
               </div>
             </header>
             <div class="content">
+              <div class="stat-grid">
+                <div class="stat">
+                  <div class="stat-label">En cours</div>
+                  <div class="stat-val" id="st-running-vast">0</div>
+                  <div class="stat-sub">transcodage / file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">En attente</div>
+                  <div class="stat-val" id="st-wait-vast">0</div>
+                  <div class="stat-sub">dans la file</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Bibliothèque</div>
+                  <div class="stat-val" id="st-done-vast">0</div>
+                  <div class="stat-sub">disponibles</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Erreurs</div>
+                  <div
+                    class="stat-val"
+                    id="st-err-vast"
+                    style="color: var(--color-text-danger)"
+                  >
+                    0
+                  </div>
+                  <div class="stat-sub">à traiter</div>
+                </div>
+              </div>
               <div class="card">
                 <div class="card-head">
-                  <div class="card-title">Pipeline Vast.ai</div>
+                  <div class="card-title">Synchroniser le stockage S3</div>
+                  <button
+                    class="btn btn-primary"
+                    type="button"
+                    id="btn-sync-s3-vast"
+                  >
+                    Importer les objets films/*
+                  </button>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.55;
+                  "
+                >
+                  Parcourt le bucket (préfixe <code>films/&lt;id&gt;/</code>) et
+                  crée ou met à jour les fiches
+                  <strong>disponibles</strong> pour les spectateurs.
+                  <span
+                    id="sync-s3-msg-vast"
+                    style="
+                      display: block;
+                      margin-top: 8px;
+                      color: var(--color-text-tertiary);
+                    "
+                  ></span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Ajouter un film</div>
                 </div>
                 <div class="card-body">
-                  <p
-                    style="
-                      font-size: 12px;
-                      color: var(--color-text-secondary);
-                      line-height: 1.55;
-                      margin-bottom: 14px;
-                      max-width: 720px;
-                    "
-                  >
-                    Le fichier est envoyé sur <strong>S3</strong>, puis un worker
-                    <strong>Celery</strong> loue une machine Vast, exécute
-                    <strong>ffmpeg NVENC</strong> dans le conteneur (script
-                    <code>onstart</code>), renvoie le MP4 sur S3 et
-                    <strong>détruit l’instance</strong>. Coût = temps de location
-                    Vast. Prérequis :
-                    <code>VAST_API_KEY</code>, S3, Redis, worker actif.
-                  </p>
-                  <label
-                    for="vast-offer-id"
-                    style="
-                      font-size: 12px;
-                      color: var(--color-text-secondary);
-                      display: block;
-                      margin-bottom: 6px;
-                    "
-                    >ID offre Vast (optionnel — laisse vide pour prendre la 1re
-                    offre des filtres .env)</label
-                  >
-                  <input
-                    type="number"
-                    id="vast-offer-id"
-                    min="1"
-                    placeholder="ex. 36172191"
-                    style="
-                      width: 220px;
-                      margin-bottom: 12px;
-                      padding: 8px;
-                      border-radius: 8px;
-                      border: 1px solid var(--color-border-secondary);
-                      background: #0f0f0f;
-                      color: var(--color-text-primary);
-                    "
-                  />
                   <div
-                    class="upload-zone"
-                    id="vast-drop-zone"
-                    style="max-width: 520px"
+                    class="ingest-kind-bar"
+                    style="
+                      margin-bottom: 16px;
+                      padding: 12px 14px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                      border: 0.5px solid var(--color-border-tertiary);
+                    "
                   >
-                    <div class="upload-icon">☁</div>
-                    <div class="upload-title">Vidéo → Vast + S3</div>
-                    <div class="upload-sub">
-                      Un fichier — MP4, MKV, AVI, MOV, WMV, M4V
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 10px;
+                        text-transform: uppercase;
+                        letter-spacing: 0.06em;
+                      "
+                    >
+                      Type de contenu (upload & torrent)
                     </div>
-                  </div>
-                  <input
-                    type="file"
-                    id="vast-file-input"
-                    class="hidden"
-                    accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
-                  />
-                  <div
-                    id="vast-upload-row"
-                    class="upload-progress-list"
-                    style="margin-top: 12px; max-width: 520px"
-                  ></div>
-                  <div id="vast-job-panel" class="hidden" style="margin-top: 16px">
                     <div
                       style="
                         display: flex;
                         flex-wrap: wrap;
+                        gap: 16px 24px;
                         align-items: center;
-                        gap: 10px;
-                        margin-bottom: 8px;
                       "
                     >
-                      <div
-                        id="vast-task-line"
+                      <label
                         style="
-                          font-size: 11px;
-                          color: var(--color-text-tertiary);
-                          flex: 1;
-                          min-width: 160px;
-                        "
-                      >
-                        —
-                      </div>
-                      <button
-                        type="button"
-                        id="vast-btn-cancel"
-                        disabled
-                        style="
-                          font-size: 12px;
-                          padding: 6px 12px;
-                          border-radius: 8px;
-                          border: 1px solid var(--color-border-secondary);
-                          background: #1a1a1a;
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
                           color: var(--color-text-primary);
                           cursor: pointer;
                         "
                       >
-                        Annuler
-                      </button>
+                        <input
+                          type="radio"
+                          name="ingest-content-kind-vast"
+                          id="ingest-kind-film-vast"
+                          value="film"
+                          checked
+                        />
+                        Film
+                      </label>
+                      <label
+                        style="
+                          display: inline-flex;
+                          align-items: center;
+                          gap: 8px;
+                          font-size: 13px;
+                          color: var(--color-text-primary);
+                          cursor: pointer;
+                        "
+                      >
+                        <input
+                          type="radio"
+                          name="ingest-content-kind-vast"
+                          id="ingest-kind-series-vast"
+                          value="series_episode"
+                        />
+                        Série (épisode)
+                      </label>
                     </div>
-                    <div class="progress-bar" style="margin-bottom: 8px">
-                      <div
-                        class="progress-fill"
-                        id="vast-progress-fill"
-                        style="width: 0%"
-                      ></div>
-                    </div>
-                    <pre
-                      id="vast-meta"
+                    <p
                       style="
                         font-size: 11px;
-                        color: var(--color-text-secondary);
-                        white-space: pre-wrap;
-                        font-family: var(--font-mono);
-                        max-height: 200px;
-                        overflow: auto;
-                      "
-                    ></pre>
-                    <div
-                      id="vast-err"
-                      class="hidden"
-                      style="
+                        color: var(--color-text-tertiary);
                         margin-top: 10px;
-                        padding: 10px 12px;
-                        border-radius: 8px;
-                        background: rgba(248, 113, 113, 0.1);
-                        color: var(--color-text-danger);
-                        font-size: 12px;
-                        white-space: pre-wrap;
+                        line-height: 1.45;
                       "
-                    ></div>
-                    <div id="vast-video-wrap" class="hidden" style="margin-top: 14px">
+                    >
+                      <strong>Upload vidéo</strong> : transcodage sur Vast (un job
+                      par fichier). <strong>Magnet / .torrent</strong> : même file
+                      que le pipeline local (téléchargement sur ce worker), puis
+                      traitement habituel.
+                    </p>
+                  </div>
+                  <div
+                    style="
+                      margin-bottom: 16px;
+                      padding: 12px 14px;
+                      background: var(--color-background-secondary);
+                      border-radius: var(--border-radius-md);
+                      border: 0.5px solid var(--color-border-tertiary);
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: var(--color-text-secondary);
+                        margin-bottom: 8px;
+                        font-weight: 500;
+                      "
+                    >
+                      ID offre Vast (optionnel)
+                    </div>
+                    <input
+                      type="number"
+                      class="magnet-input"
+                      id="vast-offer-id"
+                      min="1"
+                      placeholder="ex. 30827347 — laisser vide pour la 1re offre .env"
+                    />
+                  </div>
+                  <div
+                    style="
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 16px;
+                    "
+                  >
+                    <div>
                       <div
                         style="
                           font-size: 12px;
                           color: var(--color-text-secondary);
                           margin-bottom: 8px;
+                          font-weight: 500;
                         "
                       >
-                        Résultat (MP4 sur S3 après Vast)
+                        Upload direct
                       </div>
-                      <video
-                        id="vast-video"
-                        controls
-                        playsinline
-                        style="
-                          width: 100%;
-                          max-width: 720px;
-                          border-radius: 8px;
-                          background: #000;
-                        "
-                      ></video>
-                      <a
-                        id="vast-stream-link"
-                        href="#"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style="
-                          display: inline-block;
-                          margin-top: 8px;
-                          font-size: 12px;
-                          color: #fca5a5;
-                        "
-                        >Ouvrir l’URL de lecture</a
+                      <div class="upload-zone" id="vast-drop-zone">
+                        <div class="upload-icon">↑</div>
+                        <div class="upload-title">Glisser des fichiers ici</div>
+                        <div class="upload-sub">
+                          MP4, MKV, AVI, MOV, WMV, M4V — plusieurs fichiers
+                          possibles — max 50 GB chacun
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="vast-file-input"
+                        class="hidden"
+                        accept=".mp4,.mkv,.avi,.mov,.wmv,.m4v"
+                      />
+                      <div
+                        id="vast-upload-row"
+                        class="upload-progress-list"
+                        style="margin-top: 12px"
+                        aria-live="polite"
+                      ></div>
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-browse-vast"
+                        type="button"
                       >
+                        Parcourir les fichiers
+                      </button>
+                      <div
+                        id="vast-job-panel"
+                        class="hidden"
+                        style="
+                          margin-top: 18px;
+                          padding-top: 16px;
+                          border-top: 0.5px solid var(--color-border-tertiary);
+                        "
+                      >
+                        <div
+                          style="
+                            display: flex;
+                            flex-wrap: wrap;
+                            align-items: center;
+                            gap: 10px;
+                            margin-bottom: 8px;
+                          "
+                        >
+                          <div
+                            id="vast-task-line"
+                            style="
+                              font-size: 11px;
+                              color: var(--color-text-tertiary);
+                              flex: 1;
+                              min-width: 160px;
+                            "
+                          >
+                            —
+                          </div>
+                          <button
+                            type="button"
+                            class="btn"
+                            id="vast-btn-cancel"
+                            disabled
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                        <div class="progress-bar" style="margin-bottom: 8px">
+                          <div
+                            class="progress-fill"
+                            id="vast-progress-fill"
+                            style="width: 0%"
+                          ></div>
+                        </div>
+                        <pre
+                          id="vast-meta"
+                          style="
+                            font-size: 11px;
+                            color: var(--color-text-secondary);
+                            white-space: pre-wrap;
+                            font-family: var(--font-mono);
+                            max-height: 200px;
+                            overflow: auto;
+                          "
+                        ></pre>
+                        <div
+                          id="vast-err"
+                          class="hidden"
+                          style="
+                            margin-top: 10px;
+                            padding: 10px 12px;
+                            border-radius: 8px;
+                            background: rgba(248, 113, 113, 0.1);
+                            color: var(--color-text-danger);
+                            font-size: 12px;
+                            white-space: pre-wrap;
+                          "
+                        ></div>
+                        <div id="vast-video-wrap" class="hidden" style="margin-top: 14px">
+                          <div
+                            style="
+                              font-size: 12px;
+                              color: var(--color-text-secondary);
+                              margin-bottom: 8px;
+                            "
+                          >
+                            Résultat (MP4 sur S3 après Vast)
+                          </div>
+                          <video
+                            id="vast-video"
+                            controls
+                            playsinline
+                            style="
+                              width: 100%;
+                              max-width: 720px;
+                              border-radius: 8px;
+                              background: #000;
+                            "
+                          ></video>
+                          <a
+                            id="vast-stream-link"
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style="
+                              display: inline-block;
+                              margin-top: 8px;
+                              font-size: 12px;
+                              color: #fca5a5;
+                            "
+                            >Ouvrir l’URL de lecture</a
+                          >
+                        </div>
+                      </div>
+                    </div>
+                    <div id="vast-torrent-block">
+                      <div
+                        style="
+                          font-size: 12px;
+                          color: var(--color-text-secondary);
+                          margin-bottom: 8px;
+                          font-weight: 500;
+                        "
+                      >
+                        Via torrent
+                      </div>
+                      <div class="magnet-row">
+                        <input
+                          class="magnet-input"
+                          id="magnet-input-vast"
+                          placeholder="magnet:?xt=urn:btih:…"
+                        />
+                      </div>
+                      <div
+                        class="upload-zone"
+                        id="torrent-drop-vast"
+                        style="padding: 14px; margin-bottom: 8px"
+                      >
+                        <div
+                          style="
+                            font-size: 12px;
+                            color: var(--color-text-tertiary);
+                          "
+                        >
+                          Déposer un fichier .torrent
+                        </div>
+                      </div>
+                      <input
+                        type="file"
+                        id="torrent-input-vast"
+                        class="hidden"
+                        accept=".torrent"
+                      />
+                      <button
+                        class="btn btn-primary"
+                        style="width: 100%"
+                        id="btn-magnet-vast"
+                        type="button"
+                      >
+                        Ajouter à la file (magnet)
+                      </button>
                     </div>
                   </div>
                 </div>
               </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">File de traitement</div>
+                </div>
+                <div class="card-body" style="padding: 8px 12px">
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                      flex-wrap: wrap;
+                      gap: 8px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                      "
+                    >
+                      Pipeline (upload, torrent, encodage local)
+                    </div>
+                    <div
+                      style="font-size: 12px; color: var(--color-text-tertiary)"
+                      id="queue-meta-vast-pipeline"
+                    ></div>
+                  </div>
+                  <div
+                    class="queue-list"
+                    id="queue-list-vast-pipeline"
+                    style="margin-bottom: 18px"
+                  ></div>
+                  <div
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      margin-bottom: 8px;
+                      flex-wrap: wrap;
+                      gap: 8px;
+                    "
+                  >
+                    <div
+                      style="
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        text-transform: uppercase;
+                        letter-spacing: 0.05em;
+                      "
+                    >
+                      Transcodage Vast (Celery)
+                    </div>
+                    <div
+                      style="font-size: 12px; color: var(--color-text-tertiary)"
+                      id="queue-meta-vast"
+                    ></div>
+                  </div>
+                  <div class="queue-list" id="queue-list-vast"></div>
+                </div>
+              </div>
             </div>
           </section>
+
           <section class="page" id="page-announcement">
             <header class="topbar">
               <div>
@@ -3266,208 +3315,11 @@
         return completion ? `${completion}\n${peers}` : peers;
       }
 
-      const TT_FILM_LS = "admin_transcode_local_film_id";
-      let transcodeTestFilmId = null;
-
-      function transcodeLocalEnterPage() {
-        void refreshGpuPill();
-        const raw = localStorage.getItem(TT_FILM_LS);
-        const id = raw ? parseInt(raw, 10) : NaN;
-        if (Number.isFinite(id) && id > 0) {
-          transcodeTestFilmId = id;
-          void transcodeTestPollTick();
-        }
-      }
-
-      function transcodeVastEnterPage() {
+      function pipelineVastEnterPage() {
         void refreshGpuPill();
         vastTestEnterRestore();
-      }
-
-      function transcodePipelinesLeavePage() {}
-
-      async function transcodeTestPollTick() {
-        const page = $("#page-transcode-local");
-        if (!page || !page.classList.contains("active")) return;
-        const raw = transcodeTestFilmId || localStorage.getItem(TT_FILM_LS);
-        const id = raw ? parseInt(String(raw), 10) : NaN;
-        if (!Number.isFinite(id) || id <= 0) return;
-        transcodeTestFilmId = id;
-        let r;
-        try {
-          r = await api("/api/admin/films/" + id + "/processing-state");
-        } catch (e) {
-          if (e && e.message === "403-admin") return;
-          return;
-        }
-        if (r.status === 404) {
-          localStorage.removeItem(TT_FILM_LS);
-          transcodeTestFilmId = null;
-          $("#tt-job-panel").classList.add("hidden");
-          return;
-        }
-        if (!r.ok) return;
-        const j = await r.json();
-        transcodeTestRenderState(j);
-      }
-
-      function transcodeTestRenderState(j) {
-        $("#tt-job-panel").classList.remove("hidden");
-        $("#tt-film-id").textContent = String(j.id);
-        const pill = $("#tt-statut-pill");
-        pill.textContent =
-          j.statut === "disponible"
-            ? "Disponible"
-            : j.statut === "erreur"
-              ? "Erreur"
-              : "En cours";
-        pill.className =
-          "status-pill " +
-          (j.statut === "disponible"
-            ? "s-done"
-            : j.statut === "erreur"
-              ? "s-error"
-              : "s-transcoding");
-        $("#tt-traitement").textContent = j.traitement
-          ? "Traitement : " + j.traitement
-          : "Traitement : …";
-        const pct = Math.min(100, Math.max(0, Number(j.pipeline_progress) || 0));
-        $("#tt-progress-fill").style.width = pct + "%";
-        const tx = transcodeProgressLabel(pct, j.traitement, j.statut);
-        $("#tt-progress-label").textContent =
-          "Progression pipeline : " + pct + " %" + (tx ? " · " + tx : "");
-        const lines = [];
-        if (j.duree_min != null) lines.push("Durée : " + j.duree_min + " min");
-        if (j.codec_video) lines.push("Vidéo : " + j.codec_video);
-        if (j.codec_audio) lines.push("Audio : " + j.codec_audio);
-        if (j.resolution) lines.push("Résolution : " + j.resolution);
-        if (j.taille_octets != null)
-          lines.push("Taille : " + fmtBytes(Number(j.taille_octets)));
-        $("#tt-meta").textContent = lines.join("\n") || "—";
-
-        $("#tt-err").classList.add("hidden");
-        const vid = $("#tt-video");
-        const streamUrl =
-          j.statut === "disponible" && j.url_streaming
-            ? String(j.url_streaming)
-            : "";
-
-        if (j.statut === "erreur") {
-          $("#tt-video-wrap").classList.add("hidden");
-          if (vid) {
-            vid.removeAttribute("src");
-            vid.removeAttribute("data-tt-stream-url");
-            try {
-              vid.load();
-            } catch (_) {}
-          }
-          $("#tt-err").textContent = j.erreur_message || "Erreur inconnue";
-          $("#tt-err").classList.remove("hidden");
-          $("#tt-price-box").classList.add("hidden");
-          return;
-        }
-
-        const est = j.estimated_gpu_rental_usd;
-        if (est != null && j.duree_min != null) {
-          const dph = j.pricing_dph_usd != null ? Number(j.pricing_dph_usd) : null;
-          $("#tt-price-val").textContent =
-            "~ " +
-            est +
-            " USD" +
-            (dph != null && !Number.isNaN(dph)
-              ? " (base " + dph + " $/h × durée film)"
-              : "");
-          $("#tt-price-note").textContent = j.pricing_note_fr || "";
-          $("#tt-price-box").classList.remove("hidden");
-        } else {
-          $("#tt-price-box").classList.add("hidden");
-        }
-
-        if (streamUrl && vid) {
-          $("#tt-video-wrap").classList.remove("hidden");
-          const prev = vid.getAttribute("data-tt-stream-url") || "";
-          if (prev !== streamUrl) {
-            vid.setAttribute("data-tt-stream-url", streamUrl);
-            vid.src = streamUrl;
-            $("#tt-stream-link").href = streamUrl;
-          }
-        } else {
-          $("#tt-video-wrap").classList.add("hidden");
-          if (vid) {
-            vid.removeAttribute("src");
-            vid.removeAttribute("data-tt-stream-url");
-            try {
-              vid.load();
-            } catch (_) {}
-          }
-        }
-      }
-
-      function transcodeTestUpload(file) {
-        const list = $("#tt-upload-row");
-        list.innerHTML = "";
-        list.classList.add("is-active");
-        const row = document.createElement("div");
-        row.className = "upload-job";
-        row.innerHTML =
-          '<div class="upload-job-head"><span class="upload-job-name"></span><span class="upload-job-pct">0%</span></div><div class="upload-job-track"><div class="upload-job-fill" style="width:0%"></div></div><div class="upload-job-msg hidden"></div>';
-        const nameEl = row.querySelector(".upload-job-name");
-        const pctEl = row.querySelector(".upload-job-pct");
-        const fill = row.querySelector(".upload-job-fill");
-        const msgEl = row.querySelector(".upload-job-msg");
-        nameEl.textContent = file.name;
-        list.appendChild(row);
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/admin/upload");
-        xhr.withCredentials = true;
-        xhr.upload.onprogress = (e) => {
-          if (!e.lengthComputable) {
-            pctEl.textContent = "…";
-            return;
-          }
-          const p = Math.min(100, Math.round((100 * e.loaded) / e.total));
-          fill.style.width = p + "%";
-          pctEl.textContent = p + "%";
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            fill.style.width = "100%";
-            pctEl.textContent = "100%";
-            row.classList.add("upload-job-ok");
-            try {
-              const resp = JSON.parse(xhr.responseText || "{}");
-              if (resp.job_id) {
-                transcodeTestFilmId = resp.job_id;
-                localStorage.setItem(TT_FILM_LS, String(resp.job_id));
-                void transcodeTestPollTick();
-                void refreshQueue();
-                void refreshStats();
-              }
-            } catch (_) {}
-          } else {
-            row.classList.add("upload-job-err");
-            let msg = "Échec upload (HTTP " + xhr.status + ")";
-            try {
-              const resp = JSON.parse(xhr.responseText || "{}");
-              if (resp.detail)
-                msg = typeof resp.detail === "string" ? resp.detail : msg;
-            } catch (_) {}
-            msgEl.textContent = msg;
-            msgEl.classList.remove("hidden");
-            pctEl.textContent = "—";
-          }
-        };
-        xhr.onerror = () => {
-          row.classList.add("upload-job-err");
-          msgEl.textContent = "Erreur réseau";
-          msgEl.classList.remove("hidden");
-          pctEl.textContent = "—";
-        };
-        const fd = new FormData();
-        fd.append("file", file, file.name);
-        fd.append("content_kind", "film");
-        xhr.send(fd);
+        void refreshQueue();
+        void refreshQueueVast();
       }
 
       const VAST_TASK_LS = "admin_transcode_vast_task_id";
@@ -3482,7 +3334,7 @@
       }
 
       async function vastTestPollTick() {
-        const page = $("#page-transcode-vast");
+        const page = $("#page-pipeline-vast");
         if (!page || !page.classList.contains("active")) return;
         const tid = vastTestTaskId || localStorage.getItem(VAST_TASK_LS);
         if (!tid || !String(tid).trim()) return;
@@ -3602,6 +3454,7 @@
                 vastTestTaskId = resp.task_id;
                 localStorage.setItem(VAST_TASK_LS, String(resp.task_id));
                 void vastTestPollTick();
+                void refreshQueueVast();
               }
             } catch (_) {}
           } else {
@@ -3684,7 +3537,7 @@
             localStorage.removeItem(VAST_TASK_LS);
           } catch (_) {}
           $("#vast-job-panel").classList.remove("hidden");
-          $("#vast-task-line").textContent = "Test Vast annulé";
+          $("#vast-task-line").textContent = "Transcodage Vast annulé";
           $("#vast-progress-fill").style.width = "0%";
           $("#vast-meta").textContent = JSON.stringify(summary, null, 2);
           $("#vast-err").classList.add("hidden");
@@ -3698,6 +3551,7 @@
             } catch (_) {}
           }
           if (btn) btn.disabled = true;
+          void refreshQueueVast();
         } catch (e) {
           if (e && e.message === "403-admin") return;
           if (btn) btn.disabled = false;
@@ -3722,9 +3576,8 @@
           loadInvites(true);
         }
         if (p === "gpu") loadGpuOnce();
-        if (p === "transcode-local") transcodeLocalEnterPage();
-        else if (p === "transcode-vast") transcodeVastEnterPage();
-        else transcodePipelinesLeavePage();
+        if (p === "pipeline") void refreshGpuPill();
+        if (p === "pipeline-vast") pipelineVastEnterPage();
       }
 
       document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
@@ -3754,16 +3607,24 @@
         await refreshGpuPill();
         setInterval(refreshStats, 8000);
         setInterval(() => {
-          if ($("#page-pipeline").classList.contains("active")) refreshQueue();
+          const pl = $("#page-pipeline");
+          const pv = $("#page-pipeline-vast");
+          if (
+            (pl && pl.classList.contains("active")) ||
+            (pv && pv.classList.contains("active"))
+          ) {
+            refreshQueue();
+          }
         }, 2000);
         setInterval(() => {
           if ($("#page-gpu").classList.contains("active")) loadGpuOnce();
         }, 3000);
         setInterval(() => {
-          const pl = $("#page-transcode-local");
-          if (pl && pl.classList.contains("active")) void transcodeTestPollTick();
-          const pv = $("#page-transcode-vast");
-          if (pv && pv.classList.contains("active")) void vastTestPollTick();
+          const pv = $("#page-pipeline-vast");
+          if (pv && pv.classList.contains("active")) {
+            void vastTestPollTick();
+            void refreshQueueVast();
+          }
         }, 1600);
       }
 
@@ -4088,6 +3949,33 @@
         }
       });
 
+      const btnSyncVast = $("#btn-sync-s3-vast");
+      if (btnSyncVast) {
+        btnSyncVast.addEventListener("click", async () => {
+          const msg = $("#sync-s3-msg-vast");
+          if (!msg) return;
+          msg.textContent = "Synchronisation…";
+          try {
+            const r = await api("/api/admin/catalog/sync-s3", { method: "POST" });
+            if (!r.ok) {
+              let t = `Erreur ${r.status}`;
+              try {
+                const j = await r.json();
+                if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+              } catch (_) {}
+              msg.textContent = t;
+              return;
+            }
+            const j = await r.json();
+            msg.textContent = `Créés: ${j.created}, mis à jour: ${j.updated}, clés bucket: ${j.keys_in_bucket}`;
+            await refreshStats();
+          } catch (e) {
+            if (e && e.message === "403-admin") return;
+            msg.textContent = "Échec (S3 non configuré ou erreur réseau).";
+          }
+        });
+      }
+
       /** Invitation codes: server-paginated GET /api/admin/invites. */
       const INVITES_PAGE_SIZE = 10;
       let invitesPage = 1;
@@ -4272,29 +4160,31 @@
           $("#st-wait").textContent = Math.max(0, s.en_cours);
           $("#st-done").textContent = s.disponible;
           $("#st-err").textContent = s.erreur;
+          const r2 = $("#st-running-vast");
+          if (r2) r2.textContent = s.en_cours;
+          const w2 = $("#st-wait-vast");
+          if (w2) w2.textContent = Math.max(0, s.en_cours);
+          const d2 = $("#st-done-vast");
+          if (d2) d2.textContent = s.disponible;
+          const e2 = $("#st-err-vast");
+          if (e2) e2.textContent = s.erreur;
           $("#badge-lib").textContent = s.disponible;
         } catch (e) {
           if (e && e.message === "403-admin") return;
         }
       }
 
-      async function refreshQueue() {
-        let r;
-        try {
-          r = await api("/api/admin/queue");
-        } catch (e) {
-          if (e && e.message === "403-admin") return;
+      function fillPipelineQueueList(listEl, items) {
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        if (!items || items.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "font-size:12px;color:var(--color-text-tertiary);padding:10px;";
+          empty.textContent = "Aucune tâche";
+          listEl.appendChild(empty);
           return;
         }
-        if (!r.ok) return;
-        const q = await r.json();
-        const items = q.items || [];
-        $("#badge-queue").textContent = items.filter(
-          (i) => i.statut === "en_cours",
-        ).length;
-        $("#queue-meta").textContent = `${items.length} élément(s)`;
-        const list = $("#queue-list");
-        list.innerHTML = "";
         items.forEach((i) => {
           const row = document.createElement("div");
           row.className = "queue-item";
@@ -4334,6 +4224,77 @@
           if (tx) subParts.push(tx);
           if (tline) subParts.push(tline);
           row.querySelector(".qi-sub").textContent = subParts.join("\n");
+          listEl.appendChild(row);
+        });
+      }
+
+      async function refreshQueue() {
+        let r;
+        try {
+          r = await api("/api/admin/queue");
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const q = await r.json();
+        const items = q.items || [];
+        $("#badge-queue").textContent = items.filter(
+          (i) => i.statut === "en_cours",
+        ).length;
+        $("#queue-meta").textContent = `${items.length} élément(s)`;
+        fillPipelineQueueList($("#queue-list"), items);
+        const listV = $("#queue-list-vast-pipeline");
+        const metaV = $("#queue-meta-vast-pipeline");
+        if (listV && metaV) {
+          metaV.textContent = `${items.length} élément(s)`;
+          fillPipelineQueueList(listV, items);
+        }
+      }
+
+      async function refreshQueueVast() {
+        const list = $("#queue-list-vast");
+        const meta = $("#queue-meta-vast");
+        if (!list || !meta) return;
+        let r;
+        try {
+          r = await api("/api/admin/transcode/vast/queue");
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          return;
+        }
+        if (!r.ok) return;
+        const q = await r.json();
+        const items = q.items || [];
+        meta.textContent = `${items.length} tâche(s) Celery Vast`;
+        list.innerHTML = "";
+        if (items.length === 0) {
+          const empty = document.createElement("div");
+          empty.style.cssText =
+            "font-size:12px;color:var(--color-text-tertiary);padding:10px;";
+          empty.textContent =
+            q.error
+              ? "Inspect Celery indisponible : " + q.error
+              : "Aucune tâche vast_transcode active ou réservée sur les workers.";
+          list.appendChild(empty);
+          return;
+        }
+        items.forEach((i) => {
+          const row = document.createElement("div");
+          row.className = "queue-item";
+          const pill = i.kind === "active" ? "s-transcoding" : "s-waiting";
+          const label = i.kind === "active" ? "Actif" : "Réservé";
+          row.innerHTML = `
+      <div class="qi-icon">☁</div>
+      <div class="qi-info">
+        <div class="qi-title"></div>
+        <div class="qi-sub"></div>
+      </div>
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span></div>`;
+          row.querySelector(".qi-title").textContent =
+            String(i.task_id || "").slice(0, 8) + "…";
+          row.querySelector(".qi-sub").textContent =
+            (i.worker || "") + (i.args ? " · " + i.args : "");
           list.appendChild(row);
         });
       }
@@ -4347,8 +4308,6 @@
             (enc.vendor === "cpu" ? "⚠ CPU — " : "") +
             (s.gpu_label || enc.label || enc.vendor || "GPU");
           $("#gpu-pill-text").textContent = txt;
-          const lp = $("#gpu-pill-text-local");
-          if (lp) lp.textContent = txt;
           const vp = $("#gpu-pill-text-vast");
           if (vp) vp.textContent = txt;
           $("#gpu-active").textContent = txt;
@@ -5814,64 +5773,26 @@
         );
         return el && el.value === "series_episode" ? "series_episode" : "film";
       }
+      function getUploadContentKindVast() {
+        const el = document.querySelector(
+          'input[name="ingest-content-kind-vast"]:checked',
+        );
+        return el && el.value === "series_episode" ? "series_episode" : "film";
+      }
       function isVideoUploadFile(f) {
         const n = f && f.name ? f.name.toLowerCase() : "";
         const dot = n.lastIndexOf(".");
         return dot >= 0 && VIDEO_UPLOAD_EXT.has(n.slice(dot));
       }
 
-      $("#btn-tt-reset").addEventListener("click", () => {
-        localStorage.removeItem(TT_FILM_LS);
-        transcodeTestFilmId = null;
-        $("#tt-job-panel").classList.add("hidden");
-        $("#tt-upload-row").innerHTML = "";
-        $("#tt-upload-row").classList.remove("is-active");
-        const vid = $("#tt-video");
-        if (vid) {
-          vid.removeAttribute("src");
-          vid.removeAttribute("data-tt-stream-url");
-          try {
-            vid.load();
-          } catch (_) {}
-        }
-      });
-
-      $("#tt-drop-zone").addEventListener("click", () =>
-        $("#tt-file-input").click(),
-      );
-      $("#tt-file-input").addEventListener("change", (e) => {
-        const f = e.target.files && e.target.files[0];
-        if (f && isVideoUploadFile(f)) transcodeTestUpload(f);
-        else if (f)
-          void showAlertModal(
-            "Fichier non pris en charge",
-            "Choisis une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
-            { okText: "OK" },
-          );
-        e.target.value = "";
-      });
-      const ttdz = $("#tt-drop-zone");
-      ["dragenter", "dragover"].forEach((ev) =>
-        ttdz.addEventListener(ev, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }),
-      );
-      ttdz.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const f = e.dataTransfer.files && e.dataTransfer.files[0];
-        if (f && isVideoUploadFile(f)) transcodeTestUpload(f);
-        else if (f)
-          void showAlertModal(
-            "Fichier non pris en charge",
-            "Dépose une vidéo (MP4, MKV, AVI, MOV, WMV, M4V).",
-            { okText: "OK" },
-          );
-      });
-
       $("#vast-drop-zone").addEventListener("click", () =>
         $("#vast-file-input").click(),
       );
+      const btnBrowseVast = $("#btn-browse-vast");
+      if (btnBrowseVast)
+        btnBrowseVast.addEventListener("click", () =>
+          $("#vast-file-input").click(),
+        );
       $("#vast-file-input").addEventListener("change", (e) => {
         const f = e.target.files && e.target.files[0];
         if (f && isVideoUploadFile(f)) vastTestUpload(f);
@@ -6094,6 +6015,85 @@
         if (!f) return;
         uploadTorrentFile(f);
       });
+
+      const btnMagnetVast = $("#btn-magnet-vast");
+      if (btnMagnetVast) {
+        btnMagnetVast.addEventListener("click", async () => {
+          const inp = $("#magnet-input-vast");
+          const m = (inp && inp.value ? inp.value : "").trim();
+          if (!m.startsWith("magnet:?")) {
+            await showAlertModal(
+              "Lien magnet invalide",
+              "Collez un lien commençant par magnet:?xt=…",
+              { okText: "OK" },
+            );
+            return;
+          }
+          const r = await api("/api/admin/torrents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              magnet: m,
+              content_kind: getUploadContentKindVast(),
+            }),
+          });
+          if (!r.ok) {
+            await showAlertModal(
+              "Ajout impossible",
+              "Le magnet n’a pas pu être ajouté à la file.",
+              { okText: "Fermer" },
+            );
+            return;
+          }
+          refreshQueue();
+          void refreshQueueVast();
+        });
+      }
+
+      async function uploadTorrentFileVast(f) {
+        const fd = new FormData();
+        fd.append("torrent", f);
+        fd.append("content_kind", getUploadContentKindVast());
+        const r = await fetch("/api/admin/torrents/file", {
+          method: "POST",
+          body: fd,
+          credentials: "include",
+        });
+        if (r.status === 401) window.location.href = "/login.html";
+        if (!r.ok) {
+          await showAlertModal(
+            "Envoi du .torrent impossible",
+            "Vérifiez le fichier ou réessayez.",
+            { okText: "Fermer" },
+          );
+          return;
+        }
+        refreshQueue();
+        void refreshQueueVast();
+      }
+
+      const tdzV = $("#torrent-drop-vast");
+      const tinV = $("#torrent-input-vast");
+      if (tdzV && tinV) {
+        tdzV.addEventListener("click", () => tinV.click());
+        tinV.addEventListener("change", (e) => {
+          const f = e.target.files[0];
+          if (f) void uploadTorrentFileVast(f);
+          e.target.value = "";
+        });
+        ["dragenter", "dragover"].forEach((ev) =>
+          tdzV.addEventListener(ev, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }),
+        );
+        tdzV.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if (!f) return;
+          void uploadTorrentFileVast(f);
+        });
+      }
 
       boot().catch(() => {
         window.location.href = "/login.html";

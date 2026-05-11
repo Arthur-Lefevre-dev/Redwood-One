@@ -1585,6 +1585,51 @@ def admin_transcode_vast_status(
     return out
 
 
+@router.get("/transcode/vast/queue")
+def admin_transcode_vast_queue(_: User = Depends(require_admin)):
+    """
+    List active/reserved Celery tasks for the Vast transcode worker task (inspect).
+    """
+    from worker.tasks import app as celery_app
+
+    task_name = "worker.tasks.vast_transcode_test_task"
+    items: list[dict[str, Any]] = []
+    try:
+        insp = celery_app.control.inspect(timeout=2.0)
+        if not insp:
+            return {"items": []}
+        for kind, getter in (("active", insp.active), ("reserved", insp.reserved)):
+            try:
+                mapping = getter()
+            except Exception:
+                mapping = None
+            if not mapping:
+                continue
+            for worker, task_list in mapping.items():
+                if not task_list:
+                    continue
+                for t in task_list:
+                    if not isinstance(t, dict):
+                        continue
+                    if t.get("name") != task_name:
+                        continue
+                    tid = t.get("id")
+                    if not tid:
+                        continue
+                    items.append(
+                        {
+                            "task_id": tid,
+                            "worker": worker,
+                            "args": str(t.get("args") or "")[:500],
+                            "kind": kind,
+                        }
+                    )
+    except Exception as e:
+        logger.exception("transcode vast queue")
+        return {"items": [], "error": str(e)[:500]}
+    return {"items": items}
+
+
 @router.post("/transcode/vast/cancel/{task_id}")
 def admin_transcode_vast_cancel(
     task_id: str,
