@@ -223,6 +223,8 @@
         padding: 10px 16px;
         border-top: 0.5px solid var(--color-border-tertiary);
         background: var(--color-background-secondary);
+        border-bottom-left-radius: var(--border-radius-lg);
+        border-bottom-right-radius: var(--border-radius-lg);
       }
       .lib-pager-info {
         font-size: 11px;
@@ -616,6 +618,15 @@
         padding: 20px 16px;
         font-size: 12px;
         color: var(--color-text-tertiary);
+      }
+      /* Bibliothèque: aligner le bas des cartes Films / Séries sur le rayon des .card */
+      #page-films .card {
+        overflow: hidden;
+      }
+      #page-films .library-card-body {
+        padding: 0;
+        overflow: auto;
+        border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
       }
       .film-actions {
         display: flex;
@@ -1716,7 +1727,7 @@
             <div class="content">
               <div class="card">
                 <div class="card-head"><div class="card-title">Films</div></div>
-                <div class="card-body" style="padding: 0; overflow: auto">
+                <div class="card-body library-card-body">
                   <table class="film-table">
                     <thead>
                       <tr>
@@ -1738,7 +1749,7 @@
                 <div class="card-head">
                   <div class="card-title">Séries</div>
                 </div>
-                <div class="card-body" style="padding: 0; overflow: auto">
+                <div class="card-body library-card-body">
                   <div id="lib-series-root" class="lib-series-root"></div>
                   <div id="lib-series-pager" class="lib-pager"></div>
                 </div>

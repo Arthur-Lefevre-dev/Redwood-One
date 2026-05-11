@@ -98,7 +98,7 @@
     .row-carousel-viewport{
       overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;scroll-snap-type:x mandatory;
       -webkit-overflow-scrolling:touch;
-      padding:0 44px;
+      padding:12px 44px 18px;
       scrollbar-width:none;
     }
     .row-carousel-viewport::-webkit-scrollbar{display:none;width:0;height:0}
@@ -136,6 +136,14 @@
     .card:hover{
       transform:translateY(-6px) scale(1.02);
       box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(139,37,0,.35);
+      border-color:rgba(139,37,0,.55);
+    }
+    /* Scrollport clips vertical overflow: no translateY here (was cutting card tops). */
+    .row-carousel-viewport .card:hover{
+      position:relative;
+      z-index:2;
+      transform:scale(1.045);
+      box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(139,37,0,.55);
       border-color:rgba(139,37,0,.55);
     }
     .card-media{position:relative}
