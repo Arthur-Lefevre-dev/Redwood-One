@@ -617,19 +617,49 @@
         flex-direction: column;
         gap: 0;
       }
-      .lib-series-show {
+      details.lib-series-show {
         border-bottom: 0.5px solid var(--color-border-tertiary);
       }
-      .lib-series-show:last-child {
+      details.lib-series-show:last-child {
         border-bottom: none;
       }
-      .lib-series-show-title {
-        margin: 0;
+      .lib-series-show-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
         padding: 12px 16px;
         font-size: 13px;
         font-weight: 600;
         background: var(--color-background-secondary);
         border-bottom: 0.5px solid var(--color-border-tertiary);
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+      }
+      .lib-series-show-summary::-webkit-details-marker {
+        display: none;
+      }
+      .lib-series-show-summary::before {
+        content: "";
+        flex-shrink: 0;
+        width: 0;
+        height: 0;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        border-left: 6px solid var(--color-text-secondary);
+        transform: rotate(0deg);
+        transition: transform 0.12s ease;
+      }
+      details.lib-series-show[open] > .lib-series-show-summary::before {
+        transform: rotate(90deg);
+      }
+      .lib-series-show-title {
+        margin: 0;
+        font-size: inherit;
+        font-weight: inherit;
+      }
+      .lib-series-show-body {
+        background: var(--color-background-secondary);
       }
       .lib-series-show-meta {
         margin: 0;
@@ -637,27 +667,49 @@
         font-size: 11px;
         line-height: 1.45;
         color: var(--color-text-tertiary);
-        background: var(--color-background-secondary);
         border-bottom: 0.5px solid var(--color-border-tertiary);
       }
-      .lib-series-season {
+      details.lib-series-season {
         background: var(--color-background-tertiary);
         border-bottom: 0.5px solid var(--color-border-tertiary);
       }
-      .lib-series-season:last-child {
+      details.lib-series-season:last-child {
         border-bottom: none;
       }
-      .lib-series-season-label {
-        padding: 10px 16px 6px;
+      .lib-series-season-summary {
+        padding: 10px 16px 8px;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         color: var(--color-text-tertiary);
+        cursor: pointer;
+        list-style: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-      .lib-series-season .film-table tr:last-child td {
+      .lib-series-season-summary::-webkit-details-marker {
+        display: none;
+      }
+      .lib-series-season-summary::before {
+        content: "";
+        flex-shrink: 0;
+        width: 0;
+        height: 0;
+        border-top: 4px solid transparent;
+        border-bottom: 4px solid transparent;
+        border-left: 5px solid var(--color-text-tertiary);
+        transform: rotate(0deg);
+        transition: transform 0.12s ease;
+      }
+      details.lib-series-season[open] > .lib-series-season-summary::before {
+        transform: rotate(90deg);
+      }
+      details.lib-series-season .film-table tr:last-child td {
         border-bottom: 0.5px solid var(--color-border-tertiary);
       }
-      .lib-series-season:last-of-type .film-table tr:last-child td {
+      details.lib-series-season:last-of-type .film-table tr:last-child td {
         border-bottom: none;
       }
       .lib-series-empty {
@@ -3427,19 +3479,37 @@
 
       function transcodeProgressLabel(progress, traitement, statut) {
         if (statut !== "en_cours") return "";
-        if (
-          !traitement ||
-          (traitement !== "transcode" && traitement !== "optimise")
-        )
-          return "";
+        if (!traitement) return "";
         const p = Number(progress);
         if (Number.isNaN(p)) return "";
-        if (p >= 45 && p < 75) {
-          const inner = Math.round(((p - 45) / 30) * 100);
-          return `Transcodage: ${inner}%`;
+        const tx = traitement === "transcode" || traitement === "optimise";
+        if (tx) {
+          if (p >= 45 && p < 75) {
+            const inner = Math.round(((p - 45) / 30) * 100);
+            return `Transcodage : ${inner} %`;
+          }
+          if (p >= 75 && p < 100) {
+            const s3 = Math.round(((p - 75) / 24) * 100);
+            return `Envoi S3 : ${s3} %`;
+          }
         }
-        if (p >= 75 && p < 100) return `Envoi S3… (${p}%)`;
+        if (traitement === "direct" && p > 45 && p < 100) {
+          const s3 = Math.round(((p - 45) / 54) * 100);
+          return `Envoi S3 : ${s3} %`;
+        }
         return "";
+      }
+
+      /** During worker S3 upload, map pipeline_progress to 0–100 for the progress bar. */
+      function s3UploadBarPercent(progress, traitement) {
+        const p = Number(progress);
+        if (Number.isNaN(p)) return null;
+        const tx = traitement === "transcode" || traitement === "optimise";
+        if (tx && p >= 75 && p < 100)
+          return Math.min(100, Math.max(0, Math.round(((p - 75) / 24) * 100)));
+        if (traitement === "direct" && p > 45 && p < 100)
+          return Math.min(100, Math.max(0, Math.round(((p - 45) / 54) * 100)));
+        return null;
       }
 
       function torrentCompletionPct(ts) {
@@ -4646,6 +4716,9 @@
           ) {
             const tcp = torrentCompletionPct(i.torrent_stats);
             if (tcp != null) progW = tcp;
+          } else {
+            const s3b = s3UploadBarPercent(i.progress, i.traitement);
+            if (s3b != null) progW = s3b;
           }
           row.innerHTML = `
       <div class="qi-icon">▶</div>
@@ -4663,6 +4736,17 @@
             (i.traitement || "Pipeline") + " · " + (i.source || "");
           if (i.source === "torrent" && i.transcode_target === "vast") {
             base += " · encodage : Vast (après téléchargement)";
+          }
+          if (
+            i.celery_task_kind === "vast_transcode" &&
+            i.celery_task_id &&
+            String(i.celery_task_id).trim()
+          ) {
+            const tid = String(i.celery_task_id).trim();
+            base +=
+              " · tâche Celery Vast : " +
+              tid.slice(0, 12) +
+              (tid.length > 12 ? "…" : "");
           }
           const subParts = [base];
           if (tx) subParts.push(tx);
@@ -4739,10 +4823,31 @@
         <div class="qi-sub"></div>
       </div>
       <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelVastBtn}</div>`;
-          row.querySelector(".qi-title").textContent =
-            String(i.task_id || "").slice(0, 8) + "…";
-          row.querySelector(".qi-sub").textContent =
-            (i.worker || "") + (i.args ? " · " + i.args : "");
+          const ft = (i.film_title || "").trim();
+          const fid =
+            i.film_id != null && Number.isFinite(Number(i.film_id))
+              ? Number(i.film_id)
+              : null;
+          let mainTitle = "";
+          if (fid != null && fid > 0) {
+            mainTitle = "Film #" + fid + (ft ? " — " + ft : "");
+          } else if (ft) {
+            mainTitle = ft;
+          } else {
+            mainTitle = tid ? tid.slice(0, 12) + "…" : "—";
+          }
+          row.querySelector(".qi-title").textContent = mainTitle;
+          const subBits = [];
+          if (i.job_source === "torrent_vast")
+            subBits.push("Origine : torrent (file Pipeline ci-dessus)");
+          else if (i.job_source === "admin_upload")
+            subBits.push("Origine : test admin (upload onglet Vast)");
+          if (tid) subBits.push("Celery " + tid.slice(0, 14) + (tid.length > 14 ? "…" : ""));
+          if (i.job_token)
+            subBits.push("jeton " + String(i.job_token).slice(0, 10) + "…");
+          subBits.push(i.worker || "");
+          if (!ft && i.args) subBits.push(String(i.args).slice(0, 160));
+          row.querySelector(".qi-sub").textContent = subBits.filter(Boolean).join(" · ");
           list.appendChild(row);
         });
       }
@@ -5105,12 +5210,18 @@
           );
           for (const showName of sortedShows) {
             const seasonMap = byShow.get(showName);
-            const block = document.createElement("div");
+            const block = document.createElement("details");
             block.className = "lib-series-show";
-            const h = document.createElement("h3");
+            block.open = true;
+            const showSum = document.createElement("summary");
+            showSum.className = "lib-series-show-summary";
+            const h = document.createElement("span");
             h.className = "lib-series-show-title";
             h.textContent = showName;
-            block.appendChild(h);
+            showSum.appendChild(h);
+            block.appendChild(showSum);
+            const showBody = document.createElement("div");
+            showBody.className = "lib-series-show-body";
             const seasonKeys = Array.from(seasonMap.keys());
             const numericSeasons = seasonKeys
               .filter((k) => k !== LIB_SEASON_UNASSIGNED)
@@ -5130,7 +5241,7 @@
               meta.textContent =
                 "Aucune saison en base pour ces épisodes — ouvrez Modifier, type « Épisode de série », puis renseignez Saison et Épisode (sinon tout reste regroupé ici).";
             }
-            if (meta.textContent) block.appendChild(meta);
+            if (meta.textContent) showBody.appendChild(meta);
             const allEpsForKeys = [];
             for (const sk0 of seasonKeys) {
               allEpsForKeys.push(...(seasonMap.get(sk0) || []));
@@ -5159,8 +5270,9 @@
             th.textContent =
               "Affiche globale de la série, texte sous le titre, et affiches par saison — même clé série que les épisodes.";
             toolRow.appendChild(th);
-            block.appendChild(toolRow);
+            showBody.appendChild(toolRow);
             const seasonsSorted = seasonKeys.sort(compareLibrarySeasonKeys);
+            const autoOpenSingleSeason = seasonsSorted.length === 1;
             for (const sn of seasonsSorted) {
               const eps = seasonMap.get(sn);
               eps.sort((a, b) => {
@@ -5168,15 +5280,16 @@
                 const eb = dbSeasonEpisode(b).eN ?? 99999;
                 return ea - eb;
               });
-              const seasonEl = document.createElement("div");
-              seasonEl.className = "lib-series-season";
-              const lab = document.createElement("div");
-              lab.className = "lib-series-season-label";
-              lab.textContent =
+              const seasonDetails = document.createElement("details");
+              seasonDetails.className = "lib-series-season";
+              seasonDetails.open = autoOpenSingleSeason;
+              const seasonSum = document.createElement("summary");
+              seasonSum.className = "lib-series-season-summary";
+              seasonSum.textContent =
                 sn === LIB_SEASON_UNASSIGNED
                   ? "Saison non renseignée (base de données)"
                   : `Saison ${sn}`;
-              seasonEl.appendChild(lab);
+              seasonDetails.appendChild(seasonSum);
               const table = document.createElement("table");
               table.className = "film-table";
               table.innerHTML = `<thead><tr>
@@ -5206,9 +5319,10 @@
                 appendLibraryRow(tbody, ep, primary, sub);
               }
               table.appendChild(tbody);
-              seasonEl.appendChild(table);
-              block.appendChild(seasonEl);
+              seasonDetails.appendChild(table);
+              showBody.appendChild(seasonDetails);
             }
+            block.appendChild(showBody);
             root.appendChild(block);
           }
         }

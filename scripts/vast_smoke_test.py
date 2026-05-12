@@ -48,7 +48,7 @@ def main() -> int:
     sp = sub.add_parser("search", help="Search on-demand GPU offers")
     sp.add_argument(
         "--gpu",
-        help="Comma-separated GPU names (default: from VAST_DEFAULT_GPU_NAMES or RTX 3060,RTX 4060)",
+        help="Comma-separated GPU names (default: from VAST_DEFAULT_GPU_NAMES or RTX 3060,RTX 4060); see VAST_USABLE_GPU_NAMES + /vast/offers?gpu_tier=usable",
         default=None,
     )
     sp.add_argument("--limit", type=int, default=8)

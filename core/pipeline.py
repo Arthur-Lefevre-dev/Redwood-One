@@ -54,6 +54,8 @@ def _build_ffmpeg_cmd(
     br = f"{int(s.TRANSCODE_VIDEO_BITRATE_KBPS)}k"
     maxr = f"{int(s.TRANSCODE_VIDEO_MAXRATE_KBPS)}k"
     buf = f"{int(s.TRANSCODE_VIDEO_BUFSIZE_KBPS)}k"
+    audio_k = max(64, min(512, int(getattr(s, "TRANSCODE_AUDIO_BITRATE_KBPS", 160) or 160)))
+    ab = f"{audio_k}k"
     # Target average bitrate (VBV). No scale / no -r: resolution and fps follow the source.
     cmd += ["-b:v", br, "-maxrate", maxr, "-bufsize", buf]
     # CPU libx264/libx265: force 8-bit 4:2:0 so 10-bit BluRay/HDR-like sources mux cleanly to MP4.
@@ -62,7 +64,7 @@ def _build_ffmpeg_cmd(
     if enc["vendor"] != "cpu" and "_vaapi" not in vcodec:
         if "_nvenc" in vcodec or "_amf" in vcodec:
             cmd += ["-rc:v", "vbr"]
-    cmd += ["-c:a", "aac", "-b:a", "128k", "-fps_mode", "passthrough", str(output_path)]
+    cmd += ["-c:a", "aac", "-b:a", ab, "-fps_mode", "passthrough", str(output_path)]
     return cmd
 
 
@@ -239,7 +241,23 @@ def process_film_file(
                 progress(75)
 
         key = build_object_key(film.id, Path(work_path).name)
-        upload_file(work_path, key)
+        base_pg = 75 if needs_tx else 45
+        span_pg = 24 if needs_tx else 54
+        last_s3_pct = [-1]
+
+        def s3_upload_progress(transferred: int, total: int) -> None:
+            if not progress:
+                return
+            tot = max(1, int(total))
+            frac = min(1.0, float(transferred) / float(tot))
+            p = base_pg + int(frac * span_pg)
+            p = min(99, max(base_pg, p))
+            if p <= last_s3_pct[0]:
+                return
+            last_s3_pct[0] = p
+            progress(p)
+
+        upload_file(work_path, key, progress_callback=s3_upload_progress)
         film.s3_key = key
         from config import get_settings
 

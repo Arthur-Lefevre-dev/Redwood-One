@@ -34,6 +34,31 @@ def require_vast_api_key() -> str:
     return key
 
 
+def parse_iso_country_codes(raw: Optional[str]) -> List[str]:
+    """Parse comma-separated ISO 3166-1 alpha-2 codes (e.g. 'CN,RU' -> ['CN','RU'])."""
+    if not raw or not str(raw).strip():
+        return []
+    out: List[str] = []
+    for part in str(raw).split(","):
+        c = part.strip().upper()
+        if len(c) == 2 and c.isalpha():
+            out.append(c)
+    return out
+
+
+def country_code_from_vast_geolocation(geo: Any) -> Optional[str]:
+    """Vast returns geolocation like 'Shanghai, CN' — return trailing alpha-2 if present."""
+    if not isinstance(geo, str):
+        return None
+    parts = [p.strip() for p in geo.split(",") if p.strip()]
+    if not parts:
+        return None
+    last = parts[-1].strip().upper()
+    if len(last) == 2 and last.isalpha():
+        return last
+    return None
+
+
 def search_offers(
     gpu_names: List[str],
     *,
@@ -47,6 +72,7 @@ def search_offers(
     max_bandwidth_usd_per_tb: Optional[float] = None,
     min_inet_down_mbps: Optional[float] = None,
     min_inet_up_mbps: Optional[float] = None,
+    exclude_geolocation_codes: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     POST /bundles/ — returns a list of offer dicts (subset of fields kept as-is).
@@ -58,6 +84,9 @@ def search_offers(
 
     When min_inet_down_mbps / min_inet_up_mbps are > 0 (defaults from settings), adds inet_down / inet_up
     gte filters (speeds in Mb/s per Vast API).
+
+    When exclude_geolocation_codes is None, uses VAST_EXCLUDE_GEOLOCATION_CODES from settings (default CN).
+    Pass [] to disable geolocation exclusion for this call.
     """
     api_key = require_vast_api_key()
     s = get_settings()
@@ -83,6 +112,12 @@ def search_offers(
         else float(getattr(s, "VAST_MIN_INET_UP_MBPS", 0.0) or 0.0)
     )
 
+    if exclude_geolocation_codes is None:
+        exclude_geo = parse_iso_country_codes(getattr(s, "VAST_EXCLUDE_GEOLOCATION_CODES", None) or "")
+    else:
+        exclude_geo = [str(x).strip().upper() for x in exclude_geolocation_codes if str(x).strip()]
+        exclude_geo = [c for c in exclude_geo if len(c) == 2 and c.isalpha()]
+
     if num_gpus_eq is not None:
         num_gpus_filter: Dict[str, Any] = {"eq": int(num_gpus_eq)}
     else:
@@ -106,6 +141,8 @@ def search_offers(
         payload["inet_down"] = {"gte": down_floor}
     if up_floor > 0:
         payload["inet_up"] = {"gte": up_floor}
+    if exclude_geo:
+        payload["geolocation"] = {"notin": exclude_geo}
     url = f"{_api_root()}/bundles/"
     with httpx.Client(timeout=60.0) as client:
         r = client.post(url, headers=_bearer_headers(api_key), json=payload)
@@ -140,6 +177,10 @@ def search_offers(
             continue
         if up_floor > 0 and iup is None:
             continue
+        if exclude_geo:
+            gcc = country_code_from_vast_geolocation(o.get("geolocation"))
+            if gcc and gcc in exclude_geo:
+                continue
         out.append(
             {
                 "id": oid,
@@ -148,6 +189,7 @@ def search_offers(
                 "dph_total": o.get("dph_total"),
                 "reliability": o.get("reliability"),
                 "verified": o.get("verified"),
+                "geolocation": o.get("geolocation"),
                 "inet_down": o.get("inet_down"),
                 "inet_up": o.get("inet_up"),
                 "inet_down_cost": o.get("inet_down_cost"),
@@ -225,6 +267,35 @@ def default_gpu_name_list() -> List[str]:
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def usable_gpu_name_list() -> List[str]:
+    """Lower-priority GPUs (e.g. entry Turing) — still fine for NVENC; not used by pick_first by default."""
+    raw = (getattr(get_settings(), "VAST_USABLE_GPU_NAMES", None) or "").strip()
+    if not raw:
+        return []
+    return [x.strip() for x in raw.split(",") if x.strip()]
+
+
+def vast_gpu_names_for_tier(tier: str) -> List[str]:
+    """
+    Resolve GPU name list when the admin does not pass an explicit `gpu` query.
+    tier: default | usable | all (all = default first, then usable, deduped case-insensitively).
+    """
+    t = (tier or "default").strip().lower()
+    if t == "usable":
+        return usable_gpu_name_list()
+    if t in ("all", "combined", "default+usable"):
+        out: List[str] = []
+        seen: set[str] = set()
+        for n in default_gpu_name_list() + usable_gpu_name_list():
+            k = n.casefold()
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(n)
+        return out
+    return default_gpu_name_list()
+
+
 def pick_first_verified_bundle_offer(
     gpu_names: List[str],
     *,
@@ -258,7 +329,8 @@ def pick_first_verified_bundle_offer(
     raise RuntimeError(
         "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
         "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_MIN_INET_DOWN_MBPS, "
-        "VAST_MIN_INET_UP_MBPS, VAST_DEFAULT_GPU_NAMES"
+        "VAST_MIN_INET_UP_MBPS, noms GPU passés à la recherche — auto-pic : VAST_DEFAULT_GPU_NAMES ; "
+        "GPU secondaires : VAST_USABLE_GPU_NAMES, voir GET /api/admin/vast/offers?gpu_tier=usable ou all"
         + (", une seule GPU requise (VAST_TRANSCODE_SINGLE_GPU_ONLY)" if single_gpu else "")
         + "). Élargissez les noms de GPU, relevez les plafonds $/h ou réseau, ou baissez les débits min. (Mb/s)"
         + (" ou désactivez VAST_TRANSCODE_SINGLE_GPU_ONLY si l'API n'a aucune offre 1×GPU" if single_gpu else "")

@@ -4,7 +4,7 @@ import logging
 import re
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import boto3
 from botocore.client import BaseClient
@@ -35,12 +35,29 @@ def build_object_key(film_id: int, filename: str) -> str:
     return f"films/{film_id}/{uuid.uuid4().hex}{ext}"
 
 
-def upload_file(local_path: str, key: str) -> None:
+def upload_file(
+    local_path: str,
+    key: str,
+    *,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+) -> None:
     s = get_settings()
     if not s.S3_BUCKET_NAME or not s.S3_ENDPOINT_URL:
         raise RuntimeError("S3 not configured")
     client = get_s3_client()
-    client.upload_file(local_path, s.S3_BUCKET_NAME, key)
+    total = Path(local_path).stat().st_size
+    state = {"acc": 0}
+
+    def _cb(delta: int) -> None:
+        if not progress_callback or delta <= 0:
+            return
+        state["acc"] = min(total, state["acc"] + int(delta))
+        progress_callback(state["acc"], total)
+
+    cb = _cb if progress_callback else None
+    client.upload_file(local_path, s.S3_BUCKET_NAME, key, Callback=cb)
+    if progress_callback and total > 0:
+        progress_callback(total, total)
     logger.info("s3: uploaded %s -> s3://%s/%s", local_path, s.S3_BUCKET_NAME, key)
 
 
