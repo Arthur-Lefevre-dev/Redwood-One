@@ -1899,7 +1899,13 @@ async def admin_transcode_vast_upload(
             status_code=503,
             detail="Impossible de lancer la tâche Celery (Redis / worker).",
         ) from e
-    store_job_envelope(async_res.id, job_token, ext)
+    store_job_envelope(
+        async_res.id,
+        job_token,
+        ext,
+        film_title=(file.filename or "upload")[:512],
+        source="admin_upload",
+    )
     return {
         "task_id": async_res.id,
         "job_token": job_token,
@@ -1940,11 +1946,32 @@ def admin_transcode_vast_status(
 
 
 @router.get("/transcode/vast/queue")
-def admin_transcode_vast_queue(_: User = Depends(require_admin)):
+def admin_transcode_vast_queue(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     """
     List active/reserved Celery tasks for the Vast transcode worker task (inspect).
+    Enriched with film id/title from Redis envelope (and DB fallback).
     """
+    import ast
+
+    from core.vast_transcode_cancel import read_job_envelope
     from worker.tasks import app as celery_app
+
+    def _film_id_from_inspect_task(t: dict[str, Any]) -> Optional[int]:
+        raw = t.get("args")
+        if isinstance(raw, (list, tuple)) and len(raw) >= 4:
+            x = raw[3]
+            if isinstance(x, int) and x > 0:
+                return x
+        if isinstance(raw, str):
+            try:
+                parsed = ast.literal_eval(raw.strip())
+                if isinstance(parsed, (list, tuple)) and len(parsed) >= 4:
+                    x = parsed[3]
+                    if isinstance(x, int) and x > 0:
+                        return x
+            except Exception:
+                return None
+        return None
 
     task_name = "worker.tasks.vast_transcode_test_task"
     items: list[dict[str, Any]] = []
@@ -1970,14 +1997,38 @@ def admin_transcode_vast_queue(_: User = Depends(require_admin)):
                     tid = t.get("id")
                     if not tid:
                         continue
-                    items.append(
-                        {
-                            "task_id": tid,
-                            "worker": worker,
-                            "args": str(t.get("args") or "")[:500],
-                            "kind": kind,
-                        }
-                    )
+                    entry: dict[str, Any] = {
+                        "task_id": tid,
+                        "worker": worker,
+                        "args": str(t.get("args") or "")[:500],
+                        "kind": kind,
+                    }
+                    env = read_job_envelope(str(tid))
+                    if env:
+                        jt = env.get("job_token")
+                        if isinstance(jt, str) and jt.strip():
+                            entry["job_token"] = jt.strip()
+                        if env.get("film_id") is not None:
+                            try:
+                                entry["film_id"] = int(env["film_id"])
+                            except (TypeError, ValueError):
+                                pass
+                        ft = env.get("film_title")
+                        if isinstance(ft, str) and ft.strip():
+                            entry["film_title"] = ft.strip()[:512]
+                        src = env.get("source")
+                        if isinstance(src, str) and src.strip():
+                            entry["job_source"] = src.strip()[:64]
+                    if entry.get("film_id") is None:
+                        inferred = _film_id_from_inspect_task(t)
+                        if inferred is not None:
+                            entry["film_id"] = inferred
+                    fid = entry.get("film_id")
+                    if fid is not None and not entry.get("film_title"):
+                        row = db.get(Film, int(fid))
+                        if row and (row.titre or "").strip():
+                            entry["film_title"] = (row.titre or "").strip()[:512]
+                    items.append(entry)
     except Exception as e:
         logger.exception("transcode vast queue")
         return {"items": [], "error": str(e)[:500]}

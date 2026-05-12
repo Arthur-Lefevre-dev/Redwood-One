@@ -241,7 +241,23 @@ def process_film_file(
                 progress(75)
 
         key = build_object_key(film.id, Path(work_path).name)
-        upload_file(work_path, key)
+        base_pg = 75 if needs_tx else 45
+        span_pg = 24 if needs_tx else 54
+        last_s3_pct = [-1]
+
+        def s3_upload_progress(transferred: int, total: int) -> None:
+            if not progress:
+                return
+            tot = max(1, int(total))
+            frac = min(1.0, float(transferred) / float(tot))
+            p = base_pg + int(frac * span_pg)
+            p = min(99, max(base_pg, p))
+            if p <= last_s3_pct[0]:
+                return
+            last_s3_pct[0] = p
+            progress(p)
+
+        upload_file(work_path, key, progress_callback=s3_upload_progress)
         film.s3_key = key
         from config import get_settings
 

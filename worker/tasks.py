@@ -149,11 +149,13 @@ def download_torrent_task(
 
     target = "local"
     vast_oid: Optional[int] = None
+    film_title_for_vast = Path(video).name
     db = SessionLocal()
     try:
         f = db.get(Film, film_id)
         if f:
             f.titre = Path(video).name
+            film_title_for_vast = (f.titre or "").strip() or film_title_for_vast
             f.pipeline_progress = 10
             f.torrent_stats = None
             db.commit()
@@ -205,7 +207,14 @@ def download_torrent_task(
             logger.exception("torrent->vast Celery enqueue film_id=%s", film_id)
             _fail_film(film_id, str(e)[:8000])
             return
-        store_job_envelope(async_res.id, job_token, ext)
+        store_job_envelope(
+            async_res.id,
+            job_token,
+            ext,
+            film_id=film_id,
+            film_title=film_title_for_vast,
+            source="torrent_vast",
+        )
         db2 = SessionLocal()
         try:
             f2 = db2.get(Film, film_id)

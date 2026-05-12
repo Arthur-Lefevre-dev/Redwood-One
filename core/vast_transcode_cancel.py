@@ -121,20 +121,54 @@ def _job_envelope_key(task_id: str) -> str:
     return f"redwood:vast_transcode_job:{task_id}"
 
 
-def store_job_envelope(task_id: str, job_token: str, src_ext: str, ttl_sec: int = 172800) -> None:
-    """API stores this at enqueue so cancel can clean S3 before Celery meta exists."""
+def store_job_envelope(
+    task_id: str,
+    job_token: str,
+    src_ext: str,
+    *,
+    film_id: Optional[int] = None,
+    film_title: Optional[str] = None,
+    source: str = "admin",
+    ttl_sec: int = 172800,
+) -> None:
+    """API / worker stores this at enqueue so cancel and queue UI can resolve film + S3 keys."""
     try:
         import json
         import redis
 
         r = redis.from_url(get_settings().redis_url, decode_responses=True)
+        doc: Dict[str, Any] = {
+            "job_token": job_token,
+            "src_ext": src_ext,
+            "source": (source or "admin")[:64],
+        }
+        if film_id is not None:
+            doc["film_id"] = int(film_id)
+        if film_title and str(film_title).strip():
+            doc["film_title"] = str(film_title).strip()[:512]
         r.set(
             _job_envelope_key(task_id),
-            json.dumps({"job_token": job_token, "src_ext": src_ext}),
+            json.dumps(doc),
             ex=int(ttl_sec),
         )
     except Exception:
         logger.warning("vast_transcode_cancel: could not store job envelope for %s", task_id)
+
+
+def read_job_envelope(task_id: str) -> Dict[str, Any]:
+    """Return stored envelope dict (job_token, src_ext, film_id, film_title, source) or {}."""
+    try:
+        import json
+        import redis
+
+        r = redis.from_url(get_settings().redis_url, decode_responses=True)
+        raw = r.get(_job_envelope_key(task_id))
+        if not raw:
+            return {}
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 def _merge_job_envelope(task_id: str, meta: Dict[str, Any]) -> None:

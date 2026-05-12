@@ -49,8 +49,8 @@ class Settings(BaseSettings):
 
     # Transcode pipeline (ffmpeg): target average video bitrate in kbit/s (e.g. 6000 ≈ 6 Mbit/s).
     # VBV maxrate/bufsize cap peaks; no -vf scale / no -r so resolution and frame rate follow the source.
-    TRANSCODE_VIDEO_BITRATE_KBPS: int = 6000
-    TRANSCODE_VIDEO_MAXRATE_KBPS: int = 7200
+    TRANSCODE_VIDEO_BITRATE_KBPS: int = 4000
+    TRANSCODE_VIDEO_MAXRATE_KBPS: int = 6000
     TRANSCODE_VIDEO_BUFSIZE_KBPS: int = 12000
     # AAC audio bitrate (kbit/s) for transcoded MP4 (local + Vast onstart).
     TRANSCODE_AUDIO_BITRATE_KBPS: int = 160
