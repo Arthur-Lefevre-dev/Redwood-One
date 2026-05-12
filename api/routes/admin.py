@@ -1626,10 +1626,17 @@ def admin_vast_status(_: User = Depends(require_admin)):
     """Whether Vast.ai API key is configured (never return the key)."""
     s = get_settings()
     key_set = bool((getattr(s, "VAST_API_KEY", None) or "").strip())
+    from core import vast_ai
+
     return {
         "configured": key_set,
         "api_base_url": (getattr(s, "VAST_API_BASE_URL", None) or "").strip()
         or "https://console.vast.ai/api/v0",
+        "default_gpu_names": vast_ai.default_gpu_name_list(),
+        "usable_gpu_names": vast_ai.usable_gpu_name_list(),
+        "geolocation_excluded": vast_ai.parse_iso_country_codes(
+            getattr(s, "VAST_EXCLUDE_GEOLOCATION_CODES", None) or ""
+        ),
     }
 
 
@@ -1637,7 +1644,11 @@ def admin_vast_status(_: User = Depends(require_admin)):
 def admin_vast_offers(
     gpu: Optional[str] = Query(
         None,
-        description="GPU names comma-separated; defaults to VAST_DEFAULT_GPU_NAMES from env.",
+        description="GPU names comma-separated; if omitted, see gpu_tier (VAST_DEFAULT / VAST_USABLE).",
+    ),
+    gpu_tier: str = Query(
+        "default",
+        description="Si gpu est omis : default | usable | all (union default + usable, sans doublons).",
     ),
     limit: int = Query(8, ge=1, le=25),
     max_dph: Optional[float] = Query(
@@ -1668,6 +1679,10 @@ def admin_vast_offers(
         le=20000.0,
         description="Débit montant min. (Mb/s). Omis = env VAST_MIN_INET_UP_MBPS ; 0 = sans filtre.",
     ),
+    exclude_geolocation: Optional[str] = Query(
+        None,
+        description="Codes pays ISO (A2) à exclure, virgules. Omis = env VAST_EXCLUDE_GEOLOCATION_CODES ; chaîne vide = aucune exclusion.",
+    ),
     _: User = Depends(require_admin),
 ):
     """Search rentable GPU offers on Vast.ai (test / ops). Requires VAST_API_KEY."""
@@ -1678,23 +1693,31 @@ def admin_vast_offers(
             status_code=503,
             detail="VAST_API_KEY non configurée. Voir docker/env.example.",
         )
-    names = (
-        [x.strip() for x in (gpu or "").split(",") if x.strip()]
-        if (gpu or "").strip()
-        else vast_ai.default_gpu_name_list()
-    )
+    if (gpu or "").strip():
+        names = [x.strip() for x in (gpu or "").split(",") if x.strip()]
+    else:
+        names = vast_ai.vast_gpu_names_for_tier(gpu_tier)
     if not names:
-        raise HTTPException(status_code=400, detail="Aucun nom de GPU à rechercher.")
-    try:
-        rows = vast_ai.search_offers(
-            names,
-            limit=limit,
-            max_dph_per_hour=max_dph,
-            max_bandwidth_usd_per_tb=max_bandwidth_usd_per_tb,
-            verified=True,
-            min_inet_down_mbps=min_inet_down_mbps,
-            min_inet_up_mbps=min_inet_up_mbps,
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun nom de GPU à rechercher. "
+            "Pour gpu_tier=usable, définissez VAST_USABLE_GPU_NAMES ou passez gpu=… explicitement.",
         )
+    try:
+        s = get_settings()
+        search_kw: Dict[str, Any] = {
+            "limit": limit,
+            "max_dph_per_hour": max_dph,
+            "max_bandwidth_usd_per_tb": max_bandwidth_usd_per_tb,
+            "verified": True,
+            "min_inet_down_mbps": min_inet_down_mbps,
+            "min_inet_up_mbps": min_inet_up_mbps,
+        }
+        if exclude_geolocation is not None:
+            search_kw["exclude_geolocation_codes"] = vast_ai.parse_iso_country_codes(
+                exclude_geolocation
+            )
+        rows = vast_ai.search_offers(names, **search_kw)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except Exception as e:
@@ -1702,7 +1725,6 @@ def admin_vast_offers(
         raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
     if verified_only:
         rows = [r for r in rows if isinstance(r, dict) and r.get("verified") is not False]
-    s = get_settings()
     dph_applied = float(max_dph) if max_dph is not None else float(s.VAST_MAX_DPH_PER_HOUR)
     bw_applied = (
         float(max_bandwidth_usd_per_tb)
@@ -1729,6 +1751,15 @@ def admin_vast_offers(
             "verified_only": verified_only,
             "min_inet_down_mbps": eff_down,
             "min_inet_up_mbps": eff_up,
+            "gpu_names": names,
+            "gpu_tier": None if (gpu or "").strip() else (gpu_tier or "default").strip().lower(),
+            "geolocation_notin": (
+                vast_ai.parse_iso_country_codes(exclude_geolocation)
+                if exclude_geolocation is not None
+                else vast_ai.parse_iso_country_codes(
+                    getattr(s, "VAST_EXCLUDE_GEOLOCATION_CODES", None) or ""
+                )
+            ),
         },
     }
 

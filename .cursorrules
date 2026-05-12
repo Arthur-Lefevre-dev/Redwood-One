@@ -248,7 +248,7 @@ Table refresh_tokens :
   Encodeur : sélectionné automatiquement par core/gpu_detect.py
   Bitrate  : -maxrate 4M -bufsize 8M
   Qualité  : -crf 23
-  Audio    : -c:a aac -b:a 128k
+  Audio    : -c:a aac -b:a 160k (TRANSCODE_AUDIO_BITRATE_KBPS)
   Sortie   : .mp4
   Exemple NVIDIA : ffmpeg -hwaccel cuda -i input -c:v hevc_nvenc -crf 23 ...
   Exemple CPU    : ffmpeg -i input -c:v libx265 -crf 23 ...

@@ -10,12 +10,16 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Env: RW_IN, RW_OUT, RW_EXT, RW_BR/MR/BF, RW_GPU_WAIT (max seconds to wait for /dev/nvidia0).
-# Tries NVENC (GPU); if no CUDA device, falls back to libx264 (CPU) so the job still completes.
+# Env: RW_IN, RW_OUT, RW_EXT, RW_BR/MR/BF, RW_BA (AAC kbit/s), RW_GPU_WAIT, RW_FFMPEG_URL (optional BtbN tarball URL).
+# Prefers a recent static FFmpeg with NVENC; sets NVIDIA_DRIVER_CAPABILITIES + LD_LIBRARY_PATH for Vast.
+# Tries CPU-decode+NVENC, CUDA-decode+NVENC, optional apt NVENC if BtbN used, then libx264 (CPU).
+# Large input: aria2c parallel download (S3 presigned GET supports Range); falls back to curl.
 VAST_TRANSCODE_ONSTART = r"""set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
+export NVIDIA_DRIVER_CAPABILITIES="${NVIDIA_DRIVER_CAPABILITIES:-all}"
+export LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:${LD_LIBRARY_PATH:-}"
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates ffmpeg
+apt-get install -y -qq curl ca-certificates xz-utils ffmpeg aria2
 # Vast attaches GPU device nodes to the container; they can appear shortly after boot.
 GW="${RW_GPU_WAIT:-90}"
 i=0
@@ -24,22 +28,71 @@ while [ "$i" -lt "$GW" ]; do
   i=$((i + 1))
   sleep 1
 done
-curl -fSL "${RW_IN}" -o "/tmp/in${RW_EXT}"
+IN="/tmp/in${RW_EXT}"
+rm -f "$IN"
+DL_CONN="${RW_DL_CONN:-16}"
+DL_SPLIT="${RW_DL_SPLIT:-16}"
 set +e
-ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -i "/tmp/in${RW_EXT}" \
-  -c:v h264_nvenc -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-  -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart /tmp/out.mp4
-RC=$?
-if [ "${RC}" != "0" ]; then
-  ffmpeg -y -i "/tmp/in${RW_EXT}" \
-    -c:v h264_nvenc -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart /tmp/out.mp4
+aria2c --disable-ipv6=true --file-allocation=none --allow-overwrite=true \
+  --max-tries=8 --retry-wait=5 --timeout=120 --connect-timeout=30 \
+  --max-connection-per-server="$DL_CONN" --split="$DL_SPLIT" --min-split-size=4M \
+  --summary-interval=30 --console-log-level=notice \
+  -d /tmp -o "in${RW_EXT}" "${RW_IN}"
+AR=$?
+set -e
+if [ "$AR" != "0" ]; then
+  rm -f "$IN"
+  curl -fSL "${RW_IN}" -o "$IN"
+fi
+GPUFF=/usr/bin/ffmpeg
+if [ -n "${RW_FFMPEG_URL:-}" ]; then
+  mkdir -p /tmp/btbn
+  curl -fSL "${RW_FFMPEG_URL}" -o /tmp/btbn/ff.txz
+  tar -xJf /tmp/btbn/ff.txz -C /tmp/btbn
+  shopt -s nullglob
+  G=(/tmp/btbn/ffmpeg-*-linux64-gpl/bin/ffmpeg)
+  if [ ${#G[@]} -ge 1 ]; then GPUFF="${G[0]}"; fi
+  shopt -u nullglob
+  chmod +x "$GPUFF"
+fi
+nvidia-smi -L 2>/dev/null || true
+set +e
+if [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
+  # 1–2) Recent BtbN build: modern NVENC presets
+  "$GPUFF" -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+    -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
+    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+  RC=$?
+  if [ "${RC}" != "0" ]; then
+    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "/tmp/in${RW_EXT}" \
+      -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
+      -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    RC=$?
+  fi
+else
+  # No BtbN URL: distro ffmpeg — avoid p4 (invalid on 4.x)
+  "$GPUFF" -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+    -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
+    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+  RC=$?
+  if [ "${RC}" != "0" ]; then
+    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "/tmp/in${RW_EXT}" \
+      -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
+      -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    RC=$?
+  fi
+fi
+if [ "${RC}" != "0" ] && [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
+  # 3) Distro ffmpeg + NVENC (different linkage than BtbN static; sometimes works when static fails)
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+    -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
+    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
   RC=$?
 fi
 if [ "${RC}" != "0" ]; then
-  ffmpeg -y -i "/tmp/in${RW_EXT}" \
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
     -c:v libx264 -preset faster -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
   RC=$?
 fi
 set -e
@@ -115,7 +168,13 @@ def run_vast_transcode_test(
         br = f"{int(s.TRANSCODE_VIDEO_BITRATE_KBPS)}k"
         mr = f"{int(s.TRANSCODE_VIDEO_MAXRATE_KBPS)}k"
         bf = f"{int(s.TRANSCODE_VIDEO_BUFSIZE_KBPS)}k"
+        audio_k = max(64, min(512, int(getattr(s, "TRANSCODE_AUDIO_BITRATE_KBPS", 160) or 160)))
         gpu_wait = max(5, int(s.VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC))
+        caps = (getattr(s, "VAST_TRANSCODE_NVIDIA_DRIVER_CAPABILITIES", None) or "all").strip() or "all"
+        vis_dev = (getattr(s, "VAST_TRANSCODE_NVIDIA_VISIBLE_DEVICES", None) or "0").strip() or "0"
+        ff_url = (getattr(s, "VAST_TRANSCODE_BTBH_FFMPEG_URL", None) or "").strip()
+        aria_conn = max(1, min(32, int(getattr(s, "VAST_TRANSCODE_INPUT_ARIA2_CONN", 16) or 16)))
+        aria_split = max(1, min(32, int(getattr(s, "VAST_TRANSCODE_INPUT_ARIA2_SPLIT", 16) or 16)))
         env = {
             "RW_IN": get_url,
             "RW_OUT": put_url,
@@ -123,11 +182,15 @@ def run_vast_transcode_test(
             "RW_BR": br,
             "RW_MR": mr,
             "RW_BF": bf,
+            "RW_BA": str(audio_k),
             "RW_GPU_WAIT": str(gpu_wait),
-            # Help some hosts expose the GPU to the container (no-op if unsupported).
-            "NVIDIA_VISIBLE_DEVICES": "all",
-            "NVIDIA_DRIVER_CAPABILITIES": "compute,video,utility",
+            "NVIDIA_VISIBLE_DEVICES": vis_dev,
+            "NVIDIA_DRIVER_CAPABILITIES": caps,
+            "RW_DL_CONN": str(aria_conn),
+            "RW_DL_SPLIT": str(aria_split),
         }
+        if ff_url:
+            env["RW_FFMPEG_URL"] = ff_url
         image = (s.VAST_TRANSCODE_DOCKER_IMAGE or "nvidia/cuda:12.3.1-runtime-ubuntu22.04").strip()
         disk = max(16, int(s.VAST_TRANSCODE_DISK_GB))
 

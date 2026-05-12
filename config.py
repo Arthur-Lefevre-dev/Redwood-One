@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     TRANSCODE_VIDEO_BITRATE_KBPS: int = 6000
     TRANSCODE_VIDEO_MAXRATE_KBPS: int = 7200
     TRANSCODE_VIDEO_BUFSIZE_KBPS: int = 12000
+    # AAC audio bitrate (kbit/s) for transcoded MP4 (local + Vast onstart).
+    TRANSCODE_AUDIO_BITRATE_KBPS: int = 160
 
     # If True, POST /api/auth/register accepts users without an invite code (dev only).
     REGISTRATION_OPEN: bool = False
@@ -63,21 +65,39 @@ class Settings(BaseSettings):
     # API key: https://cloud.vast.ai/manage-keys/
     VAST_API_KEY: str = ""
     VAST_API_BASE_URL: str = "https://console.vast.ai/api/v0"
-    # Comma-separated GPU names for offer search — must match Vast bundle `gpu_name` strings.
+    # Comma-separated GPU names for offer search / auto-pick — must match Vast bundle `gpu_name` strings.
     VAST_DEFAULT_GPU_NAMES: str = (
-        "RTX 3060,RTX 4060,GTX 1070 Ti,RTX 3060 Ti,GTX 1080,RTX 3070,GTX 1060,RTX 3050,"
-        "Titan Xp,GTX 1660 S,GTX 1080 Ti,GTX 1660"
+        "GTX 1070 Ti,GTX 1080,GTX 1080 Ti,Titan Xp,RTX 2060,RTX 2060 SUPER,RTX 2070,RTX 2070 SUPER,RTX 2080,RTX 2080 SUPER,RTX 2080 Ti,TITAN RTX,RTX 3060,RTX 3060 Ti,RTX 3070,RTX 3070 Ti,RTX 3080,RTX 3080 Ti,RTX 3090,RTX 3090 Ti,RTX 4060,RTX 4060 Ti,RTX 4070,RTX 4070 SUPER,RTX 4070 Ti,RTX 4070 Ti SUPER,RTX 4080,RTX 4080 SUPER,RTX 4090,RTX 5050,RTX 5060,RTX 5060 Ti,RTX 5070,RTX 5070 Ti,RTX 5080,RTX 5090"
     )
+    # Secondary tier (NVENC still usable); excluded from default search. See GET /api/admin/vast/offers?gpu_tier=…
+    VAST_USABLE_GPU_NAMES: str = "GTX 1660,GTX 1660 SUPER,GTX 1660 S,GTX 1660 Ti,RTX 3050,GTX 1060"
     # Bundles search: max total $/hour (dph_total).
-    VAST_MAX_DPH_PER_HOUR: float = 0.058
+    VAST_MAX_DPH_PER_HOUR: float = 0.08
     # Max Internet bandwidth price: $ per TB (applied as inet_*_cost $/GB lte = value/1024).
     VAST_MAX_BANDWIDTH_USD_PER_TB: float = 4.0
     # Bundles search: minimum host internet speeds (Mb/s per Vast API — see CLI docs inet_down / inet_up).
     # Set to 0 to disable that bound. Used for auto-pick and GET /api/admin/vast/offers.
     VAST_MIN_INET_DOWN_MBPS: float = 120.0
     VAST_MIN_INET_UP_MBPS: float = 120.0
+    # Comma-separated ISO 3166-1 alpha-2 codes excluded from Vast bundle search (geolocation notin + response filter).
+    # Default excludes China (CN). Empty string = do not exclude any country.
+    VAST_EXCLUDE_GEOLOCATION_CODES: str = "CN"
     # Remote transcode on Vast (Celery): Docker image on Vast (CUDA runtime + apt ffmpeg in onstart).
     VAST_TRANSCODE_DOCKER_IMAGE: str = "nvidia/cuda:12.3.1-runtime-ubuntu22.04"
+    # Mount all driver libs (incl. NVENC); "compute" alone often breaks h264_nvenc on Vast.
+    VAST_TRANSCODE_NVIDIA_DRIVER_CAPABILITIES: str = "all"
+    # Visible GPU index(es) for the Vast container. Use "0" for typical 1×GPU contracts — "all" can make
+    # Docker/CDI try to inject every host GPU (e.g. gpu=3) and fail with "unresolvable CDI devices".
+    VAST_TRANSCODE_NVIDIA_VISIBLE_DEVICES: str = "0"
+    # If non-empty, onstart downloads this BtbN FFmpeg tarball (NVENC-friendly) before encoding.
+    # Empty string skips download and uses apt ffmpeg only (NVENC often fails on stock Ubuntu 4.4 + Vast).
+    VAST_TRANSCODE_BTBH_FFMPEG_URL: str = (
+        "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
+        "ffmpeg-master-latest-linux64-gpl.tar.xz"
+    )
+    # Parallel download of source into the Vast instance (aria2c; S3 supports Range). 1–32.
+    VAST_TRANSCODE_INPUT_ARIA2_CONN: int = 16
+    VAST_TRANSCODE_INPUT_ARIA2_SPLIT: int = 16
     VAST_TRANSCODE_DISK_GB: int = 32
     VAST_TRANSCODE_URL_TTL_SEC: int = 7200
     VAST_TRANSCODE_POLL_INTERVAL_SEC: int = 15
