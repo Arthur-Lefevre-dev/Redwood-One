@@ -55,44 +55,78 @@ if [ -n "${RW_FFMPEG_URL:-}" ]; then
   shopt -u nullglob
   chmod +x "$GPUFF"
 fi
+INP="/tmp/in${RW_EXT}"
+RW_MAP_ARGS=""
+RW_SUB_CODEC=""
+RW_HAS_AUD="0"
+if ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$INP" 2>/dev/null | grep -q .; then
+  RW_HAS_AUD="1"
+fi
+SUB_MAPS=""
+FFCSV=$(ffprobe -v error -select_streams s -show_entries stream=index,codec_name -of csv=p=0 "$INP" 2>/dev/null || true)
+while IFS= read -r line; do
+  [ -z "${line}" ] && continue
+  idx="${line%%,*}"
+  codec="${line##*,}"
+  codec_lc=$(printf '%s' "$codec" | tr '[:upper:]' '[:lower:]')
+  case "$codec_lc" in
+    subrip|ass|ssa|webvtt|mov_text|srt|text)
+      SUB_MAPS="${SUB_MAPS} -map 0:${idx}"
+      ;;
+  esac
+done <<EOF
+$(printf '%s\n' "$FFCSV")
+EOF
+if [ -n "$SUB_MAPS" ]; then
+  RW_MAP_ARGS="-map 0:v:0"
+  if [ "$RW_HAS_AUD" = "1" ]; then
+    RW_MAP_ARGS="${RW_MAP_ARGS} -map 0:a:0"
+  fi
+  RW_MAP_ARGS="${RW_MAP_ARGS}${SUB_MAPS}"
+  RW_SUB_CODEC="-c:s mov_text"
+fi
+RW_AUD_ARGS="-c:a aac -b:a ${RW_BA:-160}k"
+if [ -n "$RW_SUB_CODEC" ] && [ "$RW_HAS_AUD" != "1" ]; then
+  RW_AUD_ARGS=""
+fi
 nvidia-smi -L 2>/dev/null || true
 set +e
 if [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
   # 1–2) Recent BtbN build: modern NVENC presets
-  "$GPUFF" -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+  "$GPUFF" -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
   RC=$?
   if [ "${RC}" != "0" ]; then
-    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "/tmp/in${RW_EXT}" \
+    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
       -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-      -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
     RC=$?
   fi
 else
   # No BtbN URL: distro ffmpeg — avoid p4 (invalid on 4.x)
-  "$GPUFF" -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+  "$GPUFF" -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
   RC=$?
   if [ "${RC}" != "0" ]; then
-    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "/tmp/in${RW_EXT}" \
+    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
       -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-      -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
     RC=$?
   fi
 fi
 if [ "${RC}" != "0" ] && [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
   # 3) Distro ffmpeg + NVENC (different linkage than BtbN static; sometimes works when static fails)
-  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
   RC=$?
 fi
 if [ "${RC}" != "0" ]; then
-  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "/tmp/in${RW_EXT}" \
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
     -c:v libx264 -preset faster -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p -c:a aac -b:a "${RW_BA:-160}k" -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
   RC=$?
 fi
 set -e

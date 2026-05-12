@@ -5212,7 +5212,6 @@
             const seasonMap = byShow.get(showName);
             const block = document.createElement("details");
             block.className = "lib-series-show";
-            block.open = true;
             const showSum = document.createElement("summary");
             showSum.className = "lib-series-show-summary";
             const h = document.createElement("span");
@@ -5272,7 +5271,6 @@
             toolRow.appendChild(th);
             showBody.appendChild(toolRow);
             const seasonsSorted = seasonKeys.sort(compareLibrarySeasonKeys);
-            const autoOpenSingleSeason = seasonsSorted.length === 1;
             for (const sn of seasonsSorted) {
               const eps = seasonMap.get(sn);
               eps.sort((a, b) => {
@@ -5282,7 +5280,6 @@
               });
               const seasonDetails = document.createElement("details");
               seasonDetails.className = "lib-series-season";
-              seasonDetails.open = autoOpenSingleSeason;
               const seasonSum = document.createElement("summary");
               seasonSum.className = "lib-series-season-summary";
               seasonSum.textContent =

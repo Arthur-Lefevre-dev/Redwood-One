@@ -4,9 +4,24 @@ import json
 import logging
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Codecs muxable as timed text (mov_text) in MP4 for browser TextTrack / Plyr.
+_TEXT_SUBTITLE_CODECS = frozenset(
+    {
+        "subrip",
+        "ass",
+        "ssa",
+        "webvtt",
+        "mov_text",
+        "srt",
+        "text",
+        "subviewer",
+        "subviewer1",
+    }
+)
 
 
 class FFprobeError(Exception):
@@ -73,3 +88,32 @@ def summarize(data: Dict[str, Any]) -> Dict[str, Any]:
         "resolution": res,
         "duration_min": int(round(duration_s / 60)) if duration_s else None,
     }
+
+
+def probe_has_audio_stream(data: Dict[str, Any]) -> bool:
+    """True if ffprobe JSON lists at least one audio stream."""
+    return any(s.get("codec_type") == "audio" for s in (data.get("streams") or []))
+
+
+def text_subtitle_stream_indices_from_probe(
+    data: Dict[str, Any],
+    *,
+    max_tracks: int = 8,
+) -> List[int]:
+    """
+    Global stream indices for subtitle streams that can be remuxed to MP4 mov_text.
+    Skips bitmap / HDMV subs (e.g. hdmv_pgs_subtitle, dvd_subtitle).
+    """
+    out: List[int] = []
+    for s in data.get("streams") or []:
+        if s.get("codec_type") != "subtitle":
+            continue
+        name = (s.get("codec_name") or "").strip().lower()
+        if name not in _TEXT_SUBTITLE_CODECS:
+            continue
+        idx = s.get("index")
+        if isinstance(idx, int) and idx >= 0:
+            out.append(idx)
+        if len(out) >= max_tracks:
+            break
+    return out

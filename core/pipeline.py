@@ -13,7 +13,13 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from config import get_settings
-from core.ffprobe import FFprobeError, probe, summarize
+from core.ffprobe import (
+    FFprobeError,
+    probe,
+    probe_has_audio_stream,
+    summarize,
+    text_subtitle_stream_indices_from_probe,
+)
 from core.gpu_detect import get_encoder
 from core.logging_json import log_event
 from core.s3 import build_object_key, presigned_stream_url, upload_file
@@ -38,6 +44,9 @@ def _build_ffmpeg_cmd(
     input_path: str,
     output_path: str,
     use_h265: bool,
+    *,
+    subtitle_stream_indices: Optional[list[int]] = None,
+    has_audio: bool = True,
 ) -> list[str]:
     enc = get_encoder()
     cmd: list[str] = ["ffmpeg", "-y"]
@@ -48,6 +57,14 @@ def _build_ffmpeg_cmd(
     elif enc.get("hwaccel") == "vaapi" and enc.get("hwaccel_device"):
         cmd += ["-hwaccel", "vaapi", "-hwaccel_device", str(enc["hwaccel_device"])]
     cmd += ["-i", input_path]
+    subs = [int(x) for x in (subtitle_stream_indices or [])]
+    if subs:
+        cmd += ["-map", "0:v:0"]
+        if has_audio:
+            cmd += ["-map", "0:a:0"]
+        for idx in subs:
+            cmd += ["-map", f"0:{idx}"]
+        cmd += ["-c:s", "mov_text"]
     vcodec = enc["h265"] if use_h265 else enc["h264"]
     cmd += ["-c:v", vcodec]
     s = get_settings()
@@ -64,7 +81,11 @@ def _build_ffmpeg_cmd(
     if enc["vendor"] != "cpu" and "_vaapi" not in vcodec:
         if "_nvenc" in vcodec or "_amf" in vcodec:
             cmd += ["-rc:v", "vbr"]
-    cmd += ["-c:a", "aac", "-b:a", ab, "-fps_mode", "passthrough", str(output_path)]
+    # FFmpeg 4.x (e.g. Ubuntu 22.04) has no -fps_mode; -vsync 0 passes timestamps like passthrough.
+    if subs and not has_audio:
+        cmd += ["-vsync", "0", str(output_path)]
+    else:
+        cmd += ["-c:a", "aac", "-b:a", ab, "-vsync", "0", str(output_path)]
     return cmd
 
 
@@ -85,73 +106,107 @@ def transcode_to_mp4(
     use_h265: bool = True,
     duration_sec: float = 0.0,
     progress_frac: Optional[Callable[[float], None]] = None,
+    input_probe: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Run ffmpeg; optional progress_frac(0..1) from stderr time= vs duration_sec.
     progress_frac may be invoked from a side thread — caller must be thread-safe.
+    When input_probe is set, text subtitle streams may be muxed as mov_text for browser captions.
     """
-    cmd = _build_ffmpeg_cmd(input_path, output_path, use_h265)
-    log_event(logger, "ffmpeg_start", cmd=" ".join(cmd))
-    proc = subprocess.Popen(
-        cmd,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1,
-    )
-    assert proc.stderr is not None
-    last_emit = [0.0, -1.0]  # monotonic time, last emitted fraction
-    err_tail: deque[str] = deque(maxlen=120)
+    probe_in = input_probe if input_probe is not None else probe(input_path)
+    sub_idx = text_subtitle_stream_indices_from_probe(probe_in)
+    has_audio = probe_has_audio_stream(probe_in)
 
-    def emit(frac: float) -> None:
-        if not progress_frac:
-            return
-        f = max(0.0, min(1.0, frac))
-        f = max(f, last_emit[1])
-        now = time.monotonic()
-        if f < 0.999 and abs(f - last_emit[1]) < 0.012 and (now - last_emit[0]) < 1.5:
-            return
-        last_emit[0] = now
-        last_emit[1] = f
-        progress_frac(f)
+    def run_ffmpeg(cmd: list[str]) -> None:
+        log_event(logger, "ffmpeg_start", cmd=" ".join(cmd))
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        assert proc.stderr is not None
+        last_emit = [0.0, -1.0]  # monotonic time, last emitted fraction
+        err_tail: deque[str] = deque(maxlen=120)
 
-    def read_stderr() -> None:
-        dur = float(duration_sec or 0.0)
-        best = 0.0
-        try:
-            for line in iter(proc.stderr.readline, ""):
-                if not line:
-                    break
-                err_tail.append(line.rstrip("\n\r"))
-                t = _ffmpeg_time_to_sec(line)
-                if t < 0:
-                    continue
-                best = max(best, t)
-                if dur > 1.0:
-                    emit(best / dur)
-                elif progress_frac:
-                    emit(min(1.0, best / 300.0))
-        finally:
+        def emit(frac: float) -> None:
+            if not progress_frac:
+                return
+            f = max(0.0, min(1.0, frac))
+            f = max(f, last_emit[1])
+            now = time.monotonic()
+            if f < 0.999 and abs(f - last_emit[1]) < 0.012 and (now - last_emit[0]) < 1.5:
+                return
+            last_emit[0] = now
+            last_emit[1] = f
+            progress_frac(f)
+
+        def read_stderr() -> None:
+            dur = float(duration_sec or 0.0)
+            best = 0.0
             try:
-                proc.stderr.close()
-            except OSError:
-                pass
+                for line in iter(proc.stderr.readline, ""):
+                    if not line:
+                        break
+                    err_tail.append(line.rstrip("\n\r"))
+                    t = _ffmpeg_time_to_sec(line)
+                    if t < 0:
+                        continue
+                    best = max(best, t)
+                    if dur > 1.0:
+                        emit(best / dur)
+                    elif progress_frac:
+                        emit(min(1.0, best / 300.0))
+            finally:
+                try:
+                    proc.stderr.close()
+                except OSError:
+                    pass
 
-    th = threading.Thread(target=read_stderr, name="ffmpeg-stderr", daemon=True)
-    th.start()
+        th = threading.Thread(target=read_stderr, name="ffmpeg-stderr", daemon=True)
+        th.start()
+        try:
+            rc = proc.wait(timeout=86400)
+        finally:
+            th.join(timeout=12)
+        if rc != 0:
+            tail = "\n".join(err_tail).strip()
+            snippet = tail[-4000:] if tail else "(no stderr lines captured)"
+            log_event(logger, "ffmpeg_failed", returncode=rc, stderr_tail=snippet[-2000:])
+            raise RuntimeError(f"ffmpeg exited with code {rc}\n{snippet}")
+        if progress_frac:
+            progress_frac(1.0)
+        log_event(logger, "ffmpeg_done", output=output_path)
+
+    cmd_with_subs = _build_ffmpeg_cmd(
+        input_path,
+        output_path,
+        use_h265,
+        subtitle_stream_indices=sub_idx if sub_idx else None,
+        has_audio=has_audio,
+    )
     try:
-        rc = proc.wait(timeout=86400)
-    finally:
-        th.join(timeout=12)
-    if rc != 0:
-        tail = "\n".join(err_tail).strip()
-        snippet = tail[-4000:] if tail else "(no stderr lines captured)"
-        log_event(logger, "ffmpeg_failed", returncode=rc, stderr_tail=snippet[-2000:])
-        raise RuntimeError(f"ffmpeg exited with code {rc}\n{snippet}")
-    if progress_frac:
-        progress_frac(1.0)
-    log_event(logger, "ffmpeg_done", output=output_path)
+        run_ffmpeg(cmd_with_subs)
+    except RuntimeError:
+        if not sub_idx:
+            raise
+        log_event(
+            logger,
+            "ffmpeg_subtitles_fallback",
+            input_path=input_path,
+            subtitle_indices=sub_idx,
+            message="retry transcode without subtitle mux",
+        )
+        cmd_plain = _build_ffmpeg_cmd(
+            input_path,
+            output_path,
+            use_h265,
+            subtitle_stream_indices=None,
+            has_audio=has_audio,
+        )
+        run_ffmpeg(cmd_plain)
 
 
 ProgressCb = Optional[Callable[[int], None]]
@@ -217,6 +272,7 @@ def process_film_file(
                 use_h265=use_h265,
                 duration_sec=dur,
                 progress_frac=tx_progress,
+                input_probe=data,
             )
             work_path = tmp_out
             out_data = probe(work_path)
