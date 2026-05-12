@@ -146,6 +146,11 @@
     .plyr__control{background:transparent;color:#e5e5e5}
     .plyr__control:hover{background:rgba(255,255,255,.08);color:#fff}
     .plyr__progress__buffer{background:rgba(255,255,255,.12)}
+    /* Plyr hides the CC button when there are no text tracks; keep it visible for discoverability */
+    .player-wrap .plyr__control[data-plyr="captions"],
+    .player-wrap button[data-plyr="captions"]{
+      display:flex!important;visibility:visible!important;opacity:1!important;
+    }
     /* In-band / WebVTT captions: readable on dark video */
     .plyr__captions{font-size:clamp(14px,2.8vw,22px);padding:0 10px 8px}
     .plyr__caption{background:rgba(0,0,0,.78);color:#fff;border-radius:4px;padding:.2em .45em}
@@ -166,7 +171,26 @@
     a.pill.ep-nav[hidden]{display:none!important}
     .similar{margin-top:32px}
     .similar h2{font-size:1rem;margin-bottom:12px}
-    .cards{display:flex;gap:10px;overflow-x:auto}
+    .similar .row-carousel{position:relative;margin:0;width:100%}
+    .similar .row-carousel-viewport{
+      overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;padding:10px 40px 16px;scrollbar-width:none;
+    }
+    .similar .row-carousel-viewport::-webkit-scrollbar{display:none;width:0;height:0}
+    .similar .row-carousel .row-scroll{display:flex;gap:10px;padding:0;overflow:visible;scroll-snap-type:x mandatory;min-width:min-content}
+    .similar .row-carousel-btn{
+      position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:38px;height:38px;border-radius:50%;
+      border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.52);color:#fff;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;font-family:inherit;padding:0;
+      transition:background .2s,border-color .2s,opacity .2s;
+    }
+    .similar .row-carousel-btn svg{display:block;width:18px;height:18px;flex-shrink:0}
+    .similar .row-carousel-btn:hover:not(:disabled){background:rgba(139,37,0,.55);border-color:rgba(255,255,255,.38)}
+    .similar .row-carousel-btn:focus-visible{outline:2px solid #fecaca;outline-offset:2px}
+    .similar .row-carousel-btn:disabled{opacity:.22;cursor:default;pointer-events:none}
+    .similar .row-carousel-prev{left:2px}
+    .similar .row-carousel-next{right:2px}
+    @media (prefers-reduced-motion:reduce){.similar .row-carousel-viewport{scroll-behavior:auto}}
     .c{
       flex:0 0 120px;background:#141414;border:1px solid #222;border-radius:8px;overflow:hidden;cursor:pointer;
       transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
@@ -178,8 +202,9 @@
     }
     .c img{transition:transform .35s ease}
     .c:hover img{transform:scale(1.06)}
-    .c img{width:100%;aspect-ratio:2/3;object-fit:cover}
-    .c .t{padding:6px 8px;font-size:11px}
+    .c img{width:100%;aspect-ratio:2/3;object-fit:cover;display:block;background:#1a1a1a}
+    .c .c-ph{width:100%;aspect-ratio:2/3;background:linear-gradient(160deg,#2a2a2a,#141414);border-bottom:1px solid #222}
+    .c .t{padding:6px 8px;font-size:11px;line-height:1.25;min-height:2.5em}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
   </style>
 </head>
@@ -269,7 +294,7 @@
     <div class="row" id="actors"></div>
     <section class="similar">
       <h2>Autres films</h2>
-      <div class="cards" id="sim"></div>
+      <div class="row-scroll" id="sim" role="list"></div>
     </section>
   </main>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
@@ -493,6 +518,18 @@
           enabled: 'Activés',
         },
       });
+      function revealPlyrCaptionsButton() {
+        var w = document.querySelector('.player-wrap');
+        if (!w) return;
+        var btn = w.querySelector('button[data-plyr="captions"], .plyr__control[data-plyr="captions"]');
+        if (!btn) return;
+        btn.hidden = false;
+        btn.removeAttribute('hidden');
+        btn.style.removeProperty('display');
+      }
+      player.on('ready', revealPlyrCaptionsButton);
+      video.addEventListener('loadedmetadata', revealPlyrCaptionsButton);
+      setTimeout(revealPlyrCaptionsButton, 400);
       const playerWrap = document.querySelector('.player-wrap');
       function syncRedwoodPlayerFullscreenClass() {
         const fs =
@@ -522,10 +559,14 @@
       function appendSimilarFilmCard(x) {
         const c = document.createElement('div');
         c.className = 'c';
+        c.setAttribute('role', 'listitem');
         c.onclick = () => { location.href = '/watch/film.html?id=' + x.id; };
-        const img = x.poster_path ? posterUrl(x.poster_path) : '';
-        c.innerHTML = '<img src="' + img + '" alt="" loading="lazy" /><div class="t"></div>';
-        c.querySelector('.t').textContent = x.titre;
+        const imgUrl = x.poster_path ? posterUrl(x.poster_path) : '';
+        const media = imgUrl
+          ? '<img src="' + imgUrl + '" alt="" loading="lazy" />'
+          : '<div class="c-ph" aria-hidden="true"></div>';
+        c.innerHTML = media + '<div class="t"></div>';
+        c.querySelector('.t').textContent = x.titre || 'Sans titre';
         sim.appendChild(c);
       }
 
@@ -543,7 +584,7 @@
                 loadSimilarFilmsPage();
               });
             },
-            { root: sim, rootMargin: '320px 0px', threshold: 0 },
+            { root: sim.closest('.row-carousel-viewport') || sim, rootMargin: '320px 0px', threshold: 0 },
           );
           simState.io.observe(simState.sentinel);
         }
@@ -566,6 +607,7 @@
           if (films.length < SIM_PAGE) simState.done = true;
           films.forEach(appendSimilarFilmCard);
           ensureSimSentinel();
+          window.dispatchEvent(new Event('resize'));
         } catch (err) {
           console.error(err);
           simState.done = true;
@@ -577,6 +619,7 @@
       sim.innerHTML = '';
       loadSimilarFilmsPage();
     }
+    if (typeof initRowCarousels === 'function') initRowCarousels();
     boot().catch((e) => {
       if (e && e.message === '401') { location.href = '/login.html'; return; }
       console.error(e);

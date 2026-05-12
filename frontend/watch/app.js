@@ -101,8 +101,12 @@ async function apiJson(path, opts = {}) {
 
 function posterUrl(p) {
   if (!p) return '';
-  if (p.startsWith('http')) return p;
-  return TMDB_IMG + p;
+  const s = String(p).trim();
+  if (!s) return '';
+  if (s.startsWith('http')) return s;
+  // TMDB poster_path values are absolute paths like "/abc.jpg". Other strings break image.tmdb.org URLs.
+  if (!s.startsWith('/')) return '';
+  return TMDB_IMG + s;
 }
 
 async function logout() {
@@ -705,6 +709,82 @@ function initWatchNavInviteIcons() {
   });
 }
 
+const ROW_CAROUSEL_SVG_PREV =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M14 18l-6-6 6-6"/></svg>';
+const ROW_CAROUSEL_SVG_NEXT =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M10 18l6-6-6-6"/></svg>';
+
+/**
+ * Wrap horizontal .row-scroll rows: hide scrollbar, prev/next scroll.
+ * Skips tracks already inside .row-carousel. Safe to call multiple times.
+ */
+function initRowCarousels() {
+  document.querySelectorAll('.row-scroll').forEach(function (track) {
+    if (track.closest('.row-carousel')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'row-carousel';
+    if (track.closest('.home-search-panel')) wrap.classList.add('row-carousel--nested');
+    var view = document.createElement('div');
+    view.className = 'row-carousel-viewport';
+    var prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'row-carousel-btn row-carousel-prev';
+    prev.setAttribute('aria-label', 'Défiler vers la gauche');
+    prev.innerHTML = ROW_CAROUSEL_SVG_PREV;
+    var next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'row-carousel-btn row-carousel-next';
+    next.setAttribute('aria-label', 'Défiler vers la droite');
+    next.innerHTML = ROW_CAROUSEL_SVG_NEXT;
+    var parent = track.parentNode;
+    parent.insertBefore(wrap, track);
+    view.appendChild(track);
+    wrap.appendChild(prev);
+    wrap.appendChild(view);
+    wrap.appendChild(next);
+
+    function prefersReducedMotion() {
+      return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function scrollStep() {
+      return Math.max(200, Math.floor(view.clientWidth * 0.72));
+    }
+
+    function updateArrows() {
+      var sl = view.scrollLeft;
+      var max = view.scrollWidth - view.clientWidth - 2;
+      var overflow = max > 4;
+      prev.toggleAttribute('hidden', !overflow);
+      next.toggleAttribute('hidden', !overflow);
+      if (!overflow) return;
+      prev.disabled = sl <= 2;
+      next.disabled = sl >= max;
+    }
+
+    prev.addEventListener('click', function () {
+      view.scrollBy({
+        left: -scrollStep(),
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      });
+    });
+    next.addEventListener('click', function () {
+      view.scrollBy({
+        left: scrollStep(),
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      });
+    });
+    view.addEventListener('scroll', updateArrows, { passive: true });
+    window.addEventListener('resize', updateArrows);
+    if (typeof ResizeObserver !== 'undefined') {
+      var ro = new ResizeObserver(updateArrows);
+      ro.observe(view);
+      ro.observe(track);
+    }
+    updateArrows();
+  });
+}
+
 if (typeof document !== 'undefined') {
   injectWatchMobileNavStyles();
   upgradeWatchNavForMobile();
@@ -726,3 +806,4 @@ window.hydrateWatchNavUser = hydrateWatchNavUser;
 window.initViewerAnnouncement = initViewerAnnouncement;
 window.watchEscapeHtml = watchEscapeHtml;
 window.initWatchNavInviteIcons = initWatchNavInviteIcons;
+window.initRowCarousels = initRowCarousels;
