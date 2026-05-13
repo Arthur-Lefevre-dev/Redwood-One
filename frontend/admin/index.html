@@ -1770,6 +1770,37 @@
                           "
                         ></pre>
                         <div
+                          id="vast-remote-log-wrap"
+                          class="hidden"
+                          style="margin-top: 10px"
+                        >
+                          <div
+                            style="
+                              font-size: 11px;
+                              color: var(--color-text-tertiary);
+                              margin-bottom: 4px;
+                            "
+                          >
+                            Journal distant (ffmpeg · mis à jour depuis l’instance Vast)
+                          </div>
+                          <pre
+                            id="vast-remote-log"
+                            style="
+                              font-size: 10px;
+                              color: var(--color-text-secondary);
+                              white-space: pre-wrap;
+                              font-family: var(--font-mono);
+                              max-height: 220px;
+                              overflow: auto;
+                              margin: 0;
+                              padding: 8px;
+                              background: var(--color-background-secondary);
+                              border-radius: 8px;
+                              border: 0.5px solid var(--color-border-tertiary);
+                            "
+                          ></pre>
+                        </div>
+                        <div
                           id="vast-err"
                           class="hidden"
                           style="
@@ -3573,10 +3604,14 @@
         if (!r.ok) return;
         const j = await r.json();
         $("#vast-job-panel").classList.remove("hidden");
-        $("#vast-task-line").textContent =
+        let line =
           "Celery : " +
           (j.state || "?") +
           (j.task_id ? " · task " + j.task_id : "");
+        if (j.meta && j.meta.remote_out_time_ms) {
+          line += " · ffmpeg out_time_ms=" + j.meta.remote_out_time_ms;
+        }
+        $("#vast-task-line").textContent = line;
         const pct =
           j.state === "SUCCESS"
             ? 100
@@ -3591,6 +3626,18 @@
         const metaStr = JSON.stringify(j, null, 2);
         const metaEl = $("#vast-meta");
         if (metaEl && metaEl.textContent !== metaStr) metaEl.textContent = metaStr;
+        const rlWrap = $("#vast-remote-log-wrap");
+        const rl = $("#vast-remote-log");
+        if (rlWrap && rl) {
+          const remote = j.meta && j.meta.remote_log ? String(j.meta.remote_log) : "";
+          if (remote.trim()) {
+            rlWrap.classList.remove("hidden");
+            if (rl.textContent !== remote) rl.textContent = remote;
+          } else {
+            rlWrap.classList.add("hidden");
+            rl.textContent = "";
+          }
+        }
         $("#vast-err").classList.add("hidden");
         const bcan = $("#vast-btn-cancel");
         if (bcan) {
@@ -4708,6 +4755,11 @@
           const cancelBtn = canCancelPipeline
             ? ` <button type="button" class="btn" data-cancel-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
             : "";
+          const canRetryVast =
+            i.vast_retryable === true && st === "erreur";
+          const retryVastBtn = canRetryVast
+            ? ` <button type="button" class="btn" data-retry-vast-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Relancer Vast</button>`
+            : "";
           let progW = Math.min(100, i.progress || 0);
           if (
             i.source === "torrent" &&
@@ -4727,7 +4779,7 @@
         <div class="qi-sub"></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
       </div>
-      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}</div>`;
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}${retryVastBtn}</div>`;
           row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
           const tline = torrentStatsLine(i.torrent_stats, i.source);
           const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
@@ -6710,6 +6762,46 @@
           return;
         }
         const pipeBtn = e.target.closest("[data-cancel-film]");
+        const retryVastBtnEl = e.target.closest("[data-retry-vast-film]");
+        if (retryVastBtnEl) {
+          e.preventDefault();
+          const rfid = retryVastBtnEl.getAttribute("data-retry-vast-film");
+          if (!rfid) return;
+          const okR = await showConfirmModal(
+            "Relancer le transcodage Vast",
+            "Une nouvelle tâche Celery sera créée avec le même fichier source sur S3 (nouvelle instance Vast). Continuer ?",
+            { confirmText: "Relancer", cancelText: "Retour" },
+          );
+          if (!okR) return;
+          try {
+            const r = await api("/api/admin/transcode/vast/retry", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ film_id: parseInt(rfid, 10) }),
+            });
+            if (!r.ok) {
+              let msg = "Erreur " + r.status;
+              try {
+                const j = await r.json();
+                if (j && j.detail) msg = String(j.detail);
+              } catch (_) {
+                msg = ((await r.text()) || msg).slice(0, 500);
+              }
+              await showAlertModal("Relance impossible", msg, { okText: "OK" });
+              return;
+            }
+          } catch (_) {
+            await showAlertModal(
+              "Erreur",
+              "Réseau ou session expirée.",
+              { okText: "OK" },
+            );
+            return;
+          }
+          refreshQueue();
+          void refreshQueueVast();
+          return;
+        }
         if (!pipeBtn) return;
         e.preventDefault();
         const fid = pipeBtn.getAttribute("data-cancel-film");

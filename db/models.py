@@ -155,6 +155,9 @@ class Film(Base):
     transcode_target: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     # When transcode_target is vast: optional Vast offer id (same as admin upload Vast field).
     vast_offer_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Last Vast S3 job prefix for admin retry after worker failure (input kept until success).
+    vast_pending_job_token: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    vast_pending_input_ext: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     # Active Celery task for admin cancel (download / local encode / Vast transcode).
     pipeline_celery_task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     pipeline_celery_task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)

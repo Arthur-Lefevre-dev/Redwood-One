@@ -70,19 +70,22 @@ def cleanup_vast_transcode_artifacts(meta: Dict[str, Any]) -> Dict[str, Any]:
     keys: list[str] = []
     ik = meta.get("input_key")
     ok = meta.get("output_key")
+    pk = meta.get("progress_key")
     if isinstance(ik, str) and ik.strip():
         keys.append(ik.strip())
     if isinstance(ok, str) and ok.strip():
         keys.append(ok.strip())
+    if isinstance(pk, str) and pk.strip():
+        keys.append(pk.strip())
     jt = meta.get("job_token")
     se = meta.get("src_ext")
+    if isinstance(jt, str) and jt.strip():
+        keys.append(f"vast-test/{jt.strip()}/remote_progress.txt")
     if not keys and isinstance(jt, str) and jt.strip() and isinstance(se, str) and se.strip():
         base = jt.strip()
         ext = se.strip() if se.startswith(".") else f".{se.strip()}"
         keys.append(f"vast-test/{base}/input{ext}")
         keys.append(f"vast-test/{base}/output.mp4")
-
-    seen: set[str] = set()
     for k in keys:
         if not k or k in seen:
             continue

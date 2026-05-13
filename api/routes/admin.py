@@ -29,7 +29,7 @@ from core.donation_campaign import RECURRENCE_NONE, normalize_recurrence
 from core.donation_service import compute_donation_snapshot
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
-from core.s3 import upload_file
+from core.s3 import delete_object_key, object_size_or_none, upload_file
 from core.vast_transcode_cancel import cancel_vast_transcode_test, store_job_envelope
 from db.models import (
     ContentKind,
@@ -783,6 +783,7 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
                 "transcode_target": getattr(f, "transcode_target", None) or "local",
                 "celery_task_id": getattr(f, "pipeline_celery_task_id", None),
                 "celery_task_kind": getattr(f, "pipeline_celery_task_kind", None),
+                "vast_retryable": _film_vast_retryable(f),
             }
         )
     return {"items": out}
@@ -1839,6 +1840,145 @@ def admin_vast_create_test_instance(
 
 
 _VAST_TEST_VIDEO_EXT = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
+
+
+class VastTranscodeRetryBody(BaseModel):
+    """Retry Vast transcode using the same S3 vast-test input (film pipeline or explicit token)."""
+
+    film_id: Optional[int] = Field(default=None, ge=1)
+    job_token: Optional[str] = Field(default=None, max_length=64)
+    src_ext: Optional[str] = Field(default=None, max_length=16)
+
+
+def _film_vast_retryable(f: Film) -> bool:
+    if (getattr(f, "transcode_target", None) or "local").lower() != "vast":
+        return False
+    if f.statut != FilmStatut.erreur:
+        return False
+    jt = (getattr(f, "vast_pending_job_token", None) or "").strip()
+    se = (getattr(f, "vast_pending_input_ext", None) or "").strip()
+    if not jt or not se:
+        return False
+    ext = se if se.startswith(".") else f".{se}"
+    key = f"vast-test/{jt}/input{ext}"
+    try:
+        sz = object_size_or_none(key)
+        return sz is not None and int(sz) > 4096
+    except Exception:
+        return False
+
+
+@router.post("/transcode/vast/retry")
+def admin_transcode_vast_retry(
+    body: VastTranscodeRetryBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Re-queue vast_transcode_test_task with an existing S3 input under vast-test/{job_token}/.
+    Use film_id after a worker failure (input kept on S3), or job_token + src_ext for manual tests.
+    """
+    s = get_settings()
+    if not (s.VAST_API_KEY or "").strip():
+        raise HTTPException(
+            status_code=503,
+            detail="VAST_API_KEY non configurée.",
+        )
+    film_row: Optional[Film] = None
+    job_token = (body.job_token or "").strip()
+    src_ext = (body.src_ext or "").strip()
+    oid: Optional[int] = None
+    film_title: Optional[str] = None
+    fid_for_task: Optional[int] = None
+
+    if body.film_id is not None:
+        film_row = db.get(Film, int(body.film_id))
+        if not film_row:
+            raise HTTPException(status_code=404, detail="Film introuvable.")
+        if (film_row.transcode_target or "local").lower() != "vast":
+            raise HTTPException(
+                status_code=400,
+                detail="Ce film n’est pas configuré pour le transcodage Vast.",
+            )
+        if film_row.statut != FilmStatut.erreur:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Relance impossible : le film doit être en erreur (statut actuel : {film_row.statut.value}).",
+            )
+        jt = (getattr(film_row, "vast_pending_job_token", None) or "").strip()
+        se = (getattr(film_row, "vast_pending_input_ext", None) or "").strip()
+        if not jt or not se:
+            raise HTTPException(
+                status_code=409,
+                detail="Aucune entrée S3 Vast enregistrée pour ce film (token manquant). Réimportez le torrent.",
+            )
+        job_token = jt
+        src_ext = se if se.startswith(".") else f".{se}"
+        vo = getattr(film_row, "vast_offer_id", None)
+        oid = int(vo) if vo is not None and int(vo) > 0 else None
+        film_title = (film_row.titre or "").strip() or None
+        fid_for_task = int(film_row.id)
+    else:
+        if not job_token or not src_ext:
+            raise HTTPException(
+                status_code=400,
+                detail="Fournir film_id, ou bien job_token et src_ext (ex. .mkv).",
+            )
+        src_ext = src_ext if src_ext.startswith(".") else f".{src_ext}"
+
+    input_key = f"vast-test/{job_token}/input{src_ext}"
+    try:
+        sz = object_size_or_none(input_key)
+    except Exception as e:
+        logger.exception("transcode vast retry: head input")
+        raise HTTPException(status_code=502, detail=str(e)[:2000]) from e
+    if sz is None or int(sz) <= 4096:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Fichier source introuvable ou trop petit sur S3 ({input_key}).",
+        )
+
+    output_key = f"vast-test/{job_token}/output.mp4"
+    progress_key = f"vast-test/{job_token}/remote_progress.txt"
+    for k in (output_key, progress_key):
+        try:
+            delete_object_key(k)
+        except Exception:
+            pass
+
+    try:
+        async_res = vast_transcode_test_task.delay(job_token, src_ext, oid, fid_for_task)
+    except Exception as e:
+        logger.exception("transcode vast retry: Celery enqueue")
+        raise HTTPException(
+            status_code=503,
+            detail="Impossible de lancer la tâche Celery (Redis / worker).",
+        ) from e
+
+    store_job_envelope(
+        async_res.id,
+        job_token,
+        src_ext,
+        film_id=fid_for_task,
+        film_title=film_title,
+        source="vast_retry",
+    )
+    if film_row is not None:
+        film_row.statut = FilmStatut.en_cours
+        film_row.erreur_message = None
+        film_row.pipeline_progress = 12
+        film_row.traitement = FilmTraitement.transcode
+        film_row.pipeline_celery_task_id = async_res.id
+        film_row.pipeline_celery_task_kind = "vast_transcode"
+        db.commit()
+
+    return {
+        "task_id": async_res.id,
+        "job_token": job_token,
+        "s3_input_key": input_key,
+        "offer_id": oid,
+        "film_id": fid_for_task,
+    }
 
 
 @router.post("/transcode/vast")

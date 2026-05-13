@@ -223,6 +223,8 @@ def download_torrent_task(
                 f2.traitement = FilmTraitement.transcode
                 f2.pipeline_celery_task_id = async_res.id
                 f2.pipeline_celery_task_kind = "vast_transcode"
+                f2.vast_pending_job_token = job_token
+                f2.vast_pending_input_ext = ext
                 db2.commit()
         finally:
             db2.close()
@@ -298,9 +300,15 @@ def vast_transcode_test_task(
     film_id: Optional[int] = None,
 ):
     """Transcode one file on a Vast GPU instance (S3 presigned URLs + onstart). Costs Vast rental until destroyed."""
+    from core.vast_film_finalize import mark_film_vast_task_failed
     from core.vast_remote_transcode import run_vast_transcode_test
 
-    return run_vast_transcode_test(self, job_token, src_ext, offer_id, film_id=film_id)
+    try:
+        return run_vast_transcode_test(self, job_token, src_ext, offer_id, film_id=film_id)
+    except Exception as e:
+        if film_id is not None and int(film_id) > 0:
+            mark_film_vast_task_failed(int(film_id), str(e))
+        raise
 
 
 @app.task(name="worker.tasks.refresh_donation_balances_snapshot")

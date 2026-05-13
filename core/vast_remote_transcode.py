@@ -90,45 +90,64 @@ if [ -n "$RW_SUB_CODEC" ] && [ "$RW_HAS_AUD" != "1" ]; then
   RW_AUD_ARGS=""
 fi
 nvidia-smi -L 2>/dev/null || true
+rm -f /tmp/ffprog /tmp/fferr /tmp/rw_clip.txt
+touch /tmp/ffprog /tmp/fferr
+PROG_PUT="${RW_PROGRESS_PUT:-}"
+RW_UPL_PID=""
+if [ -n "${PROG_PUT:-}" ]; then
+  touch /tmp/rw_ff_alive
+  (
+    while [ -f /tmp/rw_ff_alive ]; do
+      { echo "===ffmpeg_progress==="; tail -n 60 /tmp/ffprog 2>/dev/null || true; echo "===ffmpeg_stderr==="; tail -n 50 /tmp/fferr 2>/dev/null || true; } > /tmp/rw_clip.txt || true
+      if [ -s /tmp/rw_clip.txt ]; then
+        curl -sf -X PUT -H "Content-Type: text/plain; charset=utf-8" --data-binary "@/tmp/rw_clip.txt" "${PROG_PUT}" || true
+      fi
+      sleep 4
+    done
+  ) &
+  RW_UPL_PID=$!
+fi
 set +e
 if [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
   # 1–2) Recent BtbN build: modern NVENC presets
-  "$GPUFF" -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
+  "$GPUFF" -hide_banner -nostdin -y -progress /tmp/ffprog -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
   RC=$?
   if [ "${RC}" != "0" ]; then
-    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
+    "$GPUFF" -hide_banner -nostdin -y -progress /tmp/ffprog -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
       -c:v h264_nvenc -preset p4 -tune hq -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
     RC=$?
   fi
 else
   # No BtbN URL: distro ffmpeg — avoid p4 (invalid on 4.x)
-  "$GPUFF" -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
+  "$GPUFF" -hide_banner -nostdin -y -progress /tmp/ffprog -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
   RC=$?
   if [ "${RC}" != "0" ]; then
-    "$GPUFF" -hide_banner -nostdin -y -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
+    "$GPUFF" -hide_banner -nostdin -y -progress /tmp/ffprog -hwaccel cuda -hwaccel_output_format cuda -i "$INP" ${RW_MAP_ARGS} \
       -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+      -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
     RC=$?
   fi
 fi
 if [ "${RC}" != "0" ] && [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
   # 3) Distro ffmpeg + NVENC (different linkage than BtbN static; sometimes works when static fails)
-  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -progress /tmp/ffprog -i "$INP" ${RW_MAP_ARGS} \
     -c:v h264_nvenc -preset fast -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
   RC=$?
 fi
 if [ "${RC}" != "0" ]; then
-  /usr/bin/ffmpeg -hide_banner -nostdin -y -i "$INP" ${RW_MAP_ARGS} \
+  /usr/bin/ffmpeg -hide_banner -nostdin -y -progress /tmp/ffprog -i "$INP" ${RW_MAP_ARGS} \
     -c:v libx264 -preset faster -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
-    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4
+    -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
   RC=$?
 fi
+rm -f /tmp/rw_ff_alive
+if [ -n "${RW_UPL_PID:-}" ]; then wait "${RW_UPL_PID}" 2>/dev/null || true; fi
 set -e
 if [ "${RC}" != "0" ]; then
   echo "ffmpeg: all encode paths failed (rc=${RC})" >&2
@@ -136,6 +155,23 @@ if [ "${RC}" != "0" ]; then
 fi
 curl -f -X PUT -H "Content-Type: video/mp4" --upload-file /tmp/out.mp4 "${RW_OUT}"
 """
+
+_REMOTE_LOG_MAX = 7800
+
+
+def _trim_remote_log(text: str, *, max_len: int = _REMOTE_LOG_MAX) -> str:
+    t = text.strip()
+    if len(t) <= max_len:
+        return t
+    return t[-max_len:]
+
+
+def _last_out_time_ms_from_remote(snippet: str) -> Optional[str]:
+    for line in reversed(snippet.splitlines()):
+        s = line.strip()
+        if s.startswith("out_time_ms="):
+            return s.split("=", 1)[-1].strip()
+    return None
 
 
 def run_vast_transcode_test(
@@ -152,6 +188,7 @@ def run_vast_transcode_test(
     from core import vast_ai
     from core.s3 import (
         delete_object_key,
+        get_object_text_if_small,
         object_size_or_none,
         presigned_put_url,
         presigned_stream_url,
@@ -162,6 +199,7 @@ def run_vast_transcode_test(
     rid = str(getattr(task_self.request, "id", "") or "").strip() or None
     input_key = f"vast-test/{job_token}/input{src_ext}"
     output_key = f"vast-test/{job_token}/output.mp4"
+    progress_key = f"vast-test/{job_token}/remote_progress.txt"
     ttl = int(s.VAST_TRANSCODE_URL_TTL_SEC)
     poll_sec = max(5, int(s.VAST_TRANSCODE_POLL_INTERVAL_SEC))
     max_wait = max(120, int(s.VAST_TRANSCODE_MAX_WAIT_SEC))
@@ -177,6 +215,7 @@ def run_vast_transcode_test(
             job_token=job_token,
             input_key=input_key,
             output_key=output_key,
+            progress_key=progress_key,
             src_ext=src_ext,
             celery_task_id=rid,
         )
@@ -184,6 +223,16 @@ def run_vast_transcode_test(
             raise RuntimeError("Cancelled by user")
         get_url = presigned_stream_url(input_key, expires=ttl)
         put_url = presigned_put_url(output_key, expires=ttl, content_type="video/mp4")
+        progress_put_url = presigned_put_url(
+            progress_key,
+            expires=ttl,
+            content_type="text/plain; charset=utf-8",
+        )
+        for stale in (output_key, progress_key):
+            try:
+                delete_object_key(stale)
+            except Exception:
+                pass
 
         meta(step="pick_offer", progress=10)
         if is_cancel_requested(rid):
@@ -222,6 +271,7 @@ def run_vast_transcode_test(
             "NVIDIA_DRIVER_CAPABILITIES": caps,
             "RW_DL_CONN": str(aria_conn),
             "RW_DL_SPLIT": str(aria_split),
+            "RW_PROGRESS_PUT": progress_put_url,
         }
         if ff_url:
             env["RW_FFMPEG_URL"] = ff_url
@@ -233,6 +283,7 @@ def run_vast_transcode_test(
             "progress": 15,
             "offer_id": oid,
             "vast_image": image,
+            "progress_key": progress_key,
         }
         if picked_gpu_name:
             meta_kw["picked_gpu_name"] = picked_gpu_name
@@ -289,6 +340,7 @@ def run_vast_transcode_test(
             offer_id=oid,
             input_key=input_key,
             output_key=output_key,
+            progress_key=progress_key,
             job_token=job_token,
             src_ext=src_ext,
             hint="Instance runs onstart (apt + ffmpeg + upload). First boot can take several minutes.",
@@ -307,16 +359,39 @@ def run_vast_transcode_test(
                         progress=92,
                         vast_instance_id=int(inst_id),
                         output_bytes=sz2,
+                        input_key=input_key,
+                        output_key=output_key,
+                        progress_key=progress_key,
+                        job_token=job_token,
+                        src_ext=src_ext,
                     )
                     break
             elapsed = max_wait - (deadline - time.monotonic())
             prog = 20 + min(70, int(70 * elapsed / max_wait))
-            meta(
-                step="wait_output_on_s3",
-                progress=prog,
-                vast_instance_id=int(inst_id),
-                output_bytes=sz,
-            )
+            remote_snippet: Optional[str] = None
+            try:
+                raw_remote = get_object_text_if_small(progress_key, max_bytes=65536)
+                if raw_remote and raw_remote.strip():
+                    remote_snippet = _trim_remote_log(raw_remote)
+            except Exception:
+                logger.debug("vast remote_progress fetch failed", exc_info=True)
+            mwait: Dict[str, Any] = {
+                "step": "wait_output_on_s3",
+                "progress": prog,
+                "vast_instance_id": int(inst_id),
+                "output_bytes": sz,
+                "input_key": input_key,
+                "output_key": output_key,
+                "progress_key": progress_key,
+                "job_token": job_token,
+                "src_ext": src_ext,
+            }
+            if remote_snippet:
+                mwait["remote_log"] = remote_snippet
+                otm = _last_out_time_ms_from_remote(remote_snippet)
+                if otm:
+                    mwait["remote_out_time_ms"] = otm
+            meta(**mwait)
             time.sleep(poll_sec)
         else:
             raise RuntimeError(
@@ -341,6 +416,11 @@ def run_vast_transcode_test(
                 dbf.close()
         if rid:
             clear_cancel_flag(rid)
+        for k in (input_key, progress_key):
+            try:
+                delete_object_key(k)
+            except Exception:
+                logger.warning("vast_remote_transcode: could not delete %s", k)
         return {
             "ok": True,
             "job_token": job_token,
@@ -358,7 +438,3 @@ def run_vast_transcode_test(
                 logger.info("vast_remote_transcode: destroyed instance %s", inst_id)
             except Exception:
                 logger.exception("vast_remote_transcode: destroy_instance failed id=%s", inst_id)
-        try:
-            delete_object_key(input_key)
-        except Exception:
-            logger.warning("vast_remote_transcode: could not delete input %s", input_key)

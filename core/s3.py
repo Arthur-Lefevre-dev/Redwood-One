@@ -109,6 +109,33 @@ def object_size_or_none(key: str) -> Optional[int]:
         raise
 
 
+def get_object_text_if_small(key: str, *, max_bytes: int = 65536) -> Optional[str]:
+    """
+    Download object body up to max_bytes (Range request). Returns None if missing.
+    Used for Vast remote_progress.txt pushed from the instance.
+    """
+    from botocore.exceptions import ClientError
+
+    s = get_settings()
+    if not s.S3_BUCKET_NAME:
+        raise RuntimeError("S3 not configured")
+    client = get_s3_client()
+    last = max(0, int(max_bytes) - 1)
+    try:
+        resp = client.get_object(
+            Bucket=s.S3_BUCKET_NAME,
+            Key=key,
+            Range=f"bytes=0-{last}",
+        )
+        raw = resp["Body"].read()
+        return raw.decode("utf-8", errors="replace")
+    except ClientError as e:
+        code = (e.response.get("Error") or {}).get("Code", "")
+        if code in ("404", "NoSuchKey", "NotFound"):
+            return None
+        raise
+
+
 def delete_object_key(key: str) -> None:
     s = get_settings()
     client = get_s3_client()

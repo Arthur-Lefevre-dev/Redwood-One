@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from config import get_settings
 from core.ffprobe import FFprobeError, probe, summarize
+from core.logging_json import log_event
 from core.s3 import (
     build_object_key,
     copy_object_key,
@@ -23,6 +24,29 @@ from db.models import Film, FilmStatut, FilmTraitement
 from db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
+
+
+def mark_film_vast_task_failed(film_id: int, message: str) -> None:
+    """
+    Celery Vast transcode raised: mark film erreur, clear pipeline task fields.
+    Keeps vast_pending_* so POST /transcode/vast/retry can re-queue the same S3 input.
+    """
+    db = SessionLocal()
+    try:
+        film = db.get(Film, film_id)
+        if not film:
+            return
+        film.statut = FilmStatut.erreur
+        film.erreur_message = (message or "Vast transcode failed")[:8000]
+        film.pipeline_celery_task_id = None
+        film.pipeline_celery_task_kind = None
+        film.pipeline_progress = None
+        db.commit()
+        log_event(logger, "vast_transcode_error", film_id=film_id, error=message[:500])
+    except Exception:
+        logger.exception("mark_film_vast_task_failed film_id=%s", film_id)
+    finally:
+        db.close()
 
 
 def _fail(db: Session, film: Film, message: str) -> None:
@@ -86,6 +110,8 @@ def finalize_film_from_vast_s3_output(film_id: int, output_s3_key: str) -> None:
         film.pipeline_progress = 100
         film.pipeline_celery_task_id = None
         film.pipeline_celery_task_kind = None
+        film.vast_pending_job_token = None
+        film.vast_pending_input_ext = None
         db.commit()
         logger.info("finalize_film_from_vast_s3_output: film_id=%s key=%s", film_id, dest_key)
 

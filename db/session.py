@@ -177,6 +177,30 @@ def _ensure_films_pipeline_celery_columns() -> None:
     logger.info("database schema: ensured films pipeline Celery columns (sqlite)")
 
 
+def _ensure_films_vast_pending_columns() -> None:
+    """Store S3 vast-test job token on film for POST /transcode/vast/retry after failures."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS vast_pending_job_token VARCHAR(64)")
+            )
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS vast_pending_input_ext VARCHAR(16)")
+            )
+        logger.info("database schema: ensured films.vast_pending_* (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    with engine.begin() as conn:
+        if "vast_pending_job_token" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN vast_pending_job_token VARCHAR(64)"))
+        if "vast_pending_input_ext" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN vast_pending_input_ext VARCHAR(16)"))
+    logger.info("database schema: ensured films.vast_pending_* (sqlite)")
+
+
 def _ensure_films_transcode_target_columns() -> None:
     """Torrent routing: local worker vs Vast GPU after download."""
     if engine.dialect.name == "postgresql":
@@ -525,6 +549,7 @@ def init_db() -> None:
     Base.metadata.create_all(bind=engine)
     _ensure_films_trailer_columns()
     _ensure_films_transcode_target_columns()
+    _ensure_films_vast_pending_columns()
     _ensure_films_pipeline_celery_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
