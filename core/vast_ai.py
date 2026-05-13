@@ -46,6 +46,22 @@ def parse_iso_country_codes(raw: Optional[str]) -> List[str]:
     return out
 
 
+def parse_skip_int_ids(raw: Optional[str]) -> set[int]:
+    """Parse comma-separated integer ids (e.g. VAST_SKIP_MACHINE_IDS). Invalid or empty tokens are ignored."""
+    if not raw or not str(raw).strip():
+        return set()
+    out: set[int] = set()
+    for part in str(raw).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            out.add(int(part))
+        except ValueError:
+            continue
+    return out
+
+
 def country_code_from_vast_geolocation(geo: Any) -> Optional[str]:
     """Vast returns geolocation like 'Shanghai, CN' — return trailing alpha-2 if present."""
     if not isinstance(geo, str):
@@ -199,6 +215,7 @@ def search_offers(
                 "cuda_max_good": o.get("cuda_max_good"),
                 "driver_version": o.get("driver_version"),
                 "machine_id": o.get("machine_id"),
+                "host_id": o.get("host_id"),
             }
         )
     return out
@@ -329,6 +346,8 @@ def pick_first_verified_bundle_offer(
                 skip.add(int(x))
             except (TypeError, ValueError):
                 continue
+    skip_machines = parse_skip_int_ids(getattr(s, "VAST_SKIP_MACHINE_IDS", None) or "")
+    skip_hosts = parse_skip_int_ids(getattr(s, "VAST_SKIP_HOST_IDS", None) or "")
     raw = search_offers(gpu_names, **search_kw)
     for o in raw:
         if not isinstance(o, dict):
@@ -351,12 +370,27 @@ def pick_first_verified_bundle_offer(
             continue
         if ioid in skip:
             continue
+        mid = o.get("machine_id")
+        if skip_machines and mid is not None:
+            try:
+                if int(mid) in skip_machines:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        hid = o.get("host_id")
+        if skip_hosts and hid is not None:
+            try:
+                if int(hid) in skip_hosts:
+                    continue
+            except (TypeError, ValueError):
+                pass
         return o
     raise RuntimeError(
         "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
         "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_MIN_INET_DOWN_MBPS, "
-        "VAST_MIN_INET_UP_MBPS, noms GPU passés à la recherche — auto-pic : VAST_DEFAULT_GPU_NAMES ; "
-        "GPU secondaires : VAST_USABLE_GPU_NAMES, voir GET /api/admin/vast/offers?gpu_tier=usable ou all"
+        "VAST_MIN_INET_UP_MBPS, VAST_SKIP_MACHINE_IDS, VAST_SKIP_HOST_IDS, noms GPU — auto-pic : "
+        "VAST_DEFAULT_GPU_NAMES ; GPU secondaires : VAST_USABLE_GPU_NAMES, voir "
+        "GET /api/admin/vast/offers?gpu_tier=usable ou all"
         + (", une seule GPU requise (VAST_TRANSCODE_SINGLE_GPU_ONLY)" if single_gpu else "")
         + "). Élargissez les noms de GPU, relevez les plafonds $/h ou réseau, ou baissez les débits min. (Mb/s)"
         + (" ou désactivez VAST_TRANSCODE_SINGLE_GPU_ONLY si l'API n'a aucune offre 1×GPU" if single_gpu else "")

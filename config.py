@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     # Comma-separated ISO 3166-1 alpha-2 codes excluded from Vast bundle search (geolocation notin + response filter).
     # Default excludes China (CN). Empty string = do not exclude any country.
     VAST_EXCLUDE_GEOLOCATION_CODES: str = "CN"
+    # Comma-separated bundle machine_id / host_id to never auto-pick (buggy hosts). Dashboard shows these;
+    # instance contract id changes each rental — use machine/host to block the physical host.
+    VAST_SKIP_MACHINE_IDS: str = ""
+    VAST_SKIP_HOST_IDS: str = ""
     # Remote transcode on Vast (Celery): Docker image on Vast (CUDA runtime + apt ffmpeg in onstart).
     VAST_TRANSCODE_DOCKER_IMAGE: str = "nvidia/cuda:12.3.1-runtime-ubuntu22.04"
     # Mount all driver libs (incl. NVENC); "compute" alone often breaks h264_nvenc on Vast.
