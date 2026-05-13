@@ -1,0 +1,15 @@
+# Standalone maintenance page on port 80.
+# Use when the main stack is stopped but Docker is still running:
+#   docker compose -f docker/docker-compose.maintenance.yml --project-directory docker up -d
+# Stop before starting the full stack again (same host port 80).
+
+services:
+  maintenance:
+    image: nginx:alpine
+    container_name: redwood_maintenance
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ../nginx/maintenance-standalone.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/maintenance.html:/usr/share/nginx/html/index.html:ro
