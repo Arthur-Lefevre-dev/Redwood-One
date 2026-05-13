@@ -9,7 +9,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from api.limits import limiter
-from api.routes import admin, announcement, auth, donations, films, series
+from api.routes import admin, announcement, auth, donations, films, series, support_tickets
 from config import get_settings
 from core.gpu_detect import refresh_encoder_cache
 from db.session import init_db
@@ -47,6 +47,8 @@ app.include_router(announcement.router)
 app.include_router(series.router)
 app.include_router(films.router)
 app.include_router(admin.router)
+app.include_router(support_tickets.viewer_router)
+app.include_router(support_tickets.admin_router)
 app.include_router(donations.router)
 
 

@@ -61,6 +61,23 @@ class ContentKind(str, enum.Enum):
     series_episode = "series_episode"
 
 
+class SupportTicketCategory(str, enum.Enum):
+    """Viewer support ticket type (stored as value string in DB)."""
+
+    request_content = "request_content"
+    bug = "bug"
+    suggestion = "suggestion"
+    account = "account"
+    other = "other"
+
+
+class SupportTicketStatus(str, enum.Enum):
+    open = "open"
+    in_progress = "in_progress"
+    resolved = "resolved"
+    closed = "closed"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -93,6 +110,17 @@ class User(Base):
 
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+    support_tickets: Mapped[List["SupportTicket"]] = relationship(
+        "SupportTicket",
+        back_populates="user",
+        foreign_keys="SupportTicket.user_id",
+        cascade="all, delete-orphan",
+    )
+    support_ticket_messages: Mapped[List["SupportTicketMessage"]] = relationship(
+        "SupportTicketMessage",
+        back_populates="author",
+        foreign_keys="SupportTicketMessage.author_id",
     )
 
 
@@ -227,6 +255,80 @@ class ViewerAnnouncement(Base):
     message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SupportTicket(Base):
+    """Viewer-submitted support ticket (content request, bug, suggestion, account, …)."""
+
+    __tablename__ = "support_tickets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    category: Mapped[SupportTicketCategory] = mapped_column(
+        Enum(SupportTicketCategory, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[SupportTicketStatus] = mapped_column(
+        Enum(SupportTicketStatus, values_callable=lambda x: [e.value for e in x]),
+        default=SupportTicketStatus.open,
+        index=True,
+    )
+    admin_response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Last admin who posted a public reply (denormalized for list UI).
+    last_admin_reply_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="support_tickets",
+        foreign_keys=[user_id],
+    )
+    last_admin_reply_user: Mapped[Optional["User"]] = relationship(
+        "User",
+        foreign_keys=[last_admin_reply_user_id],
+        viewonly=True,
+    )
+    messages: Mapped[List["SupportTicketMessage"]] = relationship(
+        "SupportTicketMessage",
+        back_populates="ticket",
+        cascade="all, delete-orphan",
+        order_by="SupportTicketMessage.created_at",
+    )
+
+    __table_args__ = (Index("ix_support_tickets_created_at", "created_at"),)
+
+
+class SupportTicketMessage(Base):
+    """Public thread message on a support ticket (viewer or admin)."""
+
+    __tablename__ = "support_ticket_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("support_tickets.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    author_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    ticket: Mapped["SupportTicket"] = relationship("SupportTicket", back_populates="messages")
+    author: Mapped["User"] = relationship(
+        "User",
+        back_populates="support_ticket_messages",
+        foreign_keys=[author_id],
+    )
+
+    __table_args__ = (Index("ix_support_ticket_messages_ticket_created", "ticket_id", "created_at"),)
 
 
 class DonationSettings(Base):

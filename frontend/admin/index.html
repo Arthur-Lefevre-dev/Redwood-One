@@ -1451,6 +1451,10 @@
             <span class="nav-icon">◈</span>
             Dons (crypto)
           </div>
+          <div class="nav-item" data-page="support-tickets">
+            <span class="nav-icon">✉</span>
+            Tickets support
+          </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
             <span class="nav-icon">◎</span>
@@ -2347,6 +2351,249 @@
                   >
                     Effacer l’annonce
                   </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-support-tickets">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Tickets support</div>
+                <div class="page-sub">
+                  Demandes spectateurs (contenu, bugs, suggestions, compte…)
+                </div>
+              </div>
+              <div class="topbar-right">
+                <button
+                  type="button"
+                  class="btn btn-refresh"
+                  id="btn-st-refresh"
+                  title="Actualiser la liste"
+                >
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+              </div>
+            </header>
+            <div class="content">
+              <div
+                class="card"
+                style="margin-bottom: 16px"
+              >
+                <div class="card-head">
+                  <div class="card-title">Filtres</div>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 12px 20px;
+                    align-items: flex-end;
+                  "
+                >
+                  <div>
+                    <label
+                      for="st-filter-status"
+                      style="
+                        display: block;
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 4px;
+                      "
+                      >Statut</label
+                    >
+                    <select
+                      id="st-filter-status"
+                      style="
+                        min-width: 160px;
+                        padding: 8px 10px;
+                        border-radius: 8px;
+                        border: 1px solid var(--color-border-secondary);
+                        background: #0f0f0f;
+                        color: var(--color-text-primary);
+                        font-size: 13px;
+                      "
+                    >
+                      <option value="">Tous</option>
+                      <option value="open">Ouvert</option>
+                      <option value="in_progress">En cours</option>
+                      <option value="resolved">Résolu</option>
+                      <option value="closed">Fermé</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      for="st-filter-cat"
+                      style="
+                        display: block;
+                        font-size: 11px;
+                        color: var(--color-text-tertiary);
+                        margin-bottom: 4px;
+                      "
+                      >Catégorie</label
+                    >
+                    <select
+                      id="st-filter-cat"
+                      style="
+                        min-width: 200px;
+                        padding: 8px 10px;
+                        border-radius: 8px;
+                        border: 1px solid var(--color-border-secondary);
+                        background: #0f0f0f;
+                        color: var(--color-text-primary);
+                        font-size: 13px;
+                      "
+                    >
+                      <option value="">Toutes</option>
+                      <option value="request_content">Contenu (film / série)</option>
+                      <option value="bug">Bug</option>
+                      <option value="suggestion">Suggestion</option>
+                      <option value="account">Compte</option>
+                      <option value="other">Autre</option>
+                    </select>
+                  </div>
+                  <button type="button" class="btn btn-primary" id="st-apply-filters">
+                    Appliquer
+                  </button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <div class="card-title">Liste</div>
+                  <div
+                    id="st-list-meta"
+                    style="font-size: 11px; color: var(--color-text-tertiary)"
+                  >
+                    —
+                  </div>
+                </div>
+                <div class="card-body" style="overflow-x: auto">
+                  <table class="users-table" id="st-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Utilisateur</th>
+                        <th>Cat.</th>
+                        <th>Sujet</th>
+                        <th>Statut</th>
+                      </tr>
+                    </thead>
+                    <tbody id="st-tbody">
+                      <tr>
+                        <td colspan="6" style="color: var(--color-text-tertiary)">
+                          Chargement…
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card" id="st-detail-card" style="display: none">
+                <div class="card-head">
+                  <div class="card-title">
+                    Ticket <span id="st-detail-id">—</span>
+                  </div>
+                </div>
+                <div class="card-body" style="font-size: 13px; line-height: 1.55">
+                  <p style="margin-bottom: 8px; color: var(--color-text-secondary)">
+                    <strong id="st-detail-user">—</strong>
+                    <span id="st-detail-email" style="color: var(--color-text-tertiary)"></span>
+                  </p>
+                  <p style="margin-bottom: 12px">
+                    <span
+                      class="gpu-pill"
+                      id="st-detail-cat-pill"
+                      style="margin-right: 8px"
+                      >—</span
+                    >
+                    <span class="gpu-pill" id="st-detail-st-pill">—</span>
+                  </p>
+                  <p
+                    style="
+                      font-weight: 600;
+                      margin-bottom: 6px;
+                      color: var(--color-text-primary);
+                    "
+                    >Message initial (spectateur)</p
+                  >
+                  <pre
+                    id="st-detail-body"
+                    style="
+                      white-space: pre-wrap;
+                      word-break: break-word;
+                      background: #0a0a0a;
+                      border: 1px solid var(--color-border-secondary);
+                      border-radius: 8px;
+                      padding: 12px;
+                      margin-bottom: 16px;
+                      font-family: var(--font-mono, ui-monospace, monospace);
+                      font-size: 12px;
+                    "
+                  ></pre>
+                  <p
+                    style="
+                      font-weight: 600;
+                      margin-bottom: 8px;
+                      color: var(--color-text-primary);
+                    "
+                    >Fil de discussion</p
+                  >
+                  <div id="st-thread" style="margin-bottom: 16px"></div>
+                  <label for="st-detail-reply"
+                    >Nouveau message public (ajouté au fil, signé avec votre nom
+                    d’admin)</label
+                  >
+                  <textarea
+                    id="st-detail-reply"
+                    rows="5"
+                    style="
+                      display: block;
+                      width: 100%;
+                      margin-bottom: 12px;
+                      padding: 10px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                      font-family: var(--font-sans);
+                      font-size: 13px;
+                      resize: vertical;
+                    "
+                  ></textarea>
+                  <label for="st-detail-status">Statut</label>
+                  <select
+                    id="st-detail-status"
+                    style="
+                      display: block;
+                      width: 220px;
+                      margin-bottom: 12px;
+                      padding: 8px 10px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                      font-size: 13px;
+                    "
+                  >
+                    <option value="open">Ouvert</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="resolved">Résolu</option>
+                    <option value="closed">Fermé</option>
+                  </select>
+                  <button type="button" class="btn btn-primary" id="st-detail-save">
+                    Enregistrer
+                  </button>
+                  <p
+                    id="st-detail-msg"
+                    style="
+                      margin-top: 10px;
+                      font-size: 12px;
+                      color: var(--color-text-tertiary);
+                    "
+                  ></p>
                 </div>
               </div>
             </div>
@@ -4388,6 +4635,7 @@
         adminCloseMobileNav();
         if (p === "announcement") loadViewerAnnouncementAdmin();
         if (p === "donations") loadDonationsAdmin();
+        if (p === "support-tickets") void loadSupportTicketsAdmin();
         if (p === "films") loadLibrary();
         if (p === "users") {
           loadUsers(true);
@@ -5161,6 +5409,238 @@
       window.addEventListener("resize", () => {
         if (!adminIsMobileLayout()) adminCloseMobileNav();
       });
+
+      const _ST_CAT = {
+        request_content: "Contenu",
+        bug: "Bug",
+        suggestion: "Suggestion",
+        account: "Compte",
+        other: "Autre",
+      };
+      const _ST_STATUS = {
+        open: "Ouvert",
+        in_progress: "En cours",
+        resolved: "Résolu",
+        closed: "Fermé",
+      };
+      let _stSelectedId = null;
+
+      function stEsc(s) {
+        const d = document.createElement("div");
+        d.textContent = s == null ? "" : String(s);
+        return d.innerHTML;
+      }
+
+      function _stQs() {
+        const st = ($("#st-filter-status") && $("#st-filter-status").value) || "";
+        const cat = ($("#st-filter-cat") && $("#st-filter-cat").value) || "";
+        const q = new URLSearchParams();
+        if (st) q.set("status", st);
+        if (cat) q.set("category", cat);
+        const s = q.toString();
+        return s ? "?" + s : "";
+      }
+
+      async function loadSupportTicketsAdmin(opts) {
+        const resetDetail = !opts || opts.resetDetail !== false;
+        const tb = $("#st-tbody");
+        const meta = $("#st-list-meta");
+        const card = $("#st-detail-card");
+        if (!tb) return;
+        if (resetDetail) {
+          _stSelectedId = null;
+          if (card) card.style.display = "none";
+        }
+        tb.innerHTML =
+          '<tr><td colspan="6" style="color:var(--color-text-tertiary)">Chargement…</td></tr>';
+        if (meta) meta.textContent = "—";
+        try {
+          const r = await api("/api/admin/support-tickets" + _stQs());
+          if (!r.ok) {
+            let t = "Impossible de charger les tickets.";
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            tb.innerHTML =
+              '<tr><td colspan="6" style="color:#f87171">' +
+              String(t).replace(/</g, "&lt;") +
+              "</td></tr>";
+            return;
+          }
+          const data = await r.json();
+          const rows = data.tickets || [];
+          const total = data.total != null ? data.total : rows.length;
+          if (meta) {
+            meta.textContent =
+              rows.length +
+              " affiché(s) · " +
+              total +
+              " au total (filtres appliqués)";
+          }
+          if (!rows.length) {
+            tb.innerHTML =
+              '<tr><td colspan="6" style="color:var(--color-text-tertiary)">Aucun ticket.</td></tr>';
+            return;
+          }
+          tb.innerHTML = rows
+            .map((t) => {
+              const cat = _ST_CAT[t.category] || t.category;
+              const st = _ST_STATUS[t.status] || t.status;
+              const u = (t.user_username || "—") + "";
+              const sub = (t.subject || "").replace(/</g, "&lt;");
+              const escU = u.replace(/</g, "&lt;");
+              return (
+                "<tr data-st-id=\"" +
+                t.id +
+                "\" style=\"cursor:pointer\">" +
+                "<td>" +
+                t.id +
+                "</td>" +
+                "<td style=\"white-space:nowrap;font-size:12px\">" +
+                (t.created_at || "").replace(/</g, "&lt;") +
+                "</td>" +
+                "<td>" +
+                escU +
+                "</td>" +
+                "<td>" +
+                String(cat).replace(/</g, "&lt;") +
+                "</td>" +
+                "<td style=\"max-width:220px;overflow:hidden;text-overflow:ellipsis\">" +
+                sub +
+                "</td>" +
+                "<td>" +
+                String(st).replace(/</g, "&lt;") +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("");
+          tb.querySelectorAll("tr[data-st-id]").forEach((tr) => {
+            tr.addEventListener("click", () => {
+              const id = parseInt(tr.getAttribute("data-st-id"), 10);
+              if (Number.isFinite(id)) void openSupportTicketDetail(id);
+            });
+          });
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          tb.innerHTML =
+            '<tr><td colspan="6" style="color:#f87171">Erreur réseau.</td></tr>';
+        }
+      }
+
+      async function openSupportTicketDetail(id) {
+        const card = $("#st-detail-card");
+        const msg = $("#st-detail-msg");
+        if (!card) return;
+        _stSelectedId = id;
+        if (msg) msg.textContent = "";
+        card.style.display = "block";
+        try {
+          const r = await api("/api/admin/support-tickets/" + id);
+          if (!r.ok) {
+            if (msg) msg.textContent = "Ticket introuvable.";
+            return;
+          }
+          const t = await r.json();
+          $("#st-detail-id").textContent = String(t.id);
+          $("#st-detail-user").textContent = t.user_username || "—";
+          const em = t.user_email ? " · " + t.user_email : "";
+          $("#st-detail-email").textContent = em;
+          $("#st-detail-cat-pill").textContent =
+            _ST_CAT[t.category] || t.category || "—";
+          $("#st-detail-st-pill").textContent =
+            _ST_STATUS[t.status] || t.status || "—";
+          $("#st-detail-body").textContent = t.body || "";
+          const thr = $("#st-thread");
+          if (thr) {
+            const msgs = t.messages || [];
+            thr.innerHTML =
+              msgs.length > 0
+                ? msgs
+                    .map((m) => {
+                      const adm = m.author_role === "admin";
+                      const who =
+                        stEsc(m.author_username || "—") +
+                        (adm
+                          ? " <span style=\"color:#86efac;font-size:11px\">(équipe)</span>"
+                          : "");
+                      const dt = stEsc(m.created_at || "");
+                      const body = stEsc(m.body || "");
+                      return (
+                        "<div style=\"margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--color-border-secondary);background:" +
+                        (adm ? "rgba(139,37,0,0.18)" : "#0f0f0f") +
+                        "\">" +
+                        "<div style=\"font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px\">" +
+                        who +
+                        " · " +
+                        dt +
+                        "</div>" +
+                        "<div style=\"font-size:13px;white-space:pre-wrap;word-break:break-word\">" +
+                        body +
+                        "</div></div>"
+                      );
+                    })
+                    .join("")
+                : "<p style=\"color:var(--color-text-tertiary);font-size:12px;margin:0\">Aucun message après l’ouverture du ticket.</p>";
+          }
+          $("#st-detail-reply").value = "";
+          $("#st-detail-status").value = t.status || "open";
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          if (msg) msg.textContent = "Erreur chargement détail.";
+        }
+      }
+
+      const _btnStRefresh = document.getElementById("btn-st-refresh");
+      if (_btnStRefresh) {
+        _btnStRefresh.addEventListener("click", () => void loadSupportTicketsAdmin());
+      }
+      const _btnStApply = document.getElementById("st-apply-filters");
+      if (_btnStApply) {
+        _btnStApply.addEventListener("click", () => void loadSupportTicketsAdmin());
+      }
+      const _btnStSave = document.getElementById("st-detail-save");
+      if (_btnStSave) {
+        _btnStSave.addEventListener("click", async () => {
+          const msg = $("#st-detail-msg");
+          if (!_stSelectedId) {
+            if (msg) msg.textContent = "Sélectionnez un ticket dans la liste.";
+            return;
+          }
+          if (msg) msg.textContent = "Enregistrement…";
+          const status =
+            ($("#st-detail-status") && $("#st-detail-status").value) || "";
+          const reply = (
+            ($("#st-detail-reply") && $("#st-detail-reply").value) ||
+            ""
+          ).trim();
+          const payload = { status };
+          if (reply) payload.admin_response = reply;
+          try {
+            const r = await api("/api/admin/support-tickets/" + _stSelectedId, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!r.ok) {
+              let t = "Échec";
+              try {
+                const j = await r.json();
+                if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+              } catch (_) {}
+              if (msg) msg.textContent = t;
+              return;
+            }
+            if (msg) msg.textContent = "Enregistré.";
+            await loadSupportTicketsAdmin({ resetDetail: false });
+            await openSupportTicketDetail(_stSelectedId);
+          } catch (e) {
+            if (e && e.message === "403-admin") return;
+            if (msg) msg.textContent = "Erreur réseau.";
+          }
+        });
+      }
 
       async function loadViewerAnnouncementAdmin() {
         const st = $("#va-status");
