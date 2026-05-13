@@ -310,9 +310,11 @@ def pick_first_verified_bundle_offer(
     gpu_names: List[str],
     *,
     search_limit: int = 64,
+    skip_offer_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     """
     Auto-pick the first GPU offer that is verified (API filter + client-side skip if verified=false).
+    skip_offer_ids: offer ids to skip (e.g. hosts that never exposed /dev/nvidia0).
     Raises RuntimeError if none match.
     """
     s = get_settings()
@@ -320,6 +322,13 @@ def pick_first_verified_bundle_offer(
     search_kw: Dict[str, Any] = {"verified": True, "limit": search_limit}
     if single_gpu:
         search_kw["num_gpus_eq"] = 1
+    skip: set[int] = set()
+    if skip_offer_ids:
+        for x in skip_offer_ids:
+            try:
+                skip.add(int(x))
+            except (TypeError, ValueError):
+                continue
     raw = search_offers(gpu_names, **search_kw)
     for o in raw:
         if not isinstance(o, dict):
@@ -334,8 +343,15 @@ def pick_first_verified_bundle_offer(
             except (TypeError, ValueError):
                 continue
         oid = o.get("id")
-        if oid is not None:
-            return o
+        if oid is None:
+            continue
+        try:
+            ioid = int(oid)
+        except (TypeError, ValueError):
+            continue
+        if ioid in skip:
+            continue
+        return o
     raise RuntimeError(
         "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
         "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_MIN_INET_DOWN_MBPS, "

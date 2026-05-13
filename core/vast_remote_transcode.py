@@ -10,9 +10,14 @@ from config import get_settings
 
 logger = logging.getLogger(__name__)
 
+REDWOOD_VAST_NO_GPU_SENTINEL = "REDWOOD_VAST_NO_GPU=1"
+
 # Env: RW_IN, RW_OUT, RW_EXT, RW_BR/MR/BF, RW_BA (AAC kbit/s), RW_GPU_WAIT, RW_FFMPEG_URL (optional BtbN tarball URL).
 # Prefers a recent static FFmpeg with NVENC; sets NVIDIA_DRIVER_CAPABILITIES + LD_LIBRARY_PATH for Vast.
-# Tries CPU-decode+NVENC, CUDA-decode+NVENC, optional apt NVENC if BtbN used, then libx264 (CPU).
+# Vast contracts are GPU-backed: NVENC is the intended path. Order: NVENC (decode on CPU or CUDA),
+# optional distro ffmpeg NVENC if BtbN differs, then libx264 only as last resort if the NVENC stack fails
+# (driver/encoder mismatch, broken build). If /dev/nvidia0 never appears after wait, onstart aborts with
+# REDWOOD_VAST_NO_GPU=1 (no download); Celery destroys the contract and picks another offer.
 # Large input: aria2c parallel download (S3 presigned GET supports Range); falls back to curl.
 VAST_TRANSCODE_ONSTART = r"""set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -28,6 +33,15 @@ while [ "$i" -lt "$GW" ]; do
   i=$((i + 1))
   sleep 1
 done
+if [ ! -e /dev/nvidia0 ]; then
+  NO_GPU_MSG="REDWOOD_VAST_NO_GPU=1
+rw_transcode: /dev/nvidia0 missing after ${GW}s; aborting without download."
+  if [ -n "${RW_PROGRESS_PUT:-}" ]; then
+    curl -sf -X PUT -H "Content-Type: text/plain; charset=utf-8" --data-binary "$NO_GPU_MSG" "${RW_PROGRESS_PUT}" || true
+  fi
+  echo "$NO_GPU_MSG" >&2
+  exit 77
+fi
 IN="/tmp/in${RW_EXT}"
 rm -f "$IN"
 DL_CONN="${RW_DL_CONN:-16}"
@@ -141,6 +155,10 @@ if [ "${RC}" != "0" ] && [ "$GPUFF" != "/usr/bin/ffmpeg" ]; then
   RC=$?
 fi
 if [ "${RC}" != "0" ]; then
+  {
+    echo "rw_transcode: all NVENC attempts failed; using libx264 CPU fallback (unexpected on Vast if GPU is healthy)."
+    nvidia-smi -L 2>/dev/null || echo "rw_transcode: nvidia-smi unavailable"
+  } >>/tmp/fferr
   /usr/bin/ffmpeg -hide_banner -nostdin -y -progress /tmp/ffprog -i "$INP" ${RW_MAP_ARGS} \
     -c:v libx264 -preset faster -b:v "${RW_BR}" -maxrate "${RW_MR}" -bufsize "${RW_BF}" \
     -pix_fmt yuv420p ${RW_SUB_CODEC} ${RW_AUD_ARGS} -movflags +faststart /tmp/out.mp4 2>>/tmp/fferr
@@ -183,7 +201,9 @@ def run_vast_transcode_test(
 ) -> Dict[str, Any]:
     """
     Pick a Vast offer, create an instance whose onstart downloads the input from S3 (presigned GET),
-    transcodes (NVENC if GPU visible, else libx264), uploads MP4 via presigned PUT; poll S3; destroy instance.
+    transcodes with NVENC on the Vast GPU (libx264 only if every NVENC path fails), uploads MP4 via presigned PUT;
+    poll S3; destroy instance. If remote progress reports REDWOOD_VAST_NO_GPU=1 (no /dev/nvidia0), destroys
+    the contract and auto-picks another offer (unless offer_id was fixed).
     """
     from core import vast_ai
     from core.s3 import (
@@ -238,12 +258,19 @@ def run_vast_transcode_test(
         if is_cancel_requested(rid):
             raise RuntimeError("Cancelled by user")
         picked_gpu_name: Optional[str] = None
-        if offer_id is not None and int(offer_id) > 0:
+        explicit_offer = offer_id is not None and int(offer_id) > 0
+        skipped_offer_ids: list[int] = []
+        max_no_gpu_rounds = max(
+            1,
+            min(25, int(getattr(s, "VAST_TRANSCODE_NO_GPU_MAX_RETRIES", 6) or 6)),
+        )
+        if explicit_offer:
             oid = int(offer_id)
         else:
             first = vast_ai.pick_first_verified_bundle_offer(
                 vast_ai.default_gpu_name_list(),
                 search_limit=64,
+                skip_offer_ids=skipped_offer_ids,
             )
             oid = int(first["id"])
             picked_gpu_name = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
@@ -278,126 +305,195 @@ def run_vast_transcode_test(
         image = (s.VAST_TRANSCODE_DOCKER_IMAGE or "nvidia/cuda:12.3.1-runtime-ubuntu22.04").strip()
         disk = max(16, int(s.VAST_TRANSCODE_DISK_GB))
 
-        meta_kw: Dict[str, Any] = {
-            "step": "create_vast_instance",
-            "progress": 15,
-            "offer_id": oid,
-            "vast_image": image,
-            "progress_key": progress_key,
-        }
-        if picked_gpu_name:
-            meta_kw["picked_gpu_name"] = picked_gpu_name
-        meta(**meta_kw)
-        if is_cancel_requested(rid):
-            raise RuntimeError("Cancelled by user")
-        raw: Optional[Dict[str, Any]] = None
-        last_create_err: Optional[RuntimeError] = None
-        for attempt in range(3):
-            try:
-                raw = vast_ai.create_instance(
-                    oid,
-                    image=image,
-                    disk_gb=disk,
-                    runtype="ssh_direct",
-                    label=f"redwood-vast-tx-{job_token[:10]}",
-                    env=env,
-                    onstart=VAST_TRANSCODE_ONSTART,
-                )
-                last_create_err = None
+        output_ready = False
+        for gpu_round in range(max_no_gpu_rounds):
+            meta_kw: Dict[str, Any] = {
+                "step": "create_vast_instance",
+                "progress": 15,
+                "offer_id": oid,
+                "vast_image": image,
+                "progress_key": progress_key,
+                "vast_instance_round": gpu_round,
+                "vast_max_no_gpu_rounds": max_no_gpu_rounds,
+            }
+            if picked_gpu_name:
+                meta_kw["picked_gpu_name"] = picked_gpu_name
+            meta(**meta_kw)
+            if is_cancel_requested(rid):
+                raise RuntimeError("Cancelled by user")
+            raw: Optional[Dict[str, Any]] = None
+            last_create_err: Optional[RuntimeError] = None
+            for attempt in range(3):
+                try:
+                    raw = vast_ai.create_instance(
+                        oid,
+                        image=image,
+                        disk_gb=disk,
+                        runtype="ssh_direct",
+                        label=f"redwood-vast-tx-{job_token[:10]}",
+                        env=env,
+                        onstart=VAST_TRANSCODE_ONSTART,
+                    )
+                    last_create_err = None
+                    break
+                except RuntimeError as e:
+                    last_create_err = e
+                    if not vast_ai.is_no_such_ask_error(e) or attempt >= 2:
+                        raise
+                    first = vast_ai.pick_first_verified_bundle_offer(
+                        vast_ai.default_gpu_name_list(),
+                        search_limit=64,
+                        skip_offer_ids=skipped_offer_ids,
+                    )
+                    oid = int(first["id"])
+                    picked_gpu_name = (
+                        first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
+                    )
+                    logger.warning(
+                        "vast create_instance stale offer (attempt %s); repicked offer_id=%s gpu=%s",
+                        attempt + 1,
+                        oid,
+                        picked_gpu_name or "?",
+                    )
+                    meta_kw["offer_id"] = oid
+                    if picked_gpu_name:
+                        meta_kw["picked_gpu_name"] = picked_gpu_name
+                    meta(**meta_kw)
+                    if is_cancel_requested(rid):
+                        raise RuntimeError("Cancelled by user")
+            if raw is None:
+                raise last_create_err or RuntimeError("Vast create_instance failed without response")
+            raw_nid = raw.get("new_contract") if isinstance(raw, dict) else None
+            if raw_nid is None:
+                raise RuntimeError(f"Vast create_instance returned no new_contract: {raw!r}")
+            inst_id = int(raw_nid)
+
+            meta(
+                step="wait_output_on_s3",
+                progress=20,
+                vast_instance_id=inst_id,
+                offer_id=oid,
+                vast_instance_round=gpu_round,
+                input_key=input_key,
+                output_key=output_key,
+                progress_key=progress_key,
+                job_token=job_token,
+                src_ext=src_ext,
+                hint="Instance runs onstart (apt + ffmpeg + upload). First boot can take several minutes.",
+            )
+            deadline = time.monotonic() + max_wait
+            no_gpu_abort = False
+            while time.monotonic() < deadline:
+                if is_cancel_requested(rid):
+                    raise RuntimeError("Cancelled by user")
+                sz = object_size_or_none(output_key)
+                if sz is not None and sz > 256_000:
+                    time.sleep(5)
+                    sz2 = object_size_or_none(output_key)
+                    if sz2 is not None and sz2 >= sz:
+                        meta(
+                            step="output_ready",
+                            progress=92,
+                            vast_instance_id=inst_id,
+                            output_bytes=sz2,
+                            input_key=input_key,
+                            output_key=output_key,
+                            progress_key=progress_key,
+                            job_token=job_token,
+                            src_ext=src_ext,
+                        )
+                        output_ready = True
+                        break
+                elapsed = max_wait - (deadline - time.monotonic())
+                prog = 20 + min(70, int(70 * elapsed / max_wait))
+                remote_snippet: Optional[str] = None
+                raw_remote: Optional[str] = None
+                try:
+                    raw_remote = get_object_text_if_small(progress_key, max_bytes=65536)
+                    if raw_remote and raw_remote.strip():
+                        remote_snippet = _trim_remote_log(raw_remote)
+                        if REDWOOD_VAST_NO_GPU_SENTINEL in raw_remote:
+                            no_gpu_abort = True
+                            break
+                except Exception:
+                    logger.debug("vast remote_progress fetch failed", exc_info=True)
+                mwait: Dict[str, Any] = {
+                    "step": "wait_output_on_s3",
+                    "progress": prog,
+                    "vast_instance_id": inst_id,
+                    "output_bytes": sz,
+                    "input_key": input_key,
+                    "output_key": output_key,
+                    "progress_key": progress_key,
+                    "job_token": job_token,
+                    "src_ext": src_ext,
+                    "vast_instance_round": gpu_round,
+                }
+                if remote_snippet:
+                    mwait["remote_log"] = remote_snippet
+                    otm = _last_out_time_ms_from_remote(remote_snippet)
+                    if otm:
+                        mwait["remote_out_time_ms"] = otm
+                meta(**mwait)
+                time.sleep(poll_sec)
+
+            if output_ready:
                 break
-            except RuntimeError as e:
-                last_create_err = e
-                if not vast_ai.is_no_such_ask_error(e) or attempt >= 2:
-                    raise
+
+            if no_gpu_abort:
+                destroy_id = int(inst_id)
+                try:
+                    vast_ai.destroy_instance(destroy_id)
+                    logger.warning(
+                        "vast_remote_transcode: destroyed instance %s (no /dev/nvidia0 per remote progress)",
+                        destroy_id,
+                    )
+                except Exception:
+                    logger.exception(
+                        "vast_remote_transcode: destroy_instance (no gpu) failed id=%s",
+                        destroy_id,
+                    )
+                inst_id = None
+                for k in (output_key, progress_key):
+                    try:
+                        delete_object_key(k)
+                    except Exception:
+                        pass
+                if explicit_offer:
+                    raise RuntimeError(
+                        f"Vast instance had no GPU (/dev/nvidia0) for offer_id={oid}. "
+                        "Pick another offer or retry later."
+                    )
+                if gpu_round >= max_no_gpu_rounds - 1:
+                    raise RuntimeError(
+                        f"No Vast instance exposed a GPU after {max_no_gpu_rounds} attempt(s). "
+                        "See REDWOOD_VAST_NO_GPU=1 in remote progress; widen GPU filters or increase "
+                        "VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC."
+                    )
+                skipped_offer_ids.append(oid)
                 first = vast_ai.pick_first_verified_bundle_offer(
                     vast_ai.default_gpu_name_list(),
                     search_limit=64,
+                    skip_offer_ids=list(skipped_offer_ids),
                 )
                 oid = int(first["id"])
-                picked_gpu_name = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
-                logger.warning(
-                    "vast create_instance stale offer (attempt %s); repicked offer_id=%s gpu=%s",
-                    attempt + 1,
-                    oid,
-                    picked_gpu_name or "?",
+                picked_gpu_name = (
+                    first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
                 )
-                meta_kw["offer_id"] = oid
-                if picked_gpu_name:
-                    meta_kw["picked_gpu_name"] = picked_gpu_name
-                meta(**meta_kw)
-                if is_cancel_requested(rid):
-                    raise RuntimeError("Cancelled by user")
-        if raw is None:
-            raise last_create_err or RuntimeError("Vast create_instance failed without response")
-        inst_id = raw.get("new_contract") if isinstance(raw, dict) else None
-        if inst_id is None:
-            raise RuntimeError(f"Vast create_instance returned no new_contract: {raw!r}")
+                logger.warning(
+                    "vast_remote_transcode: repicking after no GPU; skipped_offer_ids=%s new_offer_id=%s",
+                    skipped_offer_ids,
+                    oid,
+                )
+                continue
 
-        meta(
-            step="wait_output_on_s3",
-            progress=20,
-            vast_instance_id=int(inst_id),
-            offer_id=oid,
-            input_key=input_key,
-            output_key=output_key,
-            progress_key=progress_key,
-            job_token=job_token,
-            src_ext=src_ext,
-            hint="Instance runs onstart (apt + ffmpeg + upload). First boot can take several minutes.",
-        )
-        deadline = time.monotonic() + max_wait
-        while time.monotonic() < deadline:
-            if is_cancel_requested(rid):
-                raise RuntimeError("Cancelled by user")
-            sz = object_size_or_none(output_key)
-            if sz is not None and sz > 256_000:
-                time.sleep(5)
-                sz2 = object_size_or_none(output_key)
-                if sz2 is not None and sz2 >= sz:
-                    meta(
-                        step="output_ready",
-                        progress=92,
-                        vast_instance_id=int(inst_id),
-                        output_bytes=sz2,
-                        input_key=input_key,
-                        output_key=output_key,
-                        progress_key=progress_key,
-                        job_token=job_token,
-                        src_ext=src_ext,
-                    )
-                    break
-            elapsed = max_wait - (deadline - time.monotonic())
-            prog = 20 + min(70, int(70 * elapsed / max_wait))
-            remote_snippet: Optional[str] = None
-            try:
-                raw_remote = get_object_text_if_small(progress_key, max_bytes=65536)
-                if raw_remote and raw_remote.strip():
-                    remote_snippet = _trim_remote_log(raw_remote)
-            except Exception:
-                logger.debug("vast remote_progress fetch failed", exc_info=True)
-            mwait: Dict[str, Any] = {
-                "step": "wait_output_on_s3",
-                "progress": prog,
-                "vast_instance_id": int(inst_id),
-                "output_bytes": sz,
-                "input_key": input_key,
-                "output_key": output_key,
-                "progress_key": progress_key,
-                "job_token": job_token,
-                "src_ext": src_ext,
-            }
-            if remote_snippet:
-                mwait["remote_log"] = remote_snippet
-                otm = _last_out_time_ms_from_remote(remote_snippet)
-                if otm:
-                    mwait["remote_out_time_ms"] = otm
-            meta(**mwait)
-            time.sleep(poll_sec)
-        else:
             raise RuntimeError(
                 "Timeout waiting for transcoded MP4 on S3. Check the instance logs on Vast.ai "
                 "(ffmpeg / network / presigned URL expiry)."
             )
+
+        if not output_ready:
+            raise RuntimeError("vast_remote_transcode: internal state (no S3 output after rounds)")
 
         view_url = presigned_stream_url(output_key, expires=86400)
         dph = float(s.VAST_MAX_DPH_PER_HOUR)
