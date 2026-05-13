@@ -81,7 +81,7 @@ def search_offers(
     limit: int = 8,
     instance_type: str = "ondemand",
     min_reliability: float = 0.95,
-    verified: bool = True,
+    verified: Optional[bool] = None,
     num_gpus_min: int = 1,
     num_gpus_eq: Optional[int] = None,
     max_dph_per_hour: Optional[float] = None,
@@ -103,6 +103,9 @@ def search_offers(
 
     When exclude_geolocation_codes is None, uses VAST_EXCLUDE_GEOLOCATION_CODES from settings (default CN).
     Pass [] to disable geolocation exclusion for this call.
+
+    When verified is None, uses VAST_BUNDLES_VERIFIED_ONLY: if true, adds verified eq true to the bundles
+    payload; if false, omits verified so unverified offers may appear. Pass True/False to override for this call.
     """
     api_key = require_vast_api_key()
     s = get_settings()
@@ -139,16 +142,22 @@ def search_offers(
     else:
         num_gpus_filter = {"gte": int(num_gpus_min)}
 
+    if verified is None:
+        require_verified_in_bundles = bool(getattr(s, "VAST_BUNDLES_VERIFIED_ONLY", True))
+    else:
+        require_verified_in_bundles = verified
+
     payload: Dict[str, Any] = {
         "gpu_name": {"in": names},
         "num_gpus": num_gpus_filter,
         "reliability": {"gte": min_reliability},
-        "verified": {"eq": verified},
         "rentable": {"eq": True},
         "type": instance_type,
         "limit": limit,
         "dph_total": {"lte": dph_cap},
     }
+    if require_verified_in_bundles:
+        payload["verified"] = {"eq": True}
     if bw_tb_cap > 0:
         per_gb = bw_tb_cap / 1024.0
         payload["inet_down_cost"] = {"lte": per_gb}
@@ -330,13 +339,15 @@ def pick_first_verified_bundle_offer(
     skip_offer_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     """
-    Auto-pick the first GPU offer that is verified (API filter + client-side skip if verified=false).
+    Auto-pick the first GPU offer matching bundle filters (verified-only vs all per VAST_BUNDLES_VERIFIED_ONLY).
+    When VAST_BUNDLES_VERIFIED_ONLY is true, API requests verified eq true and unverified rows are skipped.
     skip_offer_ids: offer ids to skip (e.g. hosts that never exposed /dev/nvidia0).
     Raises RuntimeError if none match.
     """
     s = get_settings()
     single_gpu = bool(getattr(s, "VAST_TRANSCODE_SINGLE_GPU_ONLY", True))
-    search_kw: Dict[str, Any] = {"verified": True, "limit": search_limit}
+    require_verified = bool(getattr(s, "VAST_BUNDLES_VERIFIED_ONLY", True))
+    search_kw: Dict[str, Any] = {"limit": search_limit}
     if single_gpu:
         search_kw["num_gpus_eq"] = 1
     skip: set[int] = set()
@@ -352,7 +363,7 @@ def pick_first_verified_bundle_offer(
     for o in raw:
         if not isinstance(o, dict):
             continue
-        if o.get("verified") is False:
+        if require_verified and o.get("verified") is False:
             continue
         if single_gpu:
             ng = o.get("num_gpus")
@@ -385,8 +396,8 @@ def pick_first_verified_bundle_offer(
             except (TypeError, ValueError):
                 pass
         return o
-    raise RuntimeError(
-        "Aucune offre GPU vérifiée (verified) ne correspond aux filtres actuels "
+    msg = (
+        "Aucune offre GPU ne correspond aux filtres actuels "
         "(VAST_MAX_DPH_PER_HOUR, VAST_MAX_BANDWIDTH_USD_PER_TB, VAST_MIN_INET_DOWN_MBPS, "
         "VAST_MIN_INET_UP_MBPS, VAST_SKIP_MACHINE_IDS, VAST_SKIP_HOST_IDS, noms GPU — auto-pic : "
         "VAST_DEFAULT_GPU_NAMES ; GPU secondaires : VAST_USABLE_GPU_NAMES, voir "
@@ -396,3 +407,9 @@ def pick_first_verified_bundle_offer(
         + (" ou désactivez VAST_TRANSCODE_SINGLE_GPU_ONLY si l'API n'a aucune offre 1×GPU" if single_gpu else "")
         + "."
     )
+    if require_verified:
+        msg += (
+            " Les machines « Unverified » sont exclues tant que VAST_BUNDLES_VERIFIED_ONLY=true ; "
+            "mettez-la à false pour les autoriser."
+        )
+    raise RuntimeError(msg)

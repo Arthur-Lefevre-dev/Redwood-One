@@ -2033,7 +2033,6 @@ def admin_vast_offers(
             "limit": limit,
             "max_dph_per_hour": max_dph,
             "max_bandwidth_usd_per_tb": max_bandwidth_usd_per_tb,
-            "verified": True,
             "min_inet_down_mbps": min_inet_down_mbps,
             "min_inet_up_mbps": min_inet_up_mbps,
         }
@@ -2072,6 +2071,7 @@ def admin_vast_offers(
             "max_dph_per_hour": dph_applied,
             "max_bandwidth_usd_per_tb": bw_applied,
             "inet_cost_cap_usd_per_gb": (bw_applied / 1024.0) if bw_applied > 0 else None,
+            "vast_bundles_verified_only": bool(getattr(s, "VAST_BUNDLES_VERIFIED_ONLY", True)),
             "verified_only": verified_only,
             "min_inet_down_mbps": eff_down,
             "min_inet_up_mbps": eff_up,

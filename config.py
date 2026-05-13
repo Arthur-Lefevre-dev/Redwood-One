@@ -117,6 +117,9 @@ class Settings(BaseSettings):
     VAST_TRANSCODE_NO_GPU_MAX_RETRIES: int = 6
     # If True, bundle search for auto-picked transcode uses num_gpus eq 1 only (reduces CDI gpu=N failures on some hosts).
     VAST_TRANSCODE_SINGLE_GPU_ONLY: bool = True
+    # If True, POST /bundles/ requests verified eq true and auto-pick skips offers with verified=false.
+    # Set to false to include Vast "Unverified Machines" in search and remote transcode auto-pick.
+    VAST_BUNDLES_VERIFIED_ONLY: bool = True
 
     # Billing / cost estimates for admin dashboard (not legal invoices).
     # OVH-style object storage: € HT per GiB per hour (example default; override in .env).
