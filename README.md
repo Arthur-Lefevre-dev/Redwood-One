@@ -9,14 +9,17 @@ Plateforme de **catalogue et diffusion vidéo** pour un usage privé ou restrein
 - **Catalogue** : films et **séries** (épisodes regroupés par `series_key`) ; lecture via `/watch/film.html` et `/watch/serie.html`.
 - **Authentification** : JWT dans cookies httpOnly ; rôles **admin** et **viewer**.
 - **Spectateurs** : inscription avec **code d’invitation** (ou ouverture publique en dev via `REGISTRATION_OPEN=true`), recherche, derniers ajouts, navigation par genres, suggestion **« Choisir pour moi »** selon les genres favoris ; page **Paramètres** (`/watch/settings.html`) pour le profil, les préférences et les **codes d’invitation générés par le membre** (quota **d’un code par mois calendaire UTC** ; voir aussi `core/member_invites.py`).
-- **Admin** : upload, torrents, file d’attente Celery, utilisateurs, **codes d’invitation** (admin + suivi des codes membres), **réinitialisation du quota mensuel d’invitation** d’un utilisateur, sync S3 ; confirmations et erreurs affichées dans des **modales** (plus de `alert` / `confirm` navigateur).
+- **Tickets support** : page spectateur **`/watch/support.html`** (ouverture de ticket, catégories, fil de discussion) ; console admin **Tickets support** (liste filtrée, réponse publique, changement de statut, clôture). Le panneau détail peut être refermé avec la **croix** sans modifier le statut du ticket.
+- **Dons crypto** : configuration et suivi des adresses (Bitcoin, Tron, Polygon, etc.), objectif de campagne et rafraîchissement des soldes côté admin ; progression pour spectateur connecté via `GET /api/donations/progress`.
+- **Transcodage cloud (Vast.ai)** : optionnel — cible **Vast** sur un titre, recherche d’offres GPU et suivi depuis l’admin ; variables `VAST_*` documentées dans `docker/env.example`.
+- **Admin** : upload, torrents, file d’attente Celery, utilisateurs, **codes d’invitation** (admin + suivi des codes membres), **réinitialisation du quota mensuel d’invitation** d’un utilisateur, sync S3, **bibliothèque** (films + épisodes de série regroupés) avec **pagination par série** (jusqu’à 10 blocs « show » par page, tous les épisodes de ces séries chargés ensemble) ; confirmations et erreurs affichées dans des **modales** (plus de `alert` / `confirm` navigateur).
 
 ## Stack technique
 
 | Composant | Rôle |
 |-----------|------|
 | **FastAPI** (`api/main.py`) | API REST, `init_db()` au démarrage |
-| **PostgreSQL** | Films, utilisateurs, invitations, jetons de rafraîchissement |
+| **PostgreSQL** | Films, utilisateurs, invitations, jetons de rafraîchissement, tickets support, paramètres de dons |
 | **Redis** | Broker Celery |
 | **Celery** (`worker`, `beat`) | Tâches asynchrones (pipeline, torrents) |
 | **Flower** | Monitoring des workers (port **5555** en Docker) |
@@ -55,13 +58,13 @@ Plateforme de **catalogue et diffusion vidéo** pour un usage privé ou restrein
    - Site : **http://localhost** (nginx)
    - Connexion spectateur : `/login.html` — inscription : `/register.html`
    - Connexion admin uniquement : `/login-admin.html` — console : `/admin/`
-   - Catalogue spectateur : `/watch/` — paramètres / invitations membre : `/watch/settings.html`
+   - Catalogue spectateur : `/watch/` — paramètres / invitations membre : `/watch/settings.html` — support : `/watch/support.html`
    - API santé : `GET /api/health`
    - Flower : **http://localhost:5555** (auth basique selon `FLOWER_USER` / `FLOWER_PASSWORD`)
 
 ### GPU (transcodage)
 
-Le worker peut utiliser un GPU selon l’environnement. Voir les commentaires dans [docker/docker-compose.yml](docker/docker-compose.yml) (`/dev/dri` pour AMD, réservations NVIDIA, etc.) et la variable `REDWOOD_GPU_VENDOR` dans `env.example`.
+Le worker peut utiliser un **GPU local** selon l’environnement. Voir les commentaires dans [docker/docker-compose.yml](docker/docker-compose.yml) (`/dev/dri` pour AMD, réservations NVIDIA, etc.) et la variable `REDWOOD_GPU_VENDOR` dans `env.example`. Pour un transcodage **délégué sur machine louée**, configurer plutôt **Vast.ai** (`VAST_API_KEY`, `VAST_MAX_DPH_PER_HOUR`, etc. dans `docker/env.example`).
 
 ## Développement local (sans Docker)
 
@@ -90,11 +93,11 @@ pytest
 ## Structure du dépôt (aperçu)
 
 ```
-api/           # FastAPI — routes auth, films, séries, admin
-core/          # Pipeline vidéo, S3, TMDB, détection GPU, sync catalogue, invitations membres
+api/           # FastAPI — auth, films, séries, admin, support_tickets, donations, announcement
+core/          # Pipeline vidéo, S3, TMDB, GPU, sync catalogue, invitations membres, dons, libellés admin séries
 db/            # Modèles SQLAlchemy, session
 worker/        # Tâches Celery
-frontend/      # HTML/JS/CSS — login, register, admin, watch (dont settings)
+frontend/      # HTML/JS/CSS — login, register, admin, watch (catalogue, settings, support)
 docker/        # Dockerfiles, compose, env.example
 nginx/         # Configuration reverse proxy
 scripts/       # seed_admin.py, scripts SQL optionnels (migrations manuelles)
@@ -111,7 +114,9 @@ scripts/       # seed_admin.py, scripts SQL optionnels (migrations manuelles)
 | `/api/auth/*` | Login, register, refresh, logout ; profil `GET`/`PATCH /me`, préférences `PATCH /me/preferences` ; invitations membre `POST /me/invite` (alias `POST /member-invite`) et état quota dans les réponses `/me` |
 | `/api/films/*` | Liste, featured, latest, genres, surprise-me, détail, URL de lecture |
 | `/api/series/*` | Liste des séries, détail par `series_key` (saisons / épisodes) |
-| `/api/admin/*` | Films, upload, torrents, file d’attente, sync S3, invitations, utilisateurs, `POST .../users/{id}/reset-invite-monthly-quota` (protégé admin) |
+| `/api/support-tickets/*` | Spectateur connecté : création de ticket, liste, détail, réponses |
+| `/api/donations/progress` | Spectateur connecté : objectif, avancement, fenêtre de campagne, adresses de dépôt (lecture seule) |
+| `/api/admin/*` | Ressources admin : catalogue / films, upload, torrents, file Celery, sync S3, utilisateurs, invitations, estimation coûts **Vast**, dons crypto, **tickets support** ; `GET /api/admin/library-meta` (totaux bibliothèque). Pour les épisodes : `GET /api/admin/films?content_kind=series_episode&paginate_by=series_show` pagine par **bloc série** (défaut `episode` = dix lignes épisode). |
 
 Documentation interactive Swagger : `http://localhost:8000/docs` si vous exposez le port de l’API (ex. `docker compose port api 8000` ou profil de debug). Avec la config nginx fournie, seul le préfixe `/api/` est proxifié vers FastAPI : les routes `/docs` et `/openapi.json` ne sont pas servies sur le port 80 tant qu’elles ne sont pas ajoutées à nginx.
 
