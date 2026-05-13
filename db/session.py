@@ -520,6 +520,104 @@ def _ensure_donation_settings_extended_columns() -> None:
     logger.info("database schema: ensured donation_settings tron/campaign columns (sqlite)")
 
 
+def _ensure_support_ticket_thread_schema() -> None:
+    """support_ticket_messages + support_tickets.last_admin_reply_user_id."""
+    insp = inspect(engine)
+    if "support_tickets" not in insp.get_table_names():
+        return
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS support_ticket_messages (
+                        id SERIAL PRIMARY KEY,
+                        ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+                        author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        body TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'utc')
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_ticket_id "
+                    "ON support_ticket_messages(ticket_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_author_id "
+                    "ON support_ticket_messages(author_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_ticket_created "
+                    "ON support_ticket_messages(ticket_id, created_at)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS "
+                    "last_admin_reply_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_tickets_last_admin_reply_user_id "
+                    "ON support_tickets(last_admin_reply_user_id)"
+                )
+            )
+        logger.info("database schema: ensured support_ticket_messages + last_admin_reply_user_id (postgresql)")
+        return
+    if "support_ticket_messages" not in insp.get_table_names():
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE support_ticket_messages (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+                        author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        body TEXT NOT NULL,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_ticket_id "
+                    "ON support_ticket_messages(ticket_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_author_id "
+                    "ON support_ticket_messages(author_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_support_ticket_messages_ticket_created "
+                    "ON support_ticket_messages(ticket_id, created_at)"
+                )
+            )
+        logger.info("database schema: created support_ticket_messages (sqlite)")
+    insp = inspect(engine)
+    cols = {c["name"] for c in insp.get_columns("support_tickets")}
+    if "last_admin_reply_user_id" not in cols:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE support_tickets ADD COLUMN last_admin_reply_user_id INTEGER"
+                )
+            )
+        logger.info("database schema: added support_tickets.last_admin_reply_user_id (sqlite)")
+
+
 def _widen_series_meta_poster_columns() -> None:
     """Allow full TMDB/CDN URLs in poster_path (existing DBs may still be VARCHAR(512))."""
     if engine.dialect.name != "postgresql":
@@ -564,6 +662,7 @@ def init_db() -> None:
     _migrate_donation_xmr_to_xrp()
     _ensure_donation_settings_extended_columns()
     _widen_series_meta_poster_columns()
+    _ensure_support_ticket_thread_schema()
 
 
 def get_db() -> Generator[Session, None, None]:
