@@ -847,6 +847,42 @@ def _month_bucket_expr(column, dialect_name: str):
     return func.strftime("%Y-%m", column)
 
 
+def _add_calendar_months(y: int, mo: int, delta: int) -> Tuple[int, int]:
+    """Add ``delta`` calendar months to ``(y, mo)``; ``mo`` is 1..12."""
+    total = y * 12 + (mo - 1) + delta
+    y2 = total // 12
+    mo2 = total % 12 + 1
+    return y2, mo2
+
+
+def _utc_month_label_series(num_months: int) -> List[str]:
+    """
+    Last ``num_months`` calendar months in UTC (oldest first).
+    Matches naive UTC timestamps used for Film.date_ajout / User.date_creation.
+    """
+    now = datetime.now(timezone.utc)
+    y, mo = now.year, now.month
+    y0, m0 = _add_calendar_months(y, mo, -(num_months - 1))
+    out: List[str] = []
+    cy, cm = y0, m0
+    for _ in range(num_months):
+        out.append(f"{cy:04d}-{cm:02d}")
+        cy, cm = _add_calendar_months(cy, cm, 1)
+    return out
+
+
+def _dense_series_for_month_labels(
+    labels: List[str], sparse: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """One entry per label month; counts default to 0 (Chart.js / admin UI)."""
+    smap: Dict[str, int] = {}
+    for x in sparse or []:
+        key = str(x.get("month") or "")[:7]
+        if len(key) == 7 and key[4] == "-":
+            smap[key] = int(x.get("count") or 0)
+    return [{"month": lab, "count": int(smap.get(lab, 0))} for lab in labels]
+
+
 def _day_bucket_expr(column, dialect_name: str):
     if dialect_name == "postgresql":
         return func.date_trunc("day", column)
@@ -889,7 +925,6 @@ def admin_statistics_overview(
     Vast-related counts and a rough spend upper bound from settings (not live Vast billing).
     """
     s = get_settings()
-    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=32 * months)
 
     total_users = int(db.query(func.count(User.id)).scalar() or 0)
     active_users = int(
@@ -972,8 +1007,13 @@ def admin_statistics_overview(
     invites_total = int(db.query(func.count(InvitationCode.id)).scalar() or 0)
     invites_uses = int(db.query(func.coalesce(func.sum(InvitationCode.uses), 0)).scalar() or 0)
 
-    films_by_month = _monthly_counts(db, Film.date_ajout, since)
-    users_by_month = _monthly_counts(db, User.date_creation, since)
+    month_labels = _utc_month_label_series(months)
+    y0, m0 = int(month_labels[0][:4]), int(month_labels[0][5:7])
+    since = datetime(y0, m0, 1, 0, 0, 0)
+    films_by_month_sparse = _monthly_counts(db, Film.date_ajout, since)
+    users_by_month_sparse = _monthly_counts(db, User.date_creation, since)
+    films_by_month = _dense_series_for_month_labels(month_labels, films_by_month_sparse)
+    users_by_month = _dense_series_for_month_labels(month_labels, users_by_month_sparse)
 
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -1014,6 +1054,7 @@ def admin_statistics_overview(
         "invites": {"codes_total": invites_total, "uses_total": invites_uses},
         "timeseries": {
             "months": months,
+            "month_labels": month_labels,
             "films_added_by_month": films_by_month,
             "users_registered_by_month": users_by_month,
         },

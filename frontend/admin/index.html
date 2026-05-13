@@ -4423,10 +4423,14 @@
       function _statMonthLabels(monthsBack) {
         const labels = [];
         const now = new Date();
+        const y = now.getUTCFullYear();
+        const mo = now.getUTCMonth();
         for (let i = monthsBack - 1; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const t = new Date(Date.UTC(y, mo - i, 1));
           labels.push(
-            d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"),
+            t.getUTCFullYear() +
+              "-" +
+              String(t.getUTCMonth() + 1).padStart(2, "0"),
           );
         }
         return labels;
@@ -4467,7 +4471,14 @@
           const v = data.vast || {};
           const inv = data.invites || {};
           const ts = data.timeseries || {};
-          const months = Math.min(24, Math.max(6, Number(ts.months) || 12));
+          const tsMonths = Number(ts.months) || 14;
+          const useApiDense =
+            Array.isArray(ts.month_labels) &&
+            ts.month_labels.length > 0 &&
+            Array.isArray(ts.films_added_by_month) &&
+            ts.films_added_by_month.length === ts.month_labels.length &&
+            Array.isArray(ts.users_registered_by_month) &&
+            ts.users_registered_by_month.length === ts.month_labels.length;
 
           genEl.textContent =
             "Données au " +
@@ -4616,9 +4627,20 @@
             }
           }
 
-          const monthLabels = _statMonthLabels(months);
-          const filmsMo = _seriesByMonth(ts.films_added_by_month, monthLabels);
-          const usersMo = _seriesByMonth(ts.users_registered_by_month, monthLabels);
+          const monthLabels = useApiDense
+            ? ts.month_labels
+            : _statMonthLabels(tsMonths);
+          const filmsMo = useApiDense
+            ? ts.films_added_by_month.map((x) => Number(x.count) || 0)
+            : _seriesByMonth(ts.films_added_by_month, monthLabels);
+          const usersMo = useApiDense
+            ? ts.users_registered_by_month.map((x) => Number(x.count) || 0)
+            : _seriesByMonth(ts.users_registered_by_month, monthLabels);
+
+          const chartAnim = {
+            duration: 900,
+            easing: "easeOutCubic",
+          };
 
           const ctxFM = document.getElementById("chart-films-month");
           if (ctxFM) {
@@ -4641,6 +4663,7 @@
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
+                  animation: chartAnim,
                   scales: {
                     x: { ticks: { maxRotation: 45, minRotation: 0 } },
                     y: { beginAtZero: true, ticks: { precision: 0 } },
@@ -4670,6 +4693,7 @@
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
+                  animation: chartAnim,
                   scales: {
                     x: { ticks: { maxRotation: 45, minRotation: 0 } },
                     y: { beginAtZero: true, ticks: { precision: 0 } },
@@ -5112,6 +5136,10 @@
             void refreshQueueVast();
           }
         }, 1600);
+        setInterval(() => {
+          const st = $("#page-statistics");
+          if (st && st.classList.contains("active")) void loadStatisticsPage();
+        }, 45000);
       }
 
       $("#btn-logout").addEventListener("click", async () => {
