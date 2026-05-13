@@ -365,6 +365,18 @@
         border: 0.5px solid rgba(153, 193, 102, 0.45);
         max-width: 280px;
       }
+      /* Support ticket detail: category + status on one row (base .gpu-pill is block-level flex). */
+      .st-detail-badges {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 10px;
+        margin-bottom: 12px;
+      }
+      .st-detail-badges .gpu-pill {
+        display: inline-flex;
+        max-width: min(100%, 240px);
+      }
       .dot {
         width: 6px;
         height: 6px;
@@ -2521,6 +2533,29 @@
                     </tbody>
                   </table>
                 </div>
+                <div
+                  id="st-pagination-wrap"
+                  style="
+                    display: none;
+                    padding: 10px 16px 14px;
+                    border-top: 1px solid var(--color-border-secondary);
+                    align-items: center;
+                    justify-content: space-between;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                  "
+                >
+                  <button type="button" class="btn" id="st-page-prev" disabled>
+                    ← Précédent
+                  </button>
+                  <span
+                    id="st-page-label"
+                    style="font-size: 12px; color: var(--color-text-tertiary)"
+                  ></span>
+                  <button type="button" class="btn" id="st-page-next" disabled>
+                    Suivant →
+                  </button>
+                </div>
               </div>
               <div class="card" id="st-detail-card" style="display: none">
                 <div class="card-head">
@@ -2533,15 +2568,10 @@
                     <strong id="st-detail-user">—</strong>
                     <span id="st-detail-email" style="color: var(--color-text-tertiary)"></span>
                   </p>
-                  <p style="margin-bottom: 12px">
-                    <span
-                      class="gpu-pill"
-                      id="st-detail-cat-pill"
-                      style="margin-right: 8px"
-                      >—</span
-                    >
+                  <div class="st-detail-badges" aria-label="Catégorie et statut">
+                    <span class="gpu-pill" id="st-detail-cat-pill">—</span>
                     <span class="gpu-pill" id="st-detail-st-pill">—</span>
-                  </p>
+                  </div>
                   <p
                     style="
                       font-weight: 600;
@@ -2616,6 +2646,19 @@
                   </select>
                   <button type="button" class="btn btn-primary" id="st-detail-save">
                     Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    id="st-detail-close-ticket"
+                    style="
+                      margin-left: 8px;
+                      border-color: #991b1b;
+                      color: #fca5a5;
+                      background: rgba(127, 29, 29, 0.2);
+                    "
+                  >
+                    Fermer le ticket
                   </button>
                   <p
                     id="st-detail-msg"
@@ -5478,6 +5521,8 @@
         closed: "Fermé",
       };
       let _stSelectedId = null;
+      let _stPageOffset = 0;
+      const _ST_PAGE_LIMIT = 25;
 
       function stEsc(s) {
         const d = document.createElement("div");
@@ -5491,8 +5536,32 @@
         const q = new URLSearchParams();
         if (st) q.set("status", st);
         if (cat) q.set("category", cat);
-        const s = q.toString();
-        return s ? "?" + s : "";
+        q.set("limit", String(_ST_PAGE_LIMIT));
+        q.set("offset", String(_stPageOffset));
+        return "?" + q.toString();
+      }
+
+      function _stUpdatePaginationUi(data) {
+        const wrap = document.getElementById("st-pagination-wrap");
+        const prev = document.getElementById("st-page-prev");
+        const next = document.getElementById("st-page-next");
+        const label = document.getElementById("st-page-label");
+        if (!wrap || !label) return;
+        const total = Number(data.total) || 0;
+        const offset = Number(data.offset) || 0;
+        const limit = Number(data.limit) || _ST_PAGE_LIMIT;
+        const count = Number(data.count) || 0;
+        if (total <= 0) {
+          wrap.style.display = "none";
+          return;
+        }
+        wrap.style.display = "flex";
+        const page = Math.floor(offset / limit) + 1;
+        const totalPages = Math.max(1, Math.ceil(total / limit));
+        label.textContent =
+          "Page " + page + " / " + totalPages + " · " + total + " ticket(s)";
+        if (prev) prev.disabled = offset <= 0;
+        if (next) next.disabled = offset + count >= total;
       }
 
       async function loadSupportTicketsAdmin(opts) {
@@ -5520,17 +5589,20 @@
               '<tr><td colspan="6" style="color:#f87171">' +
               String(t).replace(/</g, "&lt;") +
               "</td></tr>";
+            const pw = document.getElementById("st-pagination-wrap");
+            if (pw) pw.style.display = "none";
             return;
           }
           const data = await r.json();
           const rows = data.tickets || [];
           const total = data.total != null ? data.total : rows.length;
+          _stUpdatePaginationUi(data);
           if (meta) {
             meta.textContent =
               rows.length +
-              " affiché(s) · " +
+              " sur cette page · " +
               total +
-              " au total (filtres appliqués)";
+              " au total";
           }
           if (!rows.length) {
             tb.innerHTML =
@@ -5642,6 +5714,16 @@
           }
           $("#st-detail-reply").value = "";
           $("#st-detail-status").value = t.status || "open";
+          const closeBtn = document.getElementById("st-detail-close-ticket");
+          if (closeBtn) {
+            const isClosed = (t.status || "") === "closed";
+            closeBtn.disabled = isClosed;
+            closeBtn.style.opacity = isClosed ? "0.5" : "1";
+            closeBtn.style.cursor = isClosed ? "not-allowed" : "pointer";
+            closeBtn.title = isClosed
+              ? "Ticket déjà fermé"
+              : "Fermer définitivement — le spectateur ne pourra plus répondre";
+          }
         } catch (e) {
           if (e && e.message === "403-admin") return;
           if (msg) msg.textContent = "Erreur chargement détail.";
@@ -5652,9 +5734,66 @@
       if (_btnStRefresh) {
         _btnStRefresh.addEventListener("click", () => void loadSupportTicketsAdmin());
       }
+      const _btnStPrev = document.getElementById("st-page-prev");
+      if (_btnStPrev) {
+        _btnStPrev.addEventListener("click", () => {
+          _stPageOffset = Math.max(0, _stPageOffset - _ST_PAGE_LIMIT);
+          void loadSupportTicketsAdmin({ resetDetail: false });
+        });
+      }
+      const _btnStNext = document.getElementById("st-page-next");
+      if (_btnStNext) {
+        _btnStNext.addEventListener("click", () => {
+          _stPageOffset += _ST_PAGE_LIMIT;
+          void loadSupportTicketsAdmin({ resetDetail: false });
+        });
+      }
+      const _btnStCloseTicket = document.getElementById("st-detail-close-ticket");
+      if (_btnStCloseTicket) {
+        _btnStCloseTicket.addEventListener("click", async () => {
+          const msg = $("#st-detail-msg");
+          if (!_stSelectedId) {
+            if (msg) msg.textContent = "Sélectionnez un ticket dans la liste.";
+            return;
+          }
+          const ok = await showConfirmModal(
+            "Fermer le ticket",
+            "Le spectateur ne pourra plus envoyer de message sur ce ticket. Continuer ?",
+            { confirmText: "Fermer le ticket", cancelText: "Annuler" },
+          );
+          if (!ok) return;
+          if (msg) msg.textContent = "Fermeture…";
+          try {
+            const r = await api("/api/admin/support-tickets/" + _stSelectedId, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "closed" }),
+            });
+            if (!r.ok) {
+              let t = "Échec";
+              try {
+                const j = await r.json();
+                if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+              } catch (_) {}
+              if (msg) msg.textContent = t;
+              return;
+            }
+            if (msg) msg.textContent = "Ticket fermé.";
+            showAdminToast("Ticket fermé.", "success");
+            await loadSupportTicketsAdmin({ resetDetail: false });
+            await openSupportTicketDetail(_stSelectedId);
+          } catch (e) {
+            if (e && e.message === "403-admin") return;
+            if (msg) msg.textContent = "Erreur réseau.";
+          }
+        });
+      }
       const _btnStApply = document.getElementById("st-apply-filters");
       if (_btnStApply) {
-        _btnStApply.addEventListener("click", () => void loadSupportTicketsAdmin());
+        _btnStApply.addEventListener("click", () => {
+          _stPageOffset = 0;
+          void loadSupportTicketsAdmin();
+        });
       }
       const _btnStSave = document.getElementById("st-detail-save");
       if (_btnStSave) {
