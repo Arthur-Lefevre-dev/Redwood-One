@@ -112,6 +112,14 @@ class Settings(BaseSettings):
     # If True, bundle search for auto-picked transcode uses num_gpus eq 1 only (reduces CDI gpu=N failures on some hosts).
     VAST_TRANSCODE_SINGLE_GPU_ONLY: bool = True
 
+    # Billing / cost estimates for admin dashboard (not legal invoices).
+    # OVH-style object storage: € HT per GiB per hour (example default; override in .env).
+    BILLING_STORAGE_EUR_PER_GIB_HOUR_HT: float = 0.00000972
+    # Converts Vast.ai upper-bound USD estimates to EUR for display only.
+    BILLING_USD_TO_EUR: float = 0.92
+    # Optional flat estimate for local worker transcode (€ per minute of output), 0 = hide local line.
+    BILLING_LOCAL_TRANSCODE_EUR_PER_MINUTE: float = 0.0
+
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@redwoodplus.local"

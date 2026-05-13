@@ -1379,7 +1379,7 @@
             <div class="logo-text">Redwood Plus</div>
             <div class="logo-sub">Administration</div>
           </div>
-          <div class="nav-section">Principal</div>
+          <div class="nav-section">Contenu</div>
           <div class="nav-item active" data-page="pipeline">
             <span class="nav-icon">▦</span>
             Pipeline · Local
@@ -1394,7 +1394,16 @@
             Bibliothèque
             <span class="nav-badge" id="badge-lib">0</span>
           </div>
-          <div class="nav-section">Administration</div>
+          <div class="nav-section">Indicateurs</div>
+          <div class="nav-item" data-page="statistics">
+            <span class="nav-icon">⊞</span>
+            Statistiques
+          </div>
+          <div class="nav-item" data-page="billing">
+            <span class="nav-icon">€</span>
+            Coûts &amp; estimations
+          </div>
+          <div class="nav-section">Communication</div>
           <div class="nav-item" data-page="announcement">
             <span class="nav-icon">◆</span>
             Annonce spectateurs
@@ -1402,10 +1411,6 @@
           <div class="nav-item" data-page="donations">
             <span class="nav-icon">◈</span>
             Dons (crypto)
-          </div>
-          <div class="nav-item" data-page="statistics">
-            <span class="nav-icon">⊞</span>
-            Statistiques
           </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
@@ -2666,6 +2671,152 @@
                   "
                 >
                   —
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="page" id="page-billing">
+            <header class="topbar">
+              <div>
+                <div class="page-title">Coûts &amp; estimations</div>
+                <div class="page-sub">
+                  Stockage (€/Gio/h HT), transcodage Vast (borne haute), synthèses et graphiques
+                </div>
+              </div>
+              <div class="topbar-right">
+                <button type="button" class="btn btn-refresh" id="btn-billing-refresh">
+                  <span class="btn-refresh-glyph" aria-hidden="true">↻</span
+                  >Actualiser
+                </button>
+              </div>
+            </header>
+            <div class="content">
+              <p
+                id="bill-generated"
+                class="stats-footnote"
+                style="margin-top: 0; margin-bottom: 10px"
+              >
+                —
+              </p>
+              <ul
+                id="bill-disclaimers"
+                class="stats-footnote"
+                style="margin: 0 0 14px 1.1em; line-height: 1.55"
+              ></ul>
+              <div class="stat-grid" style="margin-bottom: 16px">
+                <div class="stat">
+                  <div class="stat-label">Stockage catalogue</div>
+                  <div class="stat-val" id="bill-kpi-gib">—</div>
+                  <div class="stat-sub" id="bill-kpi-gib-sub">Gio indexés</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Stockage · € / jour (HT)</div>
+                  <div class="stat-val" id="bill-kpi-st-eur-day">—</div>
+                  <div class="stat-sub">Au palier actuel</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Stockage · € / mois ~30 j.</div>
+                  <div class="stat-val" id="bill-kpi-st-eur-mo">—</div>
+                  <div class="stat-sub">Récurrent indicatif</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Vast · total estimé (€)</div>
+                  <div class="stat-val" id="bill-kpi-vast-eur">—</div>
+                  <div class="stat-sub" id="bill-kpi-vast-sub">—</div>
+                </div>
+                <div class="stat hidden" id="bill-kpi-local-wrap">
+                  <div class="stat-label">Transcodage local (€)</div>
+                  <div class="stat-val" id="bill-kpi-local-eur">—</div>
+                  <div class="stat-sub">Si taux / min configuré</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Prix réf. stockage</div>
+                  <div class="stat-val" id="bill-kpi-rate" style="font-size: 15px">—</div>
+                  <div class="stat-sub">€ HT / Gio / h</div>
+                </div>
+              </div>
+              <div class="card" style="margin-bottom: 16px">
+                <div class="card-head">
+                  <div class="card-title">Synthèse globale (indicatif)</div>
+                </div>
+                <div
+                  class="card-body"
+                  id="bill-global-card"
+                  style="
+                    font-size: 13px;
+                    line-height: 1.65;
+                    color: var(--color-text-secondary);
+                  "
+                >
+                  —
+                </div>
+              </div>
+              <div class="card" style="margin-bottom: 14px">
+                <div class="card-head">
+                  <div class="card-title">Récapitulatif annuel (stockage HT, somme des mois du graphe)</div>
+                </div>
+                <div
+                  class="card-body"
+                  id="bill-yearly-summary"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    font-family: var(--font-mono);
+                    line-height: 1.65;
+                  "
+                >
+                  —
+                </div>
+              </div>
+              <div class="stats-dash-charts">
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Coût stockage estimé par mois (€ HT)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-bill-storage-eur" aria-label="Stockage euros par mois"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Volume catalogue cumulé (Gio, proxy)</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-bill-storage-gib" aria-label="Gio cumulés"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Transcodage Vast · € estimés par mois</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-bill-vast-month" aria-label="Vast par mois"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Transcodage Vast · € estimés par jour</div>
+                  <div class="stats-chart-wrap">
+                    <canvas id="chart-bill-vast-day" aria-label="Vast par jour"></canvas>
+                  </div>
+                </div>
+                <div class="stats-chart-card">
+                  <div class="stats-chart-title">Titres Vast · coût estimé par film (top 18)</div>
+                  <div class="stats-chart-wrap" style="height: 320px">
+                    <canvas id="chart-bill-films-bar" aria-label="Coût par film"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="margin-top: 16px">
+                <div class="card-head">
+                  <div class="card-title">Détail par film (Vast, disponibles)</div>
+                </div>
+                <div class="card-body" style="overflow-x: auto">
+                  <table class="film-table">
+                    <thead>
+                      <tr>
+                        <th>Film</th>
+                        <th>Durée (min)</th>
+                        <th>Taille</th>
+                        <th>€ estimé</th>
+                      </tr>
+                    </thead>
+                    <tbody id="bill-film-rows"></tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -4133,6 +4284,7 @@
         }
         if (p === "gpu") loadGpuOnce();
         if (p === "statistics") void loadStatisticsPage();
+        if (p === "billing") void loadBillingPage();
         if (p === "pipeline") void refreshGpuPill();
         if (p === "pipeline-vast") pipelineVastEnterPage();
       }
@@ -4417,9 +4569,356 @@
         }
       }
 
+      let _billingCharts = [];
+
+      function _destroyBillingCharts() {
+        _billingCharts.forEach((c) => {
+          try {
+            c.destroy();
+          } catch (_) {}
+        });
+        _billingCharts = [];
+      }
+
+      function _fmtEurNum(n, maxD = 6) {
+        if (n == null || !Number.isFinite(Number(n))) return "—";
+        return Number(n).toLocaleString("fr-FR", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: maxD,
+        });
+      }
+
+      function _fmtGib(n) {
+        if (n == null || !Number.isFinite(Number(n))) return "—";
+        return (
+          Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio"
+        );
+      }
+
+      async function loadBillingPage() {
+        const genEl = $("#bill-generated");
+        if (!genEl) return;
+        if (typeof Chart === "undefined") {
+          genEl.textContent = "Chart.js indisponible.";
+          return;
+        }
+        Chart.defaults.color = "#a3a3a3";
+        Chart.defaults.borderColor = "rgba(63, 63, 70, 0.55)";
+        genEl.textContent = "Chargement…";
+        try {
+          const r = await api("/api/admin/billing/overview?months=20&vast_daily_days=90");
+          if (!r.ok) {
+            let t = "Échec du chargement.";
+            try {
+              const j = await r.json();
+              if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+            } catch (_) {}
+            genEl.textContent = t;
+            return;
+          }
+          const data = await r.json();
+          genEl.textContent =
+            "Données au " +
+            new Date(data.generated_at_utc || Date.now()).toLocaleString("fr-FR", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }) +
+            " (UTC)";
+
+          const ul = $("#bill-disclaimers");
+          if (ul) {
+            ul.innerHTML = "";
+            (data.disclaimers || []).forEach((line) => {
+              const li = document.createElement("li");
+              li.textContent = line;
+              ul.appendChild(li);
+            });
+          }
+
+          const stNow = data.storage_now || {};
+          const pr = data.pricing || {};
+          const tv = data.transcode_vast || {};
+          const tl = data.transcode_local || {};
+          const gl = data.global_estimates || {};
+          const ser = data.series || {};
+
+          const gCard = $("#bill-global-card");
+          if (gCard) {
+            const bits = [
+              "Stockage récurrent (~30 j.) : " +
+                _fmtEurNum(gl.recurring_storage_eur_per_month_ht_30d, 4) +
+                " € HT",
+              "Transcodage Vast (ponctuel, borne haute) : " +
+                _fmtEurNum(gl.one_time_vast_transcode_eur_upper, 2) +
+                " €",
+            ];
+            if (
+              gl.optional_local_transcode_eur != null &&
+              Number(gl.optional_local_transcode_eur) > 0
+            ) {
+              bits.push(
+                "Transcodage local (hypothèse) : " +
+                  _fmtEurNum(gl.optional_local_transcode_eur, 2) +
+                  " €",
+              );
+            }
+            gCard.textContent = bits.join(" · ");
+          }
+
+          const kGib = $("#bill-kpi-gib");
+          if (kGib) kGib.textContent = _fmtGib(stNow.total_gib);
+          const kGibS = $("#bill-kpi-gib-sub");
+          if (kGibS) kGibS.textContent = "Somme taille_octets (catalogue)";
+
+          const kd = $("#bill-kpi-st-eur-day");
+          if (kd) kd.textContent = _fmtEurNum(stNow.est_eur_per_day_storage_ht, 5) + " €";
+          const km = $("#bill-kpi-st-eur-mo");
+          if (km) km.textContent = _fmtEurNum(stNow.est_eur_per_month_storage_30d_ht, 4) + " €";
+
+          const kv = $("#bill-kpi-vast-eur");
+          if (kv) kv.textContent = _fmtEurNum(tv.est_total_rental_eur_upper, 2) + " €";
+          const kvs = $("#bill-kpi-vast-sub");
+          if (kvs)
+            kvs.textContent =
+              (tv.films_disponible_count ?? "0") + " titres · borne haute durée × $/h";
+
+          const kr = $("#bill-kpi-rate");
+          if (kr) kr.textContent = _fmtEurNum(pr.storage_eur_per_gib_hour_ht, 8);
+
+          const locWrap = $("#bill-kpi-local-wrap");
+          const locE = $("#bill-kpi-local-eur");
+          if (tl.est_total_eur != null && Number(tl.est_total_eur) > 0) {
+            if (locWrap) locWrap.classList.remove("hidden");
+            if (locE) locE.textContent = _fmtEurNum(tl.est_total_eur, 2) + " €";
+          } else {
+            if (locWrap) locWrap.classList.add("hidden");
+          }
+
+          const ysum = $("#bill-yearly-summary");
+          if (ysum) {
+            const yy = ser.storage_cost_by_year_eur_ht || [];
+            ysum.textContent = yy.length
+              ? yy
+                  .map(
+                    (row) =>
+                      row.year +
+                      " · " +
+                      _fmtEurNum(row.est_storage_eur_sum_months_ht, 4) +
+                      " € HT (somme mois)",
+                  )
+                  .join("\n")
+              : "Pas assez d’historique sur la fenêtre demandée.";
+          }
+
+          _destroyBillingCharts();
+
+          const sm = ser.storage_monthly || [];
+          const labelsM = sm.map((x) => x.month);
+          const eurStM = sm.map((x) => Number(x.est_storage_eur_month_trapezoid_ht) || 0);
+          const gibCum = sm.map((x) => Number(x.cumulative_gib) || 0);
+
+          const ctx1 = document.getElementById("chart-bill-storage-eur");
+          if (ctx1) {
+            _billingCharts.push(
+              new Chart(ctx1, {
+                type: "line",
+                data: {
+                  labels: labelsM,
+                  datasets: [
+                    {
+                      label: "€ HT stockage (trapèze)",
+                      data: eurStM,
+                      tension: 0.2,
+                      fill: true,
+                      borderColor: "#22c55e",
+                      backgroundColor: "rgba(34, 197, 94, 0.12)",
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45 } },
+                    y: { beginAtZero: true },
+                  },
+                },
+              }),
+            );
+          }
+
+          const ctx2 = document.getElementById("chart-bill-storage-gib");
+          if (ctx2) {
+            _billingCharts.push(
+              new Chart(ctx2, {
+                type: "line",
+                data: {
+                  labels: labelsM,
+                  datasets: [
+                    {
+                      label: "Gio cumulés (proxy)",
+                      data: gibCum,
+                      tension: 0.2,
+                      borderColor: "#38bdf8",
+                      backgroundColor: "rgba(56, 189, 248, 0.12)",
+                      fill: true,
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45 } },
+                    y: { beginAtZero: true },
+                  },
+                },
+              }),
+            );
+          }
+
+          const vm = ser.vast_transcode_eur_by_month || [];
+          const ctx3 = document.getElementById("chart-bill-vast-month");
+          if (ctx3) {
+            _billingCharts.push(
+              new Chart(ctx3, {
+                type: "bar",
+                data: {
+                  labels: vm.map((x) => x.month),
+                  datasets: [
+                    {
+                      label: "€ estimé Vast",
+                      data: vm.map((x) => Number(x.est_vast_rental_eur) || 0),
+                      backgroundColor: "rgba(139, 37, 0, 0.75)",
+                      borderColor: "#8b2500",
+                      borderWidth: 1,
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 45 } },
+                    y: { beginAtZero: true },
+                  },
+                },
+              }),
+            );
+          }
+
+          const vd = ser.vast_transcode_eur_by_day || [];
+          const ctx4 = document.getElementById("chart-bill-vast-day");
+          if (ctx4) {
+            _billingCharts.push(
+              new Chart(ctx4, {
+                type: "line",
+                data: {
+                  labels: vd.map((x) => x.day),
+                  datasets: [
+                    {
+                      label: "€ / jour (ajouts)",
+                      data: vd.map((x) => Number(x.est_vast_rental_eur) || 0),
+                      tension: 0.15,
+                      fill: true,
+                      borderColor: "#f97316",
+                      backgroundColor: "rgba(249, 115, 22, 0.12)",
+                    },
+                  ],
+                },
+                options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { ticks: { maxRotation: 60, autoSkip: true, maxTicksLimit: 14 } },
+                    y: { beginAtZero: true },
+                  },
+                },
+              }),
+            );
+          }
+
+          const films = (tv.per_film_top || []).slice(0, 18);
+          const ctx5 = document.getElementById("chart-bill-films-bar");
+          if (ctx5 && films.length) {
+            _billingCharts.push(
+              new Chart(ctx5, {
+                type: "bar",
+                data: {
+                  labels: films.map((f) =>
+                    (f.titre || "#" + f.id).length > 42
+                      ? (f.titre || "").slice(0, 40) + "…"
+                      : f.titre || "#" + f.id,
+                  ),
+                  datasets: [
+                    {
+                      label: "€ estimé",
+                      data: films.map((f) => Number(f.est_vast_rental_eur) || 0),
+                      backgroundColor: "rgba(168, 85, 247, 0.65)",
+                      borderColor: "#a855f7",
+                      borderWidth: 1,
+                    },
+                  ],
+                },
+                options: {
+                  indexAxis: "y",
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    x: { beginAtZero: true },
+                  },
+                },
+              }),
+            );
+          }
+
+          const tb = $("#bill-film-rows");
+          if (tb) {
+            tb.innerHTML = "";
+            (tv.per_film_top || []).forEach((f) => {
+              const tr = document.createElement("tr");
+              const td1 = document.createElement("td");
+              td1.textContent = f.titre || "";
+              const td2 = document.createElement("td");
+              td2.textContent = f.duree_min != null ? String(f.duree_min) : "—";
+              const td3 = document.createElement("td");
+              const sz = f.taille_octets;
+              if (sz != null && Number(sz) > 0) {
+                const gb = Number(sz) / 1024 ** 3;
+                td3.textContent =
+                  gb.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio";
+              } else {
+                td3.textContent = "—";
+              }
+              const td4 = document.createElement("td");
+              const eur = f.est_vast_rental_eur;
+              td4.textContent = eur != null ? _fmtEurNum(eur, 4) + " €" : "—";
+              tr.appendChild(td1);
+              tr.appendChild(td2);
+              tr.appendChild(td3);
+              tr.appendChild(td4);
+              tb.appendChild(tr);
+            });
+          }
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          const hint =
+            e && e.message ? String(e.message).slice(0, 220) : "erreur inconnue";
+          genEl.textContent =
+            "Impossible d’afficher la facturation : " +
+            hint +
+            ". Vérifiez la console (F12) si besoin.";
+        }
+      }
+
       const _btnStatsRef = document.getElementById("btn-stats-refresh");
       if (_btnStatsRef) {
         _btnStatsRef.addEventListener("click", () => void loadStatisticsPage());
+      }
+
+      const _btnBillingRef = document.getElementById("btn-billing-refresh");
+      if (_btnBillingRef) {
+        _btnBillingRef.addEventListener("click", () => void loadBillingPage());
       }
 
       async function boot() {
