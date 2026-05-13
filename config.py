@@ -129,6 +129,15 @@ class Settings(BaseSettings):
     # Optional flat estimate for local worker transcode (€ per minute of output), 0 = hide local line.
     BILLING_LOCAL_TRANSCODE_EUR_PER_MINUTE: float = 0.0
 
+    # Watch pages: optional Coinzilla tag (e.g. popunder). Paste the async script URL from the publisher dashboard.
+    WATCH_ADS_COINZILLA_ENABLED: bool = False
+    WATCH_ADS_COINZILLA_SCRIPT_SRC: str = ""
+    # If your snippet uses data-zone (or similar), set the zone id here; otherwise leave empty.
+    WATCH_ADS_COINZILLA_ZONE_ID: str = ""
+
+    TORRENT_AUTO_RETRY_ENABLED: bool = True
+    TORRENT_AUTO_RETRY_MAX: int = 5
+
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "admin"
     ADMIN_EMAIL: str = "admin@redwoodplus.local"

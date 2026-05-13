@@ -177,6 +177,60 @@ def _ensure_films_pipeline_celery_columns() -> None:
     logger.info("database schema: ensured films pipeline Celery columns (sqlite)")
 
 
+def _ensure_films_pipeline_staging_path_column() -> None:
+    """Persist upload path for POST /queue/jobs/{id}/retry-local after admin cancel."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE films ADD COLUMN IF NOT EXISTS pipeline_staging_path VARCHAR(1024)"
+                )
+            )
+        logger.info("database schema: ensured films.pipeline_staging_path (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    with engine.begin() as conn:
+        if "pipeline_staging_path" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN pipeline_staging_path VARCHAR(1024)"))
+    logger.info("database schema: ensured films.pipeline_staging_path (sqlite)")
+
+
+def _ensure_films_torrent_retry_columns() -> None:
+    """Magnet/blob path + auto-retry counter for Celery beat torrent re-download."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE films ADD COLUMN IF NOT EXISTS torrent_magnet_uri TEXT")
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE films ADD COLUMN IF NOT EXISTS torrent_blob_path VARCHAR(1024)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE films ADD COLUMN IF NOT EXISTS torrent_auto_retry_count INTEGER"
+                )
+            )
+        logger.info("database schema: ensured films torrent retry columns (postgresql)")
+        return
+    insp = inspect(engine)
+    if "films" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("films")}
+    with engine.begin() as conn:
+        if "torrent_magnet_uri" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN torrent_magnet_uri TEXT"))
+        if "torrent_blob_path" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN torrent_blob_path VARCHAR(1024)"))
+        if "torrent_auto_retry_count" not in cols:
+            conn.execute(text("ALTER TABLE films ADD COLUMN torrent_auto_retry_count INTEGER"))
+    logger.info("database schema: ensured films torrent retry columns (sqlite)")
+
+
 def _ensure_films_vast_pending_columns() -> None:
     """Store S3 vast-test job token on film for POST /transcode/vast/retry after failures."""
     if engine.dialect.name == "postgresql":
@@ -649,6 +703,8 @@ def init_db() -> None:
     _ensure_films_transcode_target_columns()
     _ensure_films_vast_pending_columns()
     _ensure_films_pipeline_celery_columns()
+    _ensure_films_pipeline_staging_path_column()
+    _ensure_films_torrent_retry_columns()
     _ensure_films_imdb_title_id_column()
     _ensure_user_invite_column()
     _ensure_user_deactivated_at_column()
