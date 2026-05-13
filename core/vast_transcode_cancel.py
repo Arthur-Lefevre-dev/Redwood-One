@@ -86,6 +86,7 @@ def cleanup_vast_transcode_artifacts(meta: Dict[str, Any]) -> Dict[str, Any]:
         ext = se.strip() if se.startswith(".") else f".{se.strip()}"
         keys.append(f"vast-test/{base}/input{ext}")
         keys.append(f"vast-test/{base}/output.mp4")
+    seen: set[str] = set()
     for k in keys:
         if not k or k in seen:
             continue
