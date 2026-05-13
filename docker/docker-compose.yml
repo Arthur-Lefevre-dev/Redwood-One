@@ -130,6 +130,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      # On VPS with HTTPS, swap nginx.conf for nginx.production.conf (same mount target).
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ../frontend:/usr/share/nginx/html:ro
       - ../nginx/maintenance.html:/usr/share/nginx/html/maintenance.html:ro
