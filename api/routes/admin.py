@@ -1,6 +1,7 @@
 """Admin-only routes: upload, queue, system, users, torrents."""
 
 import base64
+import calendar
 import logging
 import os
 import re
@@ -8,7 +9,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -846,6 +847,12 @@ def _month_bucket_expr(column, dialect_name: str):
     return func.strftime("%Y-%m", column)
 
 
+def _day_bucket_expr(column, dialect_name: str):
+    if dialect_name == "postgresql":
+        return func.date_trunc("day", column)
+    return func.strftime("%Y-%m-%d", column)
+
+
 def _monthly_counts(db: Session, column, since: datetime) -> List[Dict[str, Any]]:
     dialect = db.get_bind().dialect.name
     bucket = _month_bucket_expr(column, dialect)
@@ -1010,6 +1017,281 @@ def admin_statistics_overview(
             "films_added_by_month": films_by_month,
             "users_registered_by_month": users_by_month,
         },
+    }
+
+
+def _billing_month_label(bucket_val: Any, dialect: str) -> str:
+    if bucket_val is None:
+        return ""
+    if dialect == "postgresql":
+        try:
+            return bucket_val.date().isoformat()[:7]
+        except Exception:
+            return str(bucket_val)[:7]
+    return str(bucket_val)[:7]
+
+
+def _billing_day_label(bucket_val: Any, dialect: str) -> str:
+    if bucket_val is None:
+        return ""
+    if dialect == "postgresql":
+        try:
+            return bucket_val.date().isoformat()[:10]
+        except Exception:
+            return str(bucket_val)[:10]
+    return str(bucket_val)[:10]
+
+
+def _iter_month_labels(from_month: str, to_month: str) -> List[str]:
+    """from_month / to_month as YYYY-MM inclusive."""
+    y1, m1 = int(from_month[:4]), int(from_month[5:7])
+    y2, m2 = int(to_month[:4]), int(to_month[5:7])
+    out: List[str] = []
+    y, m = y1, m1
+    while (y, m) <= (y2, m2):
+        out.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    return out
+
+
+@router.get("/billing/overview")
+def admin_billing_overview(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+    months: int = Query(18, ge=3, le=60, description="Months of monthly storage / Vast series."),
+    vast_daily_days: int = Query(90, ge=7, le=120, description="Days for Vast est. daily chart."),
+):
+    """
+    Billing-oriented estimates: storage (€/GiB/h HT), Vast transcode upper bound (USD→EUR),
+    per-film hints, monthly/daily series from DB (no S3 byte audit).
+    """
+    s = get_settings()
+    dialect = db.get_bind().dialect.name
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = now - timedelta(days=32 * months)
+    since_day = now - timedelta(days=int(vast_daily_days))
+
+    rate_gib_h = float(getattr(s, "BILLING_STORAGE_EUR_PER_GIB_HOUR_HT", 0.0) or 0.0)
+    usd_to_eur = float(getattr(s, "BILLING_USD_TO_EUR", 0.92) or 0.92)
+    dph_usd = float(s.VAST_MAX_DPH_PER_HOUR)
+    local_eur_per_min = float(getattr(s, "BILLING_LOCAL_TRANSCODE_EUR_PER_MINUTE", 0.0) or 0.0)
+
+    sum_bytes_row = (
+        db.query(func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+        )
+        .scalar()
+    )
+    total_bytes = int(sum_bytes_row or 0)
+    total_gib = total_bytes / (1024.0**3) if total_bytes else 0.0
+    eur_per_day_storage = total_gib * 24.0 * rate_gib_h if rate_gib_h > 0 else 0.0
+    eur_per_month_storage_30 = eur_per_day_storage * 30.0
+
+    bucket_m = _month_bucket_expr(Film.date_ajout, dialect)
+    storage_rows = (
+        db.query(bucket_m, func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+            Film.date_ajout >= since,
+        )
+        .group_by(bucket_m)
+        .order_by(bucket_m)
+        .all()
+    )
+    bytes_by_month: Dict[str, int] = {}
+    for b, nbytes in storage_rows:
+        lab = _billing_month_label(b, dialect)
+        if lab:
+            bytes_by_month[lab] = int(nbytes or 0)
+
+    first_month = (now - timedelta(days=32 * months)).strftime("%Y-%m")[:7]
+    current_month = now.strftime("%Y-%m")[:7]
+    month_axis = _iter_month_labels(first_month[:7], current_month)
+    cumulative_bytes = 0
+    storage_monthly: List[Dict[str, Any]] = []
+    prev_gib_end = 0.0
+    for lab in month_axis:
+        cumulative_bytes += int(bytes_by_month.get(lab, 0))
+        gib_end = cumulative_bytes / (1024.0**3)
+        y, m = int(lab[:4]), int(lab[5:7])
+        dim = calendar.monthrange(y, m)[1]
+        gib_start = prev_gib_end
+        if rate_gib_h > 0:
+            avg_gib = (gib_start + gib_end) / 2.0
+            eur_month_storage = avg_gib * rate_gib_h * 24.0 * float(dim)
+        else:
+            eur_month_storage = 0.0
+        storage_monthly.append(
+            {
+                "month": lab,
+                "bytes_added_month": int(bytes_by_month.get(lab, 0)),
+                "cumulative_bytes_catalog_proxy": cumulative_bytes,
+                "cumulative_gib": round(gib_end, 4),
+                "est_storage_eur_month_trapezoid_ht": round(eur_month_storage, 6),
+            }
+        )
+        prev_gib_end = gib_end
+
+    by_year: Dict[str, float] = {}
+    for row in storage_monthly:
+        yk = str(row["month"])[:4]
+        by_year[yk] = by_year.get(yk, 0.0) + float(row["est_storage_eur_month_trapezoid_ht"])
+    storage_yearly = [
+        {"year": y, "est_storage_eur_sum_months_ht": round(v, 4)} for y, v in sorted(by_year.items())
+    ]
+
+    bucket_d = _day_bucket_expr(Film.date_ajout, dialect)
+    vast_day_rows = (
+        db.query(bucket_d, func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(
+            Film.transcode_target == "vast",
+            Film.statut == FilmStatut.disponible,
+            Film.date_ajout >= since_day,
+        )
+        .group_by(bucket_d)
+        .order_by(bucket_d)
+        .all()
+    )
+    vast_eur_by_day: List[Dict[str, Any]] = []
+    for b, mins in vast_day_rows:
+        dlab = _billing_day_label(b, dialect)
+        mval = int(mins or 0)
+        usd = (mval / 60.0) * dph_usd if mval > 0 else 0.0
+        vast_eur_by_day.append(
+            {
+                "day": dlab,
+                "films_minutes_sum": mval,
+                "est_vast_rental_usd": round(usd, 4),
+                "est_vast_rental_eur": round(usd * usd_to_eur, 4),
+            }
+        )
+
+    bucket_mv = _month_bucket_expr(Film.date_ajout, dialect)
+    vast_month_rows = (
+        db.query(bucket_mv, func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(
+            Film.transcode_target == "vast",
+            Film.statut == FilmStatut.disponible,
+            Film.date_ajout >= since,
+        )
+        .group_by(bucket_mv)
+        .order_by(bucket_mv)
+        .all()
+    )
+    vast_eur_by_month: List[Dict[str, Any]] = []
+    for b, mins in vast_month_rows:
+        mlab = _billing_month_label(b, dialect)
+        mval = int(mins or 0)
+        usd = (mval / 60.0) * dph_usd if mval > 0 else 0.0
+        vast_eur_by_month.append(
+            {
+                "month": mlab,
+                "films_minutes_sum": mval,
+                "est_vast_rental_usd": round(usd, 4),
+                "est_vast_rental_eur": round(usd * usd_to_eur, 4),
+            }
+        )
+
+    vast_films = (
+        db.query(Film)
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .order_by(func.coalesce(Film.duree_min, 0).desc())
+        .limit(40)
+        .all()
+    )
+    vast_done_count = int(
+        db.query(func.count(Film.id))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+        or 0
+    )
+    vast_minutes_all_row = (
+        db.query(func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(Film.transcode_target == "vast", Film.statut == FilmStatut.disponible)
+        .scalar()
+    )
+    vast_total_usd = (int(vast_minutes_all_row or 0) / 60.0) * dph_usd
+
+    per_film: List[Dict[str, Any]] = []
+    for f in vast_films:
+        usd_one = _estimated_gpu_rental_usd(f.duree_min, dph_usd)
+        u = float(usd_one) if usd_one is not None else 0.0
+        per_film.append(
+            {
+                "id": f.id,
+                "titre": (f.titre or "")[:512],
+                "duree_min": f.duree_min,
+                "taille_octets": f.taille_octets,
+                "est_vast_rental_usd": usd_one,
+                "est_vast_rental_eur": round(u * usd_to_eur, 4) if u else None,
+            }
+        )
+
+    local_minutes_row = (
+        db.query(func.coalesce(func.sum(Film.duree_min), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.traitement == FilmTraitement.transcode,
+            or_(Film.transcode_target.is_(None), Film.transcode_target == "local"),
+        )
+        .scalar()
+    )
+    local_minutes = int(local_minutes_row or 0)
+    local_est_eur = (
+        round(local_minutes * local_eur_per_min, 2) if local_eur_per_min > 0 and local_minutes else None
+    )
+
+    vast_total_eur = round(vast_total_usd * usd_to_eur, 2)
+
+    return {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "pricing": {
+            "storage_eur_per_gib_hour_ht": rate_gib_h,
+            "vast_max_dph_usd": dph_usd,
+            "usd_to_eur_assumption": usd_to_eur,
+            "local_transcode_eur_per_minute": local_eur_per_min,
+        },
+        "storage_now": {
+            "total_bytes": total_bytes,
+            "total_gib": round(total_gib, 4),
+            "est_eur_per_day_storage_ht": round(eur_per_day_storage, 6),
+            "est_eur_per_month_storage_30d_ht": round(eur_per_month_storage_30, 4),
+        },
+        "transcode_vast": {
+            "films_disponible_count": vast_done_count,
+            "est_total_rental_usd_upper": round(vast_total_usd, 2),
+            "est_total_rental_eur_upper": vast_total_eur,
+            "per_film_top": per_film,
+        },
+        "transcode_local": {
+            "catalog_transcoded_minutes": local_minutes,
+            "est_total_eur": local_est_eur,
+        },
+        "global_estimates": {
+            "one_time_vast_transcode_eur_upper": vast_total_eur,
+            "recurring_storage_eur_per_month_ht_30d": round(eur_per_month_storage_30, 4),
+            "optional_local_transcode_eur": local_est_eur,
+        },
+        "series": {
+            "months_requested": months,
+            "storage_monthly": storage_monthly,
+            "storage_cost_by_year_eur_ht": storage_yearly,
+            "vast_transcode_eur_by_month": vast_eur_by_month,
+            "vast_transcode_eur_by_day": vast_eur_by_day,
+        },
+        "disclaimers": [
+            "Les montants Vast sont une borne haute (durée catalogue × VAST_MAX_DPH_PER_HOUR), pas la facture Vast.ai.",
+            "Le stockage utilise la somme des taille_octets des fiches « disponibles », pas un inventaire S3 temps réel.",
+            "Coût stockage mois par mois : moyenne trapézoïdale des Gio cumulés (proxy par date d’ajout) × €/(Gio·h) × heures du mois.",
+        ],
     }
 
 
