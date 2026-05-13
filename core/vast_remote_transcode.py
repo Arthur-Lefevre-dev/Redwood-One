@@ -239,15 +239,45 @@ def run_vast_transcode_test(
         meta(**meta_kw)
         if is_cancel_requested(rid):
             raise RuntimeError("Cancelled by user")
-        raw = vast_ai.create_instance(
-            oid,
-            image=image,
-            disk_gb=disk,
-            runtype="ssh_direct",
-            label=f"redwood-vast-tx-{job_token[:10]}",
-            env=env,
-            onstart=VAST_TRANSCODE_ONSTART,
-        )
+        raw: Optional[Dict[str, Any]] = None
+        last_create_err: Optional[RuntimeError] = None
+        for attempt in range(3):
+            try:
+                raw = vast_ai.create_instance(
+                    oid,
+                    image=image,
+                    disk_gb=disk,
+                    runtype="ssh_direct",
+                    label=f"redwood-vast-tx-{job_token[:10]}",
+                    env=env,
+                    onstart=VAST_TRANSCODE_ONSTART,
+                )
+                last_create_err = None
+                break
+            except RuntimeError as e:
+                last_create_err = e
+                if not vast_ai.is_no_such_ask_error(e) or attempt >= 2:
+                    raise
+                first = vast_ai.pick_first_verified_bundle_offer(
+                    vast_ai.default_gpu_name_list(),
+                    search_limit=64,
+                )
+                oid = int(first["id"])
+                picked_gpu_name = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
+                logger.warning(
+                    "vast create_instance stale offer (attempt %s); repicked offer_id=%s gpu=%s",
+                    attempt + 1,
+                    oid,
+                    picked_gpu_name or "?",
+                )
+                meta_kw["offer_id"] = oid
+                if picked_gpu_name:
+                    meta_kw["picked_gpu_name"] = picked_gpu_name
+                meta(**meta_kw)
+                if is_cancel_requested(rid):
+                    raise RuntimeError("Cancelled by user")
+        if raw is None:
+            raise last_create_err or RuntimeError("Vast create_instance failed without response")
         inst_id = raw.get("new_contract") if isinstance(raw, dict) else None
         if inst_id is None:
             raise RuntimeError(f"Vast create_instance returned no new_contract: {raw!r}")

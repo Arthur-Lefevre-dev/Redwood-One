@@ -12,11 +12,17 @@ from db.models import Base
 
 _settings = get_settings()
 
-engine = create_engine(
-    _settings.DATABASE_URL,
-    pool_pre_ping=True,
-    echo=False,
-)
+_engine_kw: dict = {"pool_pre_ping": True, "echo": False}
+# Default pool (5 + 10 overflow) starves under parallel admin polling + Celery DB use on one engine.
+if str(_settings.DATABASE_URL).startswith("postgresql"):
+    _engine_kw.update(
+        pool_size=int(getattr(_settings, "SQLALCHEMY_POOL_SIZE", 20) or 20),
+        max_overflow=int(getattr(_settings, "SQLALCHEMY_MAX_OVERFLOW", 40) or 40),
+        pool_timeout=int(getattr(_settings, "SQLALCHEMY_POOL_TIMEOUT", 60) or 60),
+        pool_recycle=int(getattr(_settings, "SQLALCHEMY_POOL_RECYCLE", 1800) or 1800),
+    )
+
+engine = create_engine(_settings.DATABASE_URL, **_engine_kw)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

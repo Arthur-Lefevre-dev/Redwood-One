@@ -43,16 +43,33 @@ def probe(path: str | Path) -> Dict[str, Any]:
         "-show_streams",
         str(p),
     ]
+    # Keep stderr separate: merging STDERR into STDOUT breaks JSON when ffprobe prints warnings.
     try:
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, timeout=120)
-    except subprocess.CalledProcessError as e:
-        raise FFprobeError(e.output.decode(errors="replace") if e.output else str(e)) from e
+        completed = subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=120,
+            check=False,
+        )
     except FileNotFoundError as e:
         raise FFprobeError("ffprobe not installed") from e
+    if completed.returncode != 0:
+        err = (completed.stderr or b"").decode(errors="replace").strip()
+        tail = (completed.stdout or b"")[:4000].decode(errors="replace").strip()
+        raise FFprobeError(
+            f"ffprobe exited {completed.returncode}: {err or 'no stderr'}{'; stdout: ' + tail if tail else ''}"
+        )
+    out = completed.stdout or b""
+    if out.startswith(b"\xef\xbb\xbf"):
+        out = out[3:]
+    text = out.decode(errors="replace").strip()
+    if not text:
+        raise FFprobeError("ffprobe returned empty stdout")
     try:
-        return json.loads(out.decode())
+        return json.loads(text)
     except json.JSONDecodeError as e:
-        raise FFprobeError(f"invalid ffprobe json: {e}") from e
+        preview = text[:500].replace("\n", "\\n")
+        raise FFprobeError(f"invalid ffprobe json: {e}; stdout_preview={preview!r}") from e
 
 
 def summarize(data: Dict[str, Any]) -> Dict[str, Any]:

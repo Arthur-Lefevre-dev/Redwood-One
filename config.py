@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     )
 
     DATABASE_URL: str = "postgresql://redwood:redwood@localhost:5432/redwood"
+    # SQLAlchemy QueuePool (PostgreSQL only; SQLite uses defaults). Raise if admin UI + workers exhaust pool.
+    SQLALCHEMY_POOL_SIZE: int = 20
+    SQLALCHEMY_MAX_OVERFLOW: int = 40
+    SQLALCHEMY_POOL_TIMEOUT: int = 60
+    SQLALCHEMY_POOL_RECYCLE: int = 1800
 
     # Celery broker: build URL with URL-encoded password so special chars (@ : # / …)
     # never break kombu's parser (avoid ValueError on broker URL).

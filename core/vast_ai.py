@@ -245,6 +245,12 @@ def create_instance(
     return data if isinstance(data, dict) else {"result": data}
 
 
+def is_no_such_ask_error(exc: BaseException) -> bool:
+    """True if create_instance failed because the bundle offer id is gone (stale admin pick)."""
+    s = str(exc).lower()
+    return "no_such_ask" in s or "is not available" in s
+
+
 def destroy_instance(instance_id: int) -> Dict[str, Any]:
     """DELETE /instances/{id}/ — destroy instance (irreversible)."""
     api_key = require_vast_api_key()
@@ -256,6 +262,10 @@ def destroy_instance(instance_id: int) -> Dict[str, Any]:
         except Exception:
             data = {"raw": (r.text or "")[:2000]}
         if r.status_code >= 400:
+            # Idempotent cleanup: instance may already be gone (SIGTERM, failed create, provider reclaim).
+            if r.status_code == 404 and isinstance(data, dict) and data.get("error") == "no_such_instance":
+                logger.info("vast destroy_instance: instance %s already absent (404)", instance_id)
+                return {"success": True, "already_deleted": True, **data}
             raise RuntimeError(f"vast destroy_instance HTTP {r.status_code}: {data}")
     return data if isinstance(data, dict) else {"result": data}
 
