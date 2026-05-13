@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     # Comma-separated ISO 3166-1 alpha-2 codes excluded from Vast bundle search (geolocation notin + response filter).
     # Default excludes China (CN). Empty string = do not exclude any country.
     VAST_EXCLUDE_GEOLOCATION_CODES: str = "CN"
+    # Comma-separated bundle machine_id / host_id to never auto-pick (buggy hosts). Dashboard shows these;
+    # instance contract id changes each rental — use machine/host to block the physical host.
+    VAST_SKIP_MACHINE_IDS: str = ""
+    VAST_SKIP_HOST_IDS: str = ""
     # Remote transcode on Vast (Celery): Docker image on Vast (CUDA runtime + apt ffmpeg in onstart).
     VAST_TRANSCODE_DOCKER_IMAGE: str = "nvidia/cuda:12.3.1-runtime-ubuntu22.04"
     # Mount all driver libs (incl. NVENC); "compute" alone often breaks h264_nvenc on Vast.
@@ -95,7 +99,7 @@ class Settings(BaseSettings):
     # Docker/CDI try to inject every host GPU (e.g. gpu=3) and fail with "unresolvable CDI devices".
     VAST_TRANSCODE_NVIDIA_VISIBLE_DEVICES: str = "0"
     # If non-empty, onstart downloads this BtbN FFmpeg tarball (NVENC-friendly) before encoding.
-    # Empty string skips download and uses apt ffmpeg only (NVENC often fails on stock Ubuntu 4.4 + Vast).
+    # Empty skips download and uses apt ffmpeg only (NVENC often fails vs host driver on Vast despite GPU).
     VAST_TRANSCODE_BTBH_FFMPEG_URL: str = (
         "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
         "ffmpeg-master-latest-linux64-gpl.tar.xz"
@@ -109,6 +113,8 @@ class Settings(BaseSettings):
     VAST_TRANSCODE_MAX_WAIT_SEC: int = 7200
     # Seconds to wait in onstart for /dev/nvidia0 (Vast can attach GPU nodes slightly after boot).
     VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC: int = 90
+    # If an instance never exposes /dev/nvidia0, destroy it and try another offer (auto-pick only), up to this many rounds.
+    VAST_TRANSCODE_NO_GPU_MAX_RETRIES: int = 6
     # If True, bundle search for auto-picked transcode uses num_gpus eq 1 only (reduces CDI gpu=N failures on some hosts).
     VAST_TRANSCODE_SINGLE_GPU_ONLY: bool = True
 
