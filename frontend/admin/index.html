@@ -2,7 +2,10 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
     <title>Administration — Redwood Plus</title>
     <style>
       :root {
@@ -1124,6 +1127,233 @@
         margin-top: 12px;
         max-width: 920px;
       }
+
+      /* —— Mobile layout (drawer nav + responsive content) —— */
+      .mobile-nav-backdrop {
+        display: none;
+      }
+      .mobile-nav-header {
+        display: none;
+      }
+
+      @media (max-width: 768px) {
+        body.admin-mobile-nav-open {
+          overflow: hidden;
+        }
+        .admin-shell {
+          margin: 0 !important;
+          border-radius: 0 !important;
+          border-left: none !important;
+          border-right: none !important;
+          min-height: 100dvh;
+        }
+        .layout {
+          grid-template-columns: 1fr;
+          min-height: 100dvh;
+        }
+        .sidebar {
+          position: fixed;
+          z-index: 200;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: min(288px, 88vw);
+          max-width: 100%;
+          transform: translateX(-102%);
+          transition: transform 0.22s ease;
+          box-shadow: none;
+          padding-top: max(12px, env(safe-area-inset-top, 0px));
+          padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        body.admin-mobile-nav-open .sidebar {
+          transform: translateX(0);
+          box-shadow: 8px 0 32px rgba(0, 0, 0, 0.45);
+        }
+        .sidebar .nav-item {
+          min-height: 44px;
+          padding-top: 10px;
+          padding-bottom: 10px;
+        }
+        .mobile-nav-backdrop {
+          display: block;
+          position: fixed;
+          inset: 0;
+          z-index: 150;
+          background: rgba(0, 0, 0, 0.48);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+        }
+        body.admin-mobile-nav-open .mobile-nav-backdrop {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        .mobile-nav-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: max(10px, env(safe-area-inset-top, 0px)) 14px 10px;
+          border-bottom: 0.5px solid var(--color-border-tertiary);
+          background: var(--color-background-primary);
+          position: sticky;
+          top: 0;
+          z-index: 120;
+          flex-shrink: 0;
+        }
+        .mobile-nav-toggle {
+          flex-shrink: 0;
+          width: 44px;
+          height: 44px;
+          border-radius: var(--border-radius-md);
+          border: 0.5px solid var(--color-border-secondary);
+          background: var(--color-background-secondary);
+          color: var(--color-text-primary);
+          cursor: pointer;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 5px;
+          padding: 0;
+          font-family: var(--font-sans);
+        }
+        .mobile-nav-toggle:focus-visible {
+          outline: 2px solid var(--accent);
+          outline-offset: 2px;
+        }
+        .mobile-nav-toggle-bar {
+          display: block;
+          width: 18px;
+          height: 2px;
+          border-radius: 1px;
+          background: currentColor;
+        }
+        .mobile-nav-title {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--color-text-primary);
+          min-width: 0;
+          flex: 1;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .main {
+          min-height: 100dvh;
+          min-height: 100vh;
+        }
+        .topbar {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+        .topbar-right {
+          justify-content: flex-start;
+          width: 100%;
+        }
+        .page-sub {
+          font-size: 11px;
+          line-height: 1.45;
+        }
+        .content {
+          padding: 14px 12px 24px;
+        }
+        .stat-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        .card-head {
+          flex-wrap: wrap;
+          gap: 10px;
+          padding: 12px 14px;
+        }
+        .card-body {
+          padding: 12px 14px;
+        }
+        .magnet-row {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .magnet-input {
+          width: 100%;
+          min-height: 44px;
+        }
+        .btn {
+          min-height: 40px;
+          padding: 8px 14px;
+        }
+        .gpu-pill {
+          max-width: none;
+          width: 100%;
+          justify-content: flex-start;
+        }
+        .queue-item {
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 10px;
+        }
+        .qi-status {
+          width: 100%;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          justify-content: flex-end;
+        }
+        .lib-pager {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
+        }
+        .lib-pager-info {
+          margin-right: 0;
+        }
+        .lib-pager .btn {
+          width: 100%;
+          min-width: 0;
+        }
+        .stats-chart-wrap {
+          height: 200px;
+        }
+        .stats-dash-charts {
+          grid-template-columns: 1fr;
+        }
+        .admin-m-stack {
+          grid-template-columns: 1fr !important;
+        }
+        .stat-grid[style*="repeat(3"] {
+          grid-template-columns: repeat(2, 1fr) !important;
+        }
+        .card-body:has(> table.film-table) {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          max-width: 100%;
+        }
+        .card-body:has(> table.film-table) > table.film-table {
+          min-width: 480px;
+        }
+      }
+
+      @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+        .sidebar {
+          transition: none;
+        }
+        .mobile-nav-backdrop {
+          transition: none;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .stat-grid {
+          grid-template-columns: 1fr;
+        }
+        .stat-grid[style*="repeat(3"] {
+          grid-template-columns: 1fr !important;
+        }
+      }
     </style>
   </head>
   <body>
@@ -1139,7 +1369,12 @@
       "
     >
       <div class="layout">
-        <aside class="sidebar">
+        <div
+          class="mobile-nav-backdrop"
+          id="admin-nav-backdrop"
+          aria-hidden="true"
+        ></div>
+        <aside class="sidebar" id="admin-sidebar">
           <div class="sidebar-logo">
             <div class="logo-text">Redwood Plus</div>
             <div class="logo-sub">Administration</div>
@@ -1203,6 +1438,23 @@
         </aside>
 
         <div class="main">
+          <header class="mobile-nav-header" id="admin-mobile-header">
+            <button
+              type="button"
+              class="mobile-nav-toggle"
+              id="btn-admin-menu"
+              aria-expanded="false"
+              aria-controls="admin-sidebar"
+              aria-label="Ouvrir ou fermer le menu"
+            >
+              <span class="mobile-nav-toggle-bar" aria-hidden="true"></span>
+              <span class="mobile-nav-toggle-bar" aria-hidden="true"></span>
+              <span class="mobile-nav-toggle-bar" aria-hidden="true"></span>
+            </button>
+            <span class="mobile-nav-title" id="admin-mobile-title"
+              >Pipeline · Local</span
+            >
+          </header>
           <section class="page active" id="page-pipeline">
             <header class="topbar">
               <div>
@@ -1365,6 +1617,7 @@
                     </p>
                   </div>
                   <div
+                    class="admin-m-stack"
                     style="
                       display: grid;
                       grid-template-columns: 1fr 1fr;
@@ -1668,6 +1921,7 @@
                     />
                   </div>
                   <div
+                    class="admin-m-stack"
                     style="
                       display: grid;
                       grid-template-columns: 1fr 1fr;
@@ -3827,6 +4081,37 @@
         }
       }
 
+      const ADMIN_MOBILE_BREAKPOINT = 768;
+
+      function adminIsMobileLayout() {
+        return window.matchMedia("(max-width: " + ADMIN_MOBILE_BREAKPOINT + "px)").matches;
+      }
+
+      function adminCloseMobileNav() {
+        document.body.classList.remove("admin-mobile-nav-open");
+        const bd = document.getElementById("admin-nav-backdrop");
+        if (bd) bd.setAttribute("aria-hidden", "true");
+        const btn = document.getElementById("btn-admin-menu");
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      }
+
+      function adminToggleMobileNav() {
+        if (!adminIsMobileLayout()) return;
+        const open = document.body.classList.toggle("admin-mobile-nav-open");
+        const bd = document.getElementById("admin-nav-backdrop");
+        if (bd) bd.setAttribute("aria-hidden", open ? "false" : "true");
+        const btn = document.getElementById("btn-admin-menu");
+        if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+
+      function adminSyncMobileNavTitle(pageId) {
+        const titleEl = document.getElementById("admin-mobile-title");
+        const pageEl = document.getElementById("page-" + pageId);
+        if (!titleEl || !pageEl) return;
+        const pt = pageEl.querySelector(".page-title");
+        titleEl.textContent = pt ? pt.textContent.trim() : "Administration";
+      }
+
       function goPage(p) {
         document
           .querySelectorAll(".page")
@@ -3837,6 +4122,8 @@
         document.getElementById("page-" + p).classList.add("active");
         const nav = document.querySelector(`.nav-item[data-page="${p}"]`);
         if (nav) nav.classList.add("active");
+        adminSyncMobileNavTitle(p);
+        adminCloseMobileNav();
         if (p === "announcement") loadViewerAnnouncementAdmin();
         if (p === "donations") loadDonationsAdmin();
         if (p === "films") loadLibrary();
@@ -4182,6 +4469,21 @@
       $("#btn-logout").addEventListener("click", async () => {
         await api("/api/auth/logout", { method: "POST" });
         window.location.href = "/login-admin.html";
+      });
+
+      const _btnAdminMenu = document.getElementById("btn-admin-menu");
+      const _adminNavBd = document.getElementById("admin-nav-backdrop");
+      if (_btnAdminMenu) {
+        _btnAdminMenu.addEventListener("click", () => adminToggleMobileNav());
+      }
+      if (_adminNavBd) {
+        _adminNavBd.addEventListener("click", () => adminCloseMobileNav());
+      }
+      window.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") adminCloseMobileNav();
+      });
+      window.addEventListener("resize", () => {
+        if (!adminIsMobileLayout()) adminCloseMobileNav();
       });
 
       async function loadViewerAnnouncementAdmin() {
