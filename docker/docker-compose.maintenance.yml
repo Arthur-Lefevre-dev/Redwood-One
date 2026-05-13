@@ -12,4 +12,4 @@ services:
       - "80:80"
     volumes:
       - ../nginx/maintenance-standalone.conf:/etc/nginx/nginx.conf:ro
-      - ../nginx/maintenance.html:/usr/share/nginx/html/index.html:ro
+      - ../frontend/maintenance.html:/usr/share/nginx/html/index.html:ro
