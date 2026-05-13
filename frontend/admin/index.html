@@ -1005,8 +1005,18 @@
       .modal.modal-season-meta {
         width: min(520px, 94vw);
         max-height: 90vh;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        overscroll-behavior: contain;
+      }
+      .modal-season-meta-body {
+        flex: 1;
+        min-height: 0;
         overflow-y: auto;
         overscroll-behavior: contain;
+        padding: 12px 18px 18px;
       }
       .sm-season-meta-row-info {
         cursor: pointer;
@@ -1023,10 +1033,7 @@
         align-items: flex-start;
         justify-content: space-between;
         gap: 12px;
-        position: sticky;
-        top: 0;
-        z-index: 3;
-        margin: -18px -18px 12px -18px;
+        flex-shrink: 0;
         padding: 14px 18px 12px;
         background: var(--color-background-primary);
         border-bottom: 1px solid var(--color-border-tertiary);
@@ -1057,6 +1064,38 @@
       .modal-season-meta-close:hover {
         border-color: var(--color-accent-primary, #8b2500);
         color: #fca5a5;
+      }
+      #admin-toast-host.admin-toast {
+        position: fixed;
+        bottom: 28px;
+        left: 50%;
+        z-index: 220;
+        max-width: min(440px, 94vw);
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+        text-align: center;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
+        border: 1px solid var(--color-border-tertiary);
+        background: #1a2332;
+        color: var(--color-text-primary);
+        pointer-events: none;
+        opacity: 0;
+        transform: translateX(-50%) translateY(16px);
+        transition: transform 0.28s ease, opacity 0.28s ease;
+      }
+      #admin-toast-host.admin-toast.admin-toast--show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      #admin-toast-host.admin-toast--success {
+        border-color: #166534;
+        background: linear-gradient(180deg, #14532d 0%, #0f172a 100%);
+      }
+      #admin-toast-host.admin-toast--error {
+        border-color: #991b1b;
+        background: linear-gradient(180deg, #450a0a 0%, #1c1917 100%);
       }
       .modal textarea {
         width: 100%;
@@ -2817,6 +2856,7 @@
                     </thead>
                     <tbody id="bill-film-rows"></tbody>
                   </table>
+                  <div id="bill-film-pager" class="lib-pager"></div>
                 </div>
               </div>
             </div>
@@ -3487,6 +3527,7 @@
             ×
           </button>
         </div>
+        <div class="modal-season-meta-body">
         <p class="err-msg" id="sm-err" style="display: none"></p>
         <p class="hint" id="sm-intro">
           Même <strong>clé série</strong> que sur les épisodes. En haut : affiche
@@ -3602,6 +3643,7 @@
             Enregistrer / mettre à jour
           </button>
         </div>
+        </div>
       </div>
     </div>
 
@@ -3705,12 +3747,37 @@
       </div>
     </div>
 
+    <div
+      id="admin-toast-host"
+      class="admin-toast"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
     <script
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
       crossorigin="anonymous"
     ></script>
     <script>
       const $ = (s) => document.querySelector(s);
+
+      let adminToastTimer = null;
+      /** Brief confirmation toast (bottom of viewport). variant: success | error */
+      function showAdminToast(message, variant) {
+        const el = $("#admin-toast-host");
+        if (!el) return;
+        const v = variant === "error" ? "error" : "success";
+        el.textContent = message;
+        el.className = "admin-toast admin-toast--" + v;
+        if (adminToastTimer) clearTimeout(adminToastTimer);
+        requestAnimationFrame(() => {
+          el.classList.add("admin-toast--show");
+        });
+        adminToastTimer = setTimeout(() => {
+          el.classList.remove("admin-toast--show");
+        }, 3200);
+      }
 
       /** In-app modal (no window.alert). */
       function showAlertModal(title, message, opts = {}) {
@@ -3973,15 +4040,22 @@
         return completion ? `${completion}\n${peers}` : peers;
       }
 
+      const VAST_TASK_LS = "admin_transcode_vast_task_id";
+      let vastTestTaskId = null;
+      let _vastPollSeenTaskId = null;
+      let _vastPollLastCeleryState = null;
+      /** Baseline for pipeline queue transition toasts (avoid false positives when leaving the page). */
+      let _prevPipelineQueueById = null;
+      let _prevVastCeleryQueueByTaskId = null;
+
       function pipelineVastEnterPage() {
+        _prevPipelineQueueById = null;
+        _prevVastCeleryQueueByTaskId = null;
         void refreshGpuPill();
         vastTestEnterRestore();
         void refreshQueue();
         void refreshQueueVast();
       }
-
-      const VAST_TASK_LS = "admin_transcode_vast_task_id";
-      let vastTestTaskId = null;
 
       function vastTestEnterRestore() {
         const t = localStorage.getItem(VAST_TASK_LS);
@@ -4008,6 +4082,38 @@
         }
         if (!r.ok) return;
         const j = await r.json();
+        const tidPoll = String(
+          vastTestTaskId || localStorage.getItem(VAST_TASK_LS) || "",
+        ).trim();
+        if (tidPoll) {
+          if (_vastPollSeenTaskId !== tidPoll) {
+            _vastPollSeenTaskId = tidPoll;
+            _vastPollLastCeleryState = null;
+          }
+          const celerySt = String(j.state || "");
+          if (_vastPollLastCeleryState !== null) {
+            if (_vastPollLastCeleryState !== "SUCCESS" && celerySt === "SUCCESS") {
+              if (j.ready && j.error) {
+                showAdminToast(
+                  "Transcodage Vast terminé en erreur : " +
+                    String(j.error).slice(0, 120),
+                  "error",
+                );
+              } else {
+                showAdminToast("Transcodage Vast (aperçu) terminé.");
+              }
+            } else if (
+              _vastPollLastCeleryState !== "FAILURE" &&
+              celerySt === "FAILURE"
+            ) {
+              showAdminToast(
+                "Transcodage Vast en échec. " + String(j.error || "").slice(0, 120),
+                "error",
+              );
+            }
+          }
+          _vastPollLastCeleryState = celerySt;
+        }
         $("#vast-job-panel").classList.remove("hidden");
         let line =
           "Celery : " +
@@ -4127,10 +4233,15 @@
               if (resp.task_id) {
                 vastTestTaskId = resp.task_id;
                 localStorage.setItem(VAST_TASK_LS, String(resp.task_id));
+                _vastPollSeenTaskId = null;
+                _vastPollLastCeleryState = null;
                 void vastTestPollTick();
                 void refreshQueueVast();
               }
             } catch (_) {}
+            showAdminToast(
+              "« " + file.name + " » envoyé — transcodage Vast démarré.",
+            );
           } else {
             row.classList.add("upload-job-err");
             let msg = "Échec (HTTP " + xhr.status + ")";
@@ -4285,7 +4396,11 @@
         if (p === "gpu") loadGpuOnce();
         if (p === "statistics") void loadStatisticsPage();
         if (p === "billing") void loadBillingPage();
-        if (p === "pipeline") void refreshGpuPill();
+        if (p === "pipeline") {
+          _prevPipelineQueueById = null;
+          void refreshGpuPill();
+          void refreshQueue();
+        }
         if (p === "pipeline-vast") pipelineVastEnterPage();
       }
 
@@ -4570,6 +4685,65 @@
       }
 
       let _billingCharts = [];
+
+      const BILL_VAST_FILM_PAGE_SIZE = 15;
+      let _billVastFilmRowsCache = [];
+      let _billVastFilmPage = 1;
+
+      /** Renders paginated rows for « Détail par film (Vast, disponibles) » (client-side). */
+      function renderBillingVastFilmTable() {
+        const tb = $("#bill-film-rows");
+        const pagerHost = $("#bill-film-pager");
+        if (!tb) return;
+        const rows = Array.isArray(_billVastFilmRowsCache)
+          ? _billVastFilmRowsCache
+          : [];
+        const total = rows.length;
+        const ps = BILL_VAST_FILM_PAGE_SIZE;
+        const totalPages = Math.max(1, Math.ceil(total / ps));
+        _billVastFilmPage = Math.min(
+          Math.max(1, _billVastFilmPage),
+          totalPages,
+        );
+        const start = (_billVastFilmPage - 1) * ps;
+        const slice = rows.slice(start, start + ps);
+        tb.innerHTML = "";
+        slice.forEach((f) => {
+          const tr = document.createElement("tr");
+          const td1 = document.createElement("td");
+          td1.textContent = f.titre || "";
+          const td2 = document.createElement("td");
+          td2.textContent = f.duree_min != null ? String(f.duree_min) : "—";
+          const td3 = document.createElement("td");
+          const sz = f.taille_octets;
+          if (sz != null && Number(sz) > 0) {
+            const gb = Number(sz) / 1024 ** 3;
+            td3.textContent =
+              gb.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio";
+          } else {
+            td3.textContent = "—";
+          }
+          const td4 = document.createElement("td");
+          const eur = f.est_vast_rental_eur;
+          td4.textContent = eur != null ? _fmtEurNum(eur, 4) + " €" : "—";
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          tr.appendChild(td3);
+          tr.appendChild(td4);
+          tb.appendChild(tr);
+        });
+        renderAdminLibPager(
+          pagerHost,
+          "Films Vast (détail)",
+          _billVastFilmPage,
+          total,
+          (p) => {
+            _billVastFilmPage = p;
+            renderBillingVastFilmTable();
+          },
+          BILL_VAST_FILM_PAGE_SIZE,
+        );
+      }
 
       function _destroyBillingCharts() {
         _billingCharts.forEach((c) => {
@@ -4872,34 +5046,9 @@
             );
           }
 
-          const tb = $("#bill-film-rows");
-          if (tb) {
-            tb.innerHTML = "";
-            (tv.per_film_top || []).forEach((f) => {
-              const tr = document.createElement("tr");
-              const td1 = document.createElement("td");
-              td1.textContent = f.titre || "";
-              const td2 = document.createElement("td");
-              td2.textContent = f.duree_min != null ? String(f.duree_min) : "—";
-              const td3 = document.createElement("td");
-              const sz = f.taille_octets;
-              if (sz != null && Number(sz) > 0) {
-                const gb = Number(sz) / 1024 ** 3;
-                td3.textContent =
-                  gb.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio";
-              } else {
-                td3.textContent = "—";
-              }
-              const td4 = document.createElement("td");
-              const eur = f.est_vast_rental_eur;
-              td4.textContent = eur != null ? _fmtEurNum(eur, 4) + " €" : "—";
-              tr.appendChild(td1);
-              tr.appendChild(td2);
-              tr.appendChild(td3);
-              tr.appendChild(td4);
-              tb.appendChild(tr);
-            });
-          }
+          _billVastFilmRowsCache = tv.per_film_top || [];
+          _billVastFilmPage = 1;
+          renderBillingVastFilmTable();
         } catch (e) {
           if (e && e.message === "403-admin") return;
           const hint =
@@ -5526,6 +5675,65 @@
         }
       }
 
+      function detectPipelineQueueTransitions(items) {
+        const next = new Map();
+        for (const i of items || []) {
+          const id = Number(i.id);
+          if (!Number.isFinite(id) || id <= 0) continue;
+          next.set(id, {
+            statut: String(i.statut || ""),
+            filename:
+              (i.filename || "").trim() || "Film #" + id,
+          });
+        }
+        if (_prevPipelineQueueById instanceof Map) {
+          for (const [id, prev] of _prevPipelineQueueById.entries()) {
+            const now = next.get(id);
+            if (!now) {
+              if (prev.statut === "en_cours") {
+                showAdminToast(
+                  "« " +
+                    prev.filename +
+                    " » est disponible (pipeline terminé).",
+                );
+              }
+            } else if (prev.statut === "en_cours" && now.statut === "erreur") {
+              showAdminToast(
+                "Pipeline en erreur : « " + now.filename + " ».",
+                "error",
+              );
+            }
+          }
+        }
+        _prevPipelineQueueById = next;
+      }
+
+      function detectVastCeleryQueueTransitions(items) {
+        const next = new Map();
+        for (const i of items || []) {
+          const tid = i.task_id != null ? String(i.task_id).trim() : "";
+          if (!tid) continue;
+          const ft = (i.film_title || "").trim();
+          const fid = i.film_id;
+          const label =
+            ft ||
+            (fid != null && Number(fid) > 0
+              ? "Film #" + fid
+              : "tâche " + tid.slice(0, 12));
+          next.set(tid, { label });
+        }
+        if (_prevVastCeleryQueueByTaskId instanceof Map) {
+          for (const [tid, prev] of _prevVastCeleryQueueByTaskId.entries()) {
+            if (!next.has(tid)) {
+              showAdminToast(
+                "Transcodage Vast terminé : « " + prev.label + " ».",
+              );
+            }
+          }
+        }
+        _prevVastCeleryQueueByTaskId = next;
+      }
+
       function fillPipelineQueueList(listEl, items) {
         if (!listEl) return;
         listEl.innerHTML = "";
@@ -5624,6 +5832,7 @@
           (i) => i.statut === "en_cours",
         ).length;
         $("#queue-meta").textContent = `${items.length} élément(s)`;
+        detectPipelineQueueTransitions(items);
         fillPipelineQueueList($("#queue-list"), items);
         const listV = $("#queue-list-vast-pipeline");
         const metaV = $("#queue-meta-vast-pipeline");
@@ -5648,6 +5857,7 @@
         const q = await r.json();
         const items = q.items || [];
         meta.textContent = `${items.length} tâche(s) Celery Vast`;
+        detectVastCeleryQueueTransitions(items);
         list.innerHTML = "";
         if (items.length === 0) {
           const empty = document.createElement("div");
@@ -6364,6 +6574,7 @@
               return;
             }
             await refreshSeasonMetaList();
+            showAdminToast("Fiche saison supprimée.");
           };
           div.appendChild(info);
           div.appendChild(btn);
@@ -6640,6 +6851,7 @@
           return;
         }
         await refreshSeriesShowGlobal();
+        showAdminToast("Fiche globale enregistrée.");
       });
       $("#sm-save").addEventListener("click", async () => {
         const sk = smGetSeriesKey();
@@ -6674,6 +6886,7 @@
         }
         const saved = await r.json();
         await refreshSeasonMetaList(saved.season_number);
+        showAdminToast("Fiche saison enregistrée.");
       });
       const smKeyInp = $("#sm-key-input");
       if (smKeyInp)
@@ -6787,6 +7000,7 @@
             err.style.display = "block";
             return;
           }
+          showAdminToast("Fiche enregistrée.");
           closeFilmModal();
           loadLibrary();
         } catch (e) {
@@ -7305,6 +7519,9 @@
             row.classList.add("upload-job-ok");
             refreshQueue();
             refreshStats();
+            showAdminToast(
+              "« " + file.name + " » uploadé — le film entre en file d’attente.",
+            );
           } else {
             row.classList.add("upload-job-err");
             let msg = "Échec upload (HTTP " + xhr.status + ")";
@@ -7393,6 +7610,7 @@
           return;
         }
         refreshQueue();
+        showAdminToast("Magnet ajouté à la file d’attente (pipeline local).");
       });
 
       async function uploadTorrentFile(f) {
@@ -7415,6 +7633,7 @@
           return;
         }
         refreshQueue();
+        showAdminToast("Fichier .torrent ajouté à la file d’attente.");
       }
 
       const tdz = $("#torrent-drop");
@@ -7472,6 +7691,7 @@
           }
           refreshQueue();
           void refreshQueueVast();
+          showAdminToast("Magnet ajouté — file Vast / pipeline.");
         });
       }
 
@@ -7498,6 +7718,7 @@
         }
         refreshQueue();
         void refreshQueueVast();
+        showAdminToast("Fichier .torrent ajouté — file Vast / pipeline.");
       }
 
       const tdzV = $("#torrent-drop-vast");
@@ -7639,6 +7860,7 @@
         }
         refreshQueue();
         void refreshQueueVast();
+        showAdminToast("Magnet ajouté — file Vast / pipeline.");
       });
 
       boot().catch(() => {
