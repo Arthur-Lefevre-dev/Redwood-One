@@ -32,6 +32,10 @@ app.conf.update(
             "task": "worker.tasks.refresh_donation_balances_snapshot",
             "schedule": crontab(minute=0),
         },
+        "torrent-auto-retry-scan": {
+            "task": "worker.tasks.torrent_auto_retry_scan",
+            "schedule": crontab(minute="*/2"),
+        },
     },
     # Celery 5.3+: explicit startup retry; broker_connection_retry alone is deprecated for this.
     broker_connection_retry_on_startup=True,
@@ -95,13 +99,40 @@ def download_torrent_task(
     magnet: Optional[str] = None,
     torrent_b64: Optional[str] = None,
 ):
-    """Download torrent via aria2 RPC, update live stats in DB, then process_film_task."""
+    """Download torrent via aria2 RPC, update live stats in DB, then process_film_task or Vast."""
+    from db.models import Film
+    from db.session import SessionLocal
+
+    db_load = SessionLocal()
+    try:
+        row = db_load.get(Film, film_id)
+        if not row:
+            logger.warning("download_torrent_task: film_id=%s not found", film_id)
+            return
+        if magnet is None and torrent_b64 is None:
+            m = (getattr(row, "torrent_magnet_uri", None) or "").strip()
+            if m:
+                magnet = m
+            bp = (getattr(row, "torrent_blob_path", None) or "").strip()
+            if bp and os.path.isfile(bp):
+                with open(bp, "rb") as fh:
+                    torrent_b64 = base64.b64encode(fh.read()).decode("ascii")
+    finally:
+        db_load.close()
+
     logger.info(
         "download_torrent_task start film_id=%s magnet=%s torrent_b64_len=%s",
         film_id,
         bool(magnet),
         len(torrent_b64) if torrent_b64 else 0,
     )
+    if not magnet and not torrent_b64:
+        _fail_film(
+            film_id,
+            "Torrent: aucune source (magnet ou fichier .torrent) enregistrée pour ce film.",
+        )
+        return
+
     if not shutil.which("aria2c"):
         _fail_film(film_id, "aria2c not installed in worker image")
         return
@@ -250,6 +281,98 @@ def _fail_film(film_id: int, message: str) -> None:
             db.commit()
     finally:
         db.close()
+
+
+@app.task(name="worker.tasks.torrent_auto_retry_scan")
+def torrent_auto_retry_scan() -> None:
+    """Periodic scan: re-queue torrent downloads that failed with a transient error."""
+    from sqlalchemy import func
+
+    from core.torrent_auto_retry import torrent_error_eligible_for_auto_retry
+    from db.models import Film, FilmSource, FilmStatut
+    from db.session import SessionLocal
+
+    s = get_settings()
+    if not s.TORRENT_AUTO_RETRY_ENABLED:
+        return
+    max_retries = max(0, int(s.TORRENT_AUTO_RETRY_MAX))
+    if max_retries <= 0:
+        return
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Film)
+            .filter(
+                Film.source == FilmSource.torrent,
+                Film.statut == FilmStatut.erreur,
+                func.coalesce(Film.torrent_auto_retry_count, 0) < max_retries,
+            )
+            .order_by(Film.id.asc())
+            .limit(25)
+            .all()
+        )
+    finally:
+        db.close()
+
+    for f in rows:
+        if not torrent_error_eligible_for_auto_retry((f.erreur_message or "").strip()):
+            continue
+        has_magnet = bool((f.torrent_magnet_uri or "").strip())
+        bp = (f.torrent_blob_path or "").strip()
+        if not has_magnet and not (bp and os.path.isfile(bp)):
+            continue
+
+        prev = 0
+        db3 = SessionLocal()
+        try:
+            row = db3.get(Film, f.id)
+            if (
+                not row
+                or row.source != FilmSource.torrent
+                or row.statut != FilmStatut.erreur
+            ):
+                continue
+            prev = int(row.torrent_auto_retry_count or 0)
+            if prev >= max_retries:
+                continue
+            row.statut = FilmStatut.en_cours
+            row.pipeline_progress = 0
+            row.erreur_message = None
+            row.torrent_stats = None
+            row.pipeline_celery_task_id = None
+            row.pipeline_celery_task_kind = None
+            row.torrent_auto_retry_count = prev + 1
+            db3.commit()
+        except Exception:
+            logger.exception("torrent_auto_retry_scan: commit film_id=%s", f.id)
+            db3.rollback()
+            continue
+        finally:
+            db3.close()
+
+        try:
+            download_torrent_task.delay(f.id)
+            logger.info(
+                "torrent_auto_retry_scan: re-queued film_id=%s attempt=%s/%s",
+                f.id,
+                prev + 1,
+                max_retries,
+            )
+        except Exception:
+            logger.exception("torrent_auto_retry_scan: enqueue download_torrent_task film_id=%s", f.id)
+            db4 = SessionLocal()
+            try:
+                r2 = db4.get(Film, f.id)
+                if r2:
+                    r2.statut = FilmStatut.erreur
+                    r2.erreur_message = (
+                        "Relance auto : impossible d’envoyer la tâche Celery (Redis indisponible ?)"
+                    )[:8000]
+                    r2.torrent_auto_retry_count = max(0, prev)
+                    db4.commit()
+            finally:
+                db4.close()
 
 
 @app.task(name="worker.tasks.process_film_task", bind=True, max_retries=0)

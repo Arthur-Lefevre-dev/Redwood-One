@@ -2090,6 +2090,14 @@
                           <button
                             type="button"
                             class="btn"
+                            id="vast-btn-dismiss"
+                            title="Masquer le détail Celery / JSON"
+                          >
+                            Masquer
+                          </button>
+                          <button
+                            type="button"
+                            class="btn"
                             id="vast-btn-cancel"
                             disabled
                           >
@@ -4418,6 +4426,42 @@
         }
       }
 
+      /** Hide Vast test job panel and clear stored task id (user dismiss or terminal REVOKED). */
+      function dismissVastJobPanel() {
+        vastTestTaskId = null;
+        try {
+          localStorage.removeItem(VAST_TASK_LS);
+        } catch (_) {}
+        _vastPollSeenTaskId = null;
+        _vastPollLastCeleryState = null;
+        const panel = $("#vast-job-panel");
+        if (panel) panel.classList.add("hidden");
+        const meta = $("#vast-meta");
+        if (meta) meta.textContent = "";
+        const err = $("#vast-err");
+        if (err) {
+          err.textContent = "";
+          err.classList.add("hidden");
+        }
+        const pf = $("#vast-progress-fill");
+        if (pf) pf.style.width = "0%";
+        const rlWrap = $("#vast-remote-log-wrap");
+        const rl = $("#vast-remote-log");
+        if (rlWrap) rlWrap.classList.add("hidden");
+        if (rl) rl.textContent = "";
+        const bcan = $("#vast-btn-cancel");
+        if (bcan) bcan.disabled = true;
+        $("#vast-video-wrap").classList.add("hidden");
+        const vv = $("#vast-video");
+        if (vv) {
+          vv.removeAttribute("src");
+          vv.removeAttribute("data-vast-out-url");
+          try {
+            vv.load();
+          } catch (_) {}
+        }
+      }
+
       async function vastTestPollTick() {
         const page = $("#page-pipeline-vast");
         if (!page || !page.classList.contains("active")) return;
@@ -4435,6 +4479,11 @@
         }
         if (!r.ok) return;
         const j = await r.json();
+        const celerySt = String(j.state || "");
+        if (j.ready && celerySt === "REVOKED") {
+          dismissVastJobPanel();
+          return;
+        }
         const tidPoll = String(
           vastTestTaskId || localStorage.getItem(VAST_TASK_LS) || "",
         ).trim();
@@ -4443,7 +4492,6 @@
             _vastPollSeenTaskId = tidPoll;
             _vastPollLastCeleryState = null;
           }
-          const celerySt = String(j.state || "");
           if (_vastPollLastCeleryState !== null) {
             if (_vastPollLastCeleryState !== "SUCCESS" && celerySt === "SUCCESS") {
               if (j.ready && j.error) {
@@ -4551,6 +4599,7 @@
       }
 
       function vastTestUpload(file) {
+        dismissVastJobPanel();
         const list = $("#vast-upload-row");
         list.innerHTML = "";
         list.classList.add("is-active");
@@ -4664,31 +4713,8 @@
             if (btn) btn.disabled = false;
             return;
           }
-          let summary = {};
-          try {
-            summary = JSON.parse(raw || "{}");
-          } catch (_) {
-            summary = {};
-          }
-          vastTestTaskId = null;
-          try {
-            localStorage.removeItem(VAST_TASK_LS);
-          } catch (_) {}
-          $("#vast-job-panel").classList.remove("hidden");
-          $("#vast-task-line").textContent = "Transcodage Vast annulé";
-          $("#vast-progress-fill").style.width = "0%";
-          $("#vast-meta").textContent = JSON.stringify(summary, null, 2);
-          $("#vast-err").classList.add("hidden");
-          $("#vast-video-wrap").classList.add("hidden");
-          const vv = $("#vast-video");
-          if (vv) {
-            vv.removeAttribute("src");
-            vv.removeAttribute("data-vast-out-url");
-            try {
-              vv.load();
-            } catch (_) {}
-          }
-          if (btn) btn.disabled = true;
+          dismissVastJobPanel();
+          showAdminToast("Transcodage Vast annulé.");
           void refreshQueueVast();
         } catch (e) {
           if (e && e.message === "403-admin") return;
@@ -6520,6 +6546,10 @@
           const retryVastBtn = canRetryVast
             ? ` <button type="button" class="btn" data-retry-vast-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Relancer Vast</button>`
             : "";
+          const canRetryLocal = i.retry_local_available === true;
+          const retryLocalBtn = canRetryLocal
+            ? ` <button type="button" class="btn" data-retry-local-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Relancer</button>`
+            : "";
           let progW = Math.min(100, i.progress || 0);
           if (
             i.source === "torrent" &&
@@ -6539,7 +6569,7 @@
         <div class="qi-sub"></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
       </div>
-      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}${retryVastBtn}</div>`;
+      <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}${retryVastBtn}${retryLocalBtn}</div>`;
           row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
           const tline = torrentStatsLine(i.torrent_stats, i.source);
           const tx = transcodeProgressLabel(i.progress, i.traitement, i.statut);
@@ -8227,6 +8257,11 @@
       const vastCancelBtn = $("#vast-btn-cancel");
       if (vastCancelBtn)
         vastCancelBtn.addEventListener("click", () => void vastTestCancel());
+      const vastDismissBtn = $("#vast-btn-dismiss");
+      if (vastDismissBtn)
+        vastDismissBtn.addEventListener("click", () => {
+          dismissVastJobPanel();
+        });
 
       let uploadJobSeq = 0;
 
@@ -8554,6 +8589,46 @@
         }
         const pipeBtn = e.target.closest("[data-cancel-film]");
         const retryVastBtnEl = e.target.closest("[data-retry-vast-film]");
+        const retryLocalBtnEl = e.target.closest("[data-retry-local-film]");
+        if (retryLocalBtnEl) {
+          e.preventDefault();
+          const lfid = retryLocalBtnEl.getAttribute("data-retry-local-film");
+          if (!lfid) return;
+          const okL = await showConfirmModal(
+            "Relancer le traitement",
+            "Remettre ce fichier en file d’attente sur le worker local (même fichier sur disque que lors de l’upload). Continuer ?",
+            { confirmText: "Relancer", cancelText: "Retour" },
+          );
+          if (!okL) return;
+          try {
+            const r = await api(
+              "/api/admin/queue/jobs/" + encodeURIComponent(lfid) + "/retry-local",
+              { method: "POST" },
+            );
+            if (!r.ok) {
+              let msg = "Erreur " + r.status;
+              try {
+                const j = await r.json();
+                if (j && j.detail) msg = String(j.detail);
+              } catch (_) {
+                msg = ((await r.text()) || msg).slice(0, 500);
+              }
+              await showAlertModal("Relance impossible", msg, { okText: "OK" });
+              return;
+            }
+          } catch (_) {
+            await showAlertModal(
+              "Erreur",
+              "Réseau ou session expirée.",
+              { okText: "OK" },
+            );
+            return;
+          }
+          refreshQueue();
+          void refreshQueueVast();
+          showAdminToast("Film remis en file d’attente (pipeline local).");
+          return;
+        }
         if (retryVastBtnEl) {
           e.preventDefault();
           const rfid = retryVastBtnEl.getAttribute("data-retry-vast-film");
@@ -8619,6 +8694,22 @@
             await showAlertModal("Annulation impossible", msg, { okText: "OK" });
             return;
           }
+          let revokedTid = null;
+          try {
+            const data = await r.json();
+            if (data && data.revoked_celery_task_id) {
+              revokedTid = String(data.revoked_celery_task_id).trim();
+            }
+          } catch (_) {}
+          if (revokedTid) {
+            try {
+              const ls = localStorage.getItem(VAST_TASK_LS);
+              if (ls && ls === revokedTid) {
+                localStorage.removeItem(VAST_TASK_LS);
+                dismissVastJobPanel();
+              }
+            } catch (_) {}
+          }
         } catch (_) {
           await showAlertModal(
             "Erreur",
@@ -8629,7 +8720,7 @@
         }
         refreshQueue();
         void refreshQueueVast();
-        showAdminToast("Magnet ajouté — file Vast / pipeline.");
+        showAdminToast("Traitement annulé.");
       });
 
       boot().catch(() => {

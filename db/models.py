@@ -179,6 +179,10 @@ class Film(Base):
     pipeline_progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # Live BitTorrent stats while aria2 downloads (seeders, leechers, bps, …)
     torrent_stats: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    # Persisted torrent source for Celery retries (magnet URI or path to .torrent blob under /tmp/redwood).
+    torrent_magnet_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    torrent_blob_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    torrent_auto_retry_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # After torrent download: "local" = worker ffmpeg pipeline; "vast" = S3 + Vast GPU transcode then finalize to library.
     transcode_target: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
     # When transcode_target is vast: optional Vast offer id (same as admin upload Vast field).
@@ -189,6 +193,8 @@ class Film(Base):
     # Active Celery task for admin cancel (download / local encode / Vast transcode).
     pipeline_celery_task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     pipeline_celery_task_kind: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    # Absolute path on API/worker shared volume for direct uploads (retry after admin cancel).
+    pipeline_staging_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     # Series: one row per episode; films keep content_kind=film and null series_* fields
     content_kind: Mapped[ContentKind] = mapped_column(
         Enum(ContentKind, values_callable=lambda x: [e.value for e in x]),

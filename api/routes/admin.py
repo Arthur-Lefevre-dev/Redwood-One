@@ -143,15 +143,9 @@ def _enqueue_process_film_or_raise(film_id: int, local_path: str, db: Session) -
         )
 
 
-def _enqueue_download_torrent_or_raise(
-    film_id: int,
-    db: Session,
-    *,
-    magnet: Optional[str] = None,
-    torrent_b64: Optional[str] = None,
-) -> None:
+def _enqueue_download_torrent_or_raise(film_id: int, db: Session) -> None:
     try:
-        async_res = download_torrent_task.delay(film_id, magnet, torrent_b64)
+        async_res = download_torrent_task.delay(film_id)
         row = db.get(Film, film_id)
         if row:
             row.pipeline_celery_task_id = async_res.id
@@ -564,6 +558,7 @@ async def admin_upload(
         statut=FilmStatut.en_cours,
         pipeline_progress=0,
         content_kind=ck,
+        pipeline_staging_path=path,
     )
     db.add(film)
     db.commit()
@@ -610,11 +605,12 @@ def admin_torrent_magnet(
         content_kind=body.content_kind,
         transcode_target=body.transcode_target,
         vast_offer_id=vast_oid if body.transcode_target == "vast" else None,
+        torrent_magnet_uri=body.magnet.strip(),
     )
     db.add(film)
     db.commit()
     db.refresh(film)
-    _enqueue_download_torrent_or_raise(film.id, db, magnet=body.magnet)
+    _enqueue_download_torrent_or_raise(film.id, db)
     return {"job_id": film.id}
 
 
@@ -651,12 +647,14 @@ async def admin_torrent_file(
     db.add(film)
     db.commit()
     db.refresh(film)
-    # Celery JSON serializer cannot carry raw bytes; use base64 for the worker.
-    _enqueue_download_torrent_or_raise(
-        film.id,
-        db,
-        torrent_b64=base64.b64encode(data).decode("ascii"),
-    )
+    from core.torrent_blobs import ensure_torrent_blobs_dir, torrent_blob_path_for_film_id
+
+    ensure_torrent_blobs_dir()
+    blob_disk = torrent_blob_path_for_film_id(film.id)
+    blob_disk.write_bytes(data)
+    film.torrent_blob_path = str(blob_disk)
+    db.commit()
+    _enqueue_download_torrent_or_raise(film.id, db)
     return {"job_id": film.id}
 
 
@@ -802,6 +800,16 @@ def delete_invite(
     db.commit()
 
 
+def _film_retry_local_upload_available(f: Film) -> bool:
+    if f.statut != FilmStatut.erreur or f.source != FilmSource.upload:
+        return False
+    tgt = (getattr(f, "transcode_target", None) or "local").lower().strip()
+    if tgt != "local":
+        return False
+    p = (getattr(f, "pipeline_staging_path", None) or "").strip()
+    return bool(p and os.path.isfile(p))
+
+
 @router.get("/queue")
 def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     items = (
@@ -837,9 +845,57 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
                 "celery_task_id": getattr(f, "pipeline_celery_task_id", None),
                 "celery_task_kind": getattr(f, "pipeline_celery_task_kind", None),
                 "vast_retryable": _film_vast_retryable(f),
+                "retry_local_available": _film_retry_local_upload_available(f),
             }
         )
     return {"items": out}
+
+
+@router.post("/queue/jobs/{film_id}/retry-local")
+def admin_retry_local_pipeline_job(
+    film_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Re-enqueue process_film for a failed/cancelled direct upload when the staging file still exists."""
+    f = db.get(Film, film_id)
+    if not f:
+        raise HTTPException(404, "Film introuvable")
+    if f.statut != FilmStatut.erreur:
+        raise HTTPException(
+            status_code=409,
+            detail="Seuls les films en erreur peuvent être relancés depuis la file.",
+        )
+    if f.source != FilmSource.upload:
+        raise HTTPException(
+            status_code=409,
+            detail="La relance locale n'est disponible que pour les uploads directs.",
+        )
+    tgt = (getattr(f, "transcode_target", None) or "local").lower().strip()
+    if tgt != "local":
+        raise HTTPException(
+            status_code=409,
+            detail="Relance impossible : ce titre n'est pas configuré pour le pipeline local.",
+        )
+    local_path = (getattr(f, "pipeline_staging_path", None) or "").strip()
+    if not local_path or not os.path.isfile(local_path):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Fichier source introuvable sur le disque (supprimé ou non enregistré). "
+                "Ré-uploadez le fichier."
+            ),
+        )
+    f.statut = FilmStatut.en_cours
+    f.erreur_message = None
+    f.pipeline_progress = 0
+    f.pipeline_celery_task_id = None
+    f.pipeline_celery_task_kind = None
+    f.torrent_stats = None
+    f.traitement = None
+    db.commit()
+    _enqueue_process_film_or_raise(film_id, local_path, db)
+    return {"ok": True, "film_id": film_id}
 
 
 @router.post("/queue/jobs/{film_id}/cancel")
@@ -890,7 +946,7 @@ def admin_cancel_pipeline_job(
     f.torrent_stats = None
     f.pipeline_progress = None
     db.commit()
-    return {"ok": True, "film_id": film_id}
+    return {"ok": True, "film_id": film_id, "revoked_celery_task_id": tid}
 
 
 def _month_bucket_expr(column, dialect_name: str):
