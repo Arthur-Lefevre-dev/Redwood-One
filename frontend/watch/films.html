@@ -128,12 +128,20 @@
         empty.textContent = hasFilter
           ? 'Aucun film ne correspond à ces critères.'
           : 'Aucun film dans le catalogue pour l’instant.';
-        h1.textContent = hasFilter ? 'Résultats' : 'Films';
+        if (f.genre && !f.q && !f.actor && !f.director && !f.tmdb_id) {
+          h1.textContent = f.genre;
+        } else {
+          h1.textContent = hasFilter ? 'Résultats' : 'Films';
+        }
         lead.style.display = hasFilter ? 'none' : '';
         return;
       }
       empty.style.display = 'none';
-      h1.textContent = hasFilter ? 'Résultats' : 'Films';
+      if (f.genre && !f.q && !f.actor && !f.director && !f.tmdb_id) {
+        h1.textContent = f.genre;
+      } else {
+        h1.textContent = hasFilter ? 'Résultats' : 'Films';
+      }
       lead.style.display = hasFilter ? 'none' : '';
       rows.forEach((film) => {
         const card = document.createElement('div');

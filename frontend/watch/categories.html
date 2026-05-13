@@ -48,28 +48,13 @@
     .cat-card .name{font-weight:600;font-size:15px;text-shadow:0 1px 8px rgba(0,0,0,.9)}
     .cat-card .count{font-size:12px;color:#c4c4c4;margin-top:4px;text-shadow:0 1px 6px #000}
     .cat-card .accent-bar{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#c94a1a);opacity:.9;z-index:2}
-    .section-title{font-size:1rem;margin-bottom:14px;color:#ddd}
-    .film-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-    .film-card{
-      background:#141414;border:1px solid #222;border-radius:10px;overflow:hidden;cursor:pointer;
-      transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
-    }
-    .film-card:hover{
-      transform:translateY(-6px) scale(1.02);
-      box-shadow:0 14px 32px rgba(0,0,0,.55),0 0 0 1px rgba(139,37,0,.35);
-      border-color:rgba(139,37,0,.55);
-    }
-    .film-card img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#222;transition:transform .35s ease}
-    .film-card:hover img{transform:scale(1.04)}
-    .film-card .t{padding:8px 10px;font-size:12px;line-height:1.3}
-    .empty{color:var(--muted);padding:24px;text-align:center}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
   </style>
 </head>
 <body>
   <nav>
     <a class="brand" href="/watch/">Redwood Plus</a>
-    <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher dans tout le catalogue…" />
+    <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher des films…" />
     <div class="nav-end">
       <a href="/watch/">Accueil</a>
       <a href="/watch/films.html">Films</a>
@@ -93,48 +78,21 @@
   <div id="watch-announcement" class="watch-announcement-host" hidden></div>
   <main>
     <h1>Parcourir par catégorie</h1>
+    <p class="lead">Chaque vignette illustre le genre avec une affiche tirée au hasard d’un film du catalogue. Cliquez pour ouvrir la liste des films.</p>
     <div class="cat-grid" id="cats"></div>
-    <h2 class="section-title" id="films-title">Tous les films</h2>
-    <div class="film-grid" id="films"></div>
-    <p class="empty" id="empty" style="display:none">Aucun film dans cette catégorie.</p>
   </main>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
   <script src="/watch/app.js"></script>
   <script>
-    function renderFilms(rows) {
-      const el = document.getElementById('films');
-      const empty = document.getElementById('empty');
-      el.innerHTML = '';
-      if (!rows.length) { empty.style.display = 'block'; return; }
-      empty.style.display = 'none';
-      rows.forEach(f => {
-        const c = document.createElement('div');
-        c.className = 'film-card';
-        c.onclick = () => location.href = '/watch/film.html?id=' + f.id;
-        const img = f.poster_path ? posterUrl(f.poster_path) : '';
-        c.innerHTML = `<img src="${img}" alt="" loading="lazy" /><div class="t"></div>`;
-        c.querySelector('.t').textContent = f.titre;
-        el.appendChild(c);
-      });
-    }
-
-    async function loadAll(q) {
-      const url = '/api/films' + (q ? ('?q=' + encodeURIComponent(q)) : '');
-      const rows = await apiJson(url);
-      document.getElementById('films-title').textContent = q ? ('Résultats : « ' + q + ' »') : 'Tous les films';
-      renderFilms(rows);
-    }
-
-    async function loadGenre(g) {
-      document.getElementById('films-title').textContent = 'Genre : ' + g;
-      const rows = await apiJson('/api/films/by-genre?genre=' + encodeURIComponent(g));
-      renderFilms(rows);
-    }
-
-    let tq;
+    let navSearchTimer;
     document.getElementById('nav-q').addEventListener('input', () => {
-      clearTimeout(tq);
-      tq = setTimeout(() => loadAll(document.getElementById('nav-q').value.trim()), 300);
+      clearTimeout(navSearchTimer);
+      const q = document.getElementById('nav-q').value.trim();
+      navSearchTimer = setTimeout(() => {
+        if (q) {
+          location.href = '/watch/films.html?q=' + encodeURIComponent(q);
+        }
+      }, 350);
     });
 
     apiJson('/api/auth/me').then(async () => {
@@ -150,10 +108,11 @@
         c.innerHTML = bg + '<div class="accent-bar"></div><div class="cat-card-inner"><div class="name"></div><div class="count"></div></div>';
         c.querySelector('.name').textContent = g.name;
         c.querySelector('.count').textContent = g.count + ' titre' + (g.count > 1 ? 's' : '');
-        c.onclick = () => { document.getElementById('nav-q').value = ''; loadGenre(g.name); window.scrollTo({ top: document.getElementById('films-title').offsetTop - 20, behavior: 'smooth' }); };
+        c.onclick = () => {
+          location.href = '/watch/films.html?genre=' + encodeURIComponent(g.name);
+        };
         gEl.appendChild(c);
       });
-      await loadAll('');
     }).catch((e) => {
       if (e && e.message === '401') { location.href = '/login.html'; return; }
       console.error(e);

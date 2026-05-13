@@ -238,14 +238,19 @@ def genres_summary(db: Session = Depends(get_db), user: User = Depends(get_curre
     for f in films:
         for g in _genre_labels(f.genres):
             counts[g] = counts.get(g, 0) + 1
-    sample_poster: dict[str, str] = {}
-    # Prefer films that have a poster so category tiles always get a backdrop when any title does.
+    # One random poster per genre (among titles that have a poster) for category tiles.
+    poster_candidates: dict[str, list[str]] = {}
     with_poster = [f for f in films if f.poster_path]
     for f in with_poster:
-        pp = f.poster_path or ""
+        pp = (f.poster_path or "").strip()
+        if not pp:
+            continue
         for g in _genre_labels(f.genres):
-            if g not in sample_poster and pp:
-                sample_poster[g] = pp
+            poster_candidates.setdefault(g, []).append(pp)
+    sample_poster: dict[str, str] = {}
+    for g, paths in poster_candidates.items():
+        if paths:
+            sample_poster[g] = random.choice(paths)
     rows = [
         {"name": k, "count": v, "poster_path": sample_poster.get(k), "poster_url": _poster_url(sample_poster.get(k))}
         for k, v in counts.items()
