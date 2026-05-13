@@ -2562,6 +2562,15 @@
                   <div class="card-title">
                     Ticket <span id="st-detail-id">—</span>
                   </div>
+                  <button
+                    type="button"
+                    class="modal-season-meta-close"
+                    id="st-detail-panel-close"
+                    aria-label="Fermer le panneau"
+                    title="Fermer le panneau (ne clôt pas le ticket)"
+                  >
+                    ×
+                  </button>
                 </div>
                 <div class="card-body" style="font-size: 13px; line-height: 1.55">
                   <p style="margin-bottom: 8px; color: var(--color-text-secondary)">
@@ -5530,6 +5539,15 @@
         return d.innerHTML;
       }
 
+      /** Hide ticket detail panel only (does not change ticket status). */
+      function closeSupportTicketDetailPanel() {
+        _stSelectedId = null;
+        const card = $("#st-detail-card");
+        if (card) card.style.display = "none";
+        const msg = $("#st-detail-msg");
+        if (msg) msg.textContent = "";
+      }
+
       function _stQs() {
         const st = ($("#st-filter-status") && $("#st-filter-status").value) || "";
         const cat = ($("#st-filter-cat") && $("#st-filter-cat").value) || "";
@@ -5747,6 +5765,14 @@
           _stPageOffset += _ST_PAGE_LIMIT;
           void loadSupportTicketsAdmin({ resetDetail: false });
         });
+      }
+      const _btnStDetailPanelClose = document.getElementById(
+        "st-detail-panel-close",
+      );
+      if (_btnStDetailPanelClose) {
+        _btnStDetailPanelClose.addEventListener("click", () =>
+          closeSupportTicketDetailPanel(),
+        );
       }
       const _btnStCloseTicket = document.getElementById("st-detail-close-ticket");
       if (_btnStCloseTicket) {
@@ -6852,7 +6878,15 @@
       let libFilmsPage = 1;
       let libEpsPage = 1;
 
-      function renderAdminLibPager(host, label, page, total, onPage, pageSizeOpt) {
+      function renderAdminLibPager(
+        host,
+        label,
+        page,
+        total,
+        onPage,
+        pageSizeOpt,
+        countNounOpt,
+      ) {
         if (!host) return;
         const pageSize =
           pageSizeOpt != null && Number.isFinite(pageSizeOpt) && pageSizeOpt > 0
@@ -6863,13 +6897,17 @@
         host.innerHTML = "";
         const info = document.createElement("span");
         info.className = "lib-pager-info";
+        const countNoun =
+          typeof countNounOpt === "string" && countNounOpt
+            ? countNounOpt
+            : "entrées";
         info.textContent =
           label +
           " · page " +
           safe +
           " / " +
           totalPages +
-          (total ? " (" + total + " entrées)" : "");
+          (total ? " (" + total + " " + countNoun + ")" : "");
         const prev = document.createElement("button");
         prev.type = "button";
         prev.className = "btn";
@@ -6903,8 +6941,12 @@
         const meta = await metaR.json();
         const filmsTotalMeta = meta.films_total ?? 0;
         const epsTotalMeta = meta.episodes_total ?? 0;
+        const seriesShowsTotalMeta = meta.series_shows_total ?? 0;
         const tpF = Math.max(1, Math.ceil(filmsTotalMeta / LIB_PAGE_SIZE));
-        const tpE = Math.max(1, Math.ceil(epsTotalMeta / LIB_PAGE_SIZE));
+        const tpE = Math.max(
+          1,
+          Math.ceil(seriesShowsTotalMeta / LIB_PAGE_SIZE),
+        );
         if (resetPages) {
           libFilmsPage = 1;
           libEpsPage = 1;
@@ -6928,7 +6970,7 @@
           LIB_PAGE_SIZE +
           qParam;
         const epUrl =
-          "/api/admin/films?content_kind=series_episode&page=" +
+          "/api/admin/films?content_kind=series_episode&paginate_by=series_show&page=" +
           libEpsPage +
           "&page_size=" +
           LIB_PAGE_SIZE +
@@ -7114,13 +7156,15 @@
 
         renderAdminLibPager(
           $("#lib-series-pager"),
-          "Épisodes (séries)",
+          "Séries",
           libEpsPage,
           epsTotal,
           (p) => {
             libEpsPage = p;
             loadLibrary(false);
           },
+          LIB_PAGE_SIZE,
+          "série(s)",
         );
       }
 

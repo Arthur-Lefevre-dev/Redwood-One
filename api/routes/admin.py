@@ -5,6 +5,7 @@ import calendar
 import logging
 import os
 import re
+from collections import defaultdict
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,7 @@ from core.donation_settings_store import get_or_create_donation_settings
 from api.routes.announcement import _get_or_create_row, _is_active
 from api.routes.films import RefreshImdbApiBody, refresh_imdbapi as films_refresh_imdbapi
 from config import get_settings
+from core.admin_library_series import series_show_label_for_library_episode
 from core.catalog_sync import sync_s3_films_to_db
 from core.trailers_util import trailers_from_admin_lines, trailers_from_json_column, trailers_to_watch_urls
 from core.gpu_detect import encoder_dict_for_api
@@ -223,16 +225,12 @@ def admin_library_meta(
     base = _apply_admin_library_q(db.query(Film), q)
     films_total = base.filter(Film.content_kind == ContentKind.film).count()
     ep_q = base.filter(Film.content_kind == ContentKind.series_episode)
-    episodes_total = ep_q.count()
-    subq = (
-        ep_q.order_by(None)
-        .with_entities(Film.series_key)
-        .filter(Film.series_key.isnot(None))
-        .filter(Film.series_key != "")
-        .distinct()
-        .subquery()
-    )
-    series_shows_total = int(db.query(func.count()).select_from(subq).scalar() or 0)
+    thin = ep_q.with_entities(Film.series_title, Film.series_key, Film.titre).all()
+    episodes_total = len(thin)
+    series_labels = {
+        series_show_label_for_library_episode(st, sk, tit) for st, sk, tit in thin
+    }
+    series_shows_total = len(series_labels)
     return {
         "films_total": films_total,
         "episodes_total": episodes_total,
@@ -251,15 +249,68 @@ def admin_list_films(
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
+    paginate_by: str = Query(
+        "episode",
+        description="series_episode only: episode — 10 rows = 10 épisodes; "
+        "series_show — 10 rows = 10 blocs série (tous épisodes de ces séries).",
+    ),
 ):
     if content_kind not in ("film", "series_episode"):
         raise HTTPException(400, "content_kind must be 'film' or 'series_episode'")
+    if paginate_by not in ("episode", "series_show"):
+        raise HTTPException(400, "paginate_by must be 'episode' or 'series_show'")
+    if content_kind == "film" and paginate_by != "episode":
+        raise HTTPException(400, "paginate_by is only valid for content_kind=series_episode")
+
     kind = ContentKind.film if content_kind == "film" else ContentKind.series_episode
     query = (
         _apply_admin_library_q(db.query(Film), q)
         .filter(Film.content_kind == kind)
         .order_by(Film.date_ajout.desc())
     )
+
+    if kind == ContentKind.series_episode and paginate_by == "series_show":
+        thin = query.with_entities(
+            Film.id,
+            Film.series_title,
+            Film.series_key,
+            Film.titre,
+        ).all()
+        label_to_ids: dict[str, list[int]] = defaultdict(list)
+        for fid, st, sk, tit in thin:
+            lab = series_show_label_for_library_episode(st, sk, tit)
+            label_to_ids[lab].append(fid)
+        sorted_labels = sorted(label_to_ids.keys(), key=str.casefold)
+        total_shows = len(sorted_labels)
+        offset = (page - 1) * page_size
+        page_labels = sorted_labels[offset : offset + page_size]
+        ordered_ids: list[int] = []
+        for lab in page_labels:
+            ordered_ids.extend(label_to_ids[lab])
+        if not ordered_ids:
+            return {
+                "items": [],
+                "total": total_shows,
+                "page": page,
+                "page_size": page_size,
+                "paginate_by": paginate_by,
+            }
+        by_id = {
+            f.id: f
+            for f in db.query(Film)
+            .filter(Film.id.in_(ordered_ids))
+            .order_by(Film.date_ajout.desc())
+            .all()
+        }
+        rows = [by_id[i] for i in ordered_ids if i in by_id]
+        return {
+            "items": [_admin_film_row_dict(f) for f in rows],
+            "total": total_shows,
+            "page": page,
+            "page_size": page_size,
+            "paginate_by": paginate_by,
+        }
+
     total = query.count()
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
     return {
@@ -267,6 +318,7 @@ def admin_list_films(
         "total": total,
         "page": page,
         "page_size": page_size,
+        "paginate_by": "episode",
     }
 
 
