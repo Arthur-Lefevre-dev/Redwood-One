@@ -41,6 +41,7 @@
     .tk-msg .who em{color:#fca5a5;font-style:normal}
     .tk-reply-box{margin-top:14px}
     .tk-reply-box textarea{min-height:88px;margin-bottom:8px}
+    .tk-closed-notice{font-size:13px;color:#fbbf24;margin-top:14px;padding:12px;border-radius:8px;border:1px solid #854d0e;background:rgba(133,77,14,.2)}
     footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
   </style>
 </head>
@@ -148,20 +149,25 @@
           ? msgs
           : '<p style="font-size:12px;color:var(--muted)">Pas encore de réponse.</p>';
       const id = data.id;
+      const st = data.status || "";
+      const noReply = st === "closed" || st === "resolved";
+      const replyBlock = noReply
+        ? '<p class="tk-closed-notice">Ce ticket est <strong>résolu</strong> ou <strong>fermé</strong> — vous ne pouvez plus envoyer de message.</p>'
+        : '<div class="tk-reply-box"><label for="tk-reply-' +
+          id +
+          '">Votre réponse</label><textarea id="tk-reply-' +
+          id +
+          '" rows="4" placeholder="Écrivez ici…"></textarea><button type="button" class="btn tk-send-reply" data-tid="' +
+          id +
+          '">Envoyer</button><p class="msg" id="tk-reply-msg-' +
+          id +
+          '"></p></div>';
       host.innerHTML =
         '<p style="font-size:12px;color:var(--muted);margin-bottom:6px">Votre demande initiale</p><div class="body-preview">' +
         escapeHtml(data.body) +
         '</div><p style="font-size:12px;color:var(--muted);margin:14px 0 8px">Conversation</p>' +
         msgBlock +
-        '<div class="tk-reply-box"><label for="tk-reply-' +
-        id +
-        '">Votre réponse</label><textarea id="tk-reply-' +
-        id +
-        '" rows="4" placeholder="Écrivez ici…"></textarea><button type="button" class="btn tk-send-reply" data-tid="' +
-        id +
-        '">Envoyer</button><p class="msg" id="tk-reply-msg-' +
-        id +
-        '"></p></div>';
+        replyBlock;
     }
 
     function renderTickets(rows) {
@@ -183,6 +189,8 @@
           return (
             '<div class="ticket" data-id="' +
             t.id +
+            '" data-status="' +
+            escapeHtml(t.status || "") +
             '">' +
             "<h3>" +
             escapeHtml(t.subject) +
@@ -211,6 +219,20 @@
       if (sendBtn) {
         ev.stopPropagation();
         const tid = parseInt(sendBtn.getAttribute("data-tid"), 10);
+        const row = document.querySelector('.ticket[data-id="' + tid + '"]');
+        const rs = row && row.getAttribute("data-status");
+        if (rs === "closed" || rs === "resolved") {
+          const mEl = document.getElementById("tk-reply-msg-" + tid);
+          if (mEl) {
+            mEl.textContent =
+              rs === "resolved"
+                ? "Ce ticket est résolu."
+                : "Ce ticket est fermé.";
+            mEl.classList.add("err");
+            mEl.style.display = "block";
+          }
+          return;
+        }
         const ta = document.getElementById("tk-reply-" + tid);
         const mEl = document.getElementById("tk-reply-msg-" + tid);
         const text = (ta && ta.value.trim()) || "";
@@ -263,11 +285,10 @@
       });
       row.classList.toggle("open", !wasOpen);
       if (!row.classList.contains("open")) return;
-      if (row.getAttribute("data-loaded") === "1") return;
       try {
         const data = await apiJson("/api/support-tickets/" + id);
         renderThreadInto(sub, data);
-        row.setAttribute("data-loaded", "1");
+        row.setAttribute("data-status", data.status || "");
       } catch (e) {
         sub.innerHTML =
           '<p class="msg err" style="display:block">Impossible de charger le ticket.</p>';

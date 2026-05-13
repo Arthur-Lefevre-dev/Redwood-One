@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import asc, desc
+from sqlalchemy import asc, desc, func
 from sqlalchemy.orm import Session, joinedload
 
 from api.deps import get_current_user, require_admin
@@ -210,17 +210,19 @@ def post_viewer_reply(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Append a viewer reply on an owned ticket (reopens resolved/closed as open)."""
+    """Append a viewer reply on an owned ticket. Replies are not allowed when status is resolved or closed."""
     t = db.get(SupportTicket, ticket_id)
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="Ticket introuvable")
+    if t.status in (SupportTicketStatus.resolved, SupportTicketStatus.closed):
+        raise HTTPException(
+            status_code=403,
+            detail="Ce ticket est résolu ou fermé ; vous ne pouvez plus y répondre.",
+        )
     now = datetime.utcnow()
     msg = SupportTicketMessage(ticket_id=t.id, author_id=user.id, body=body.body, created_at=now)
     db.add(msg)
     t.updated_at = now
-    if t.status in (SupportTicketStatus.resolved, SupportTicketStatus.closed):
-        t.status = SupportTicketStatus.open
-        t.resolved_at = None
     db.add(t)
     db.commit()
     db.refresh(t)
@@ -269,6 +271,24 @@ def admin_list_tickets(
         "offset": offset,
         "limit": limit,
     }
+
+
+@admin_router.get("/pending-count")
+def admin_support_tickets_pending_count(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> Dict[str, Any]:
+    """Count tickets awaiting action (open or in progress)."""
+    n = (
+        db.query(func.count(SupportTicket.id))
+        .filter(
+            SupportTicket.status.in_(
+                (SupportTicketStatus.open, SupportTicketStatus.in_progress)
+            )
+        )
+        .scalar()
+    )
+    return {"pending": int(n or 0)}
 
 
 @admin_router.get("/{ticket_id}")

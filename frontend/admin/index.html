@@ -1071,11 +1071,10 @@
         left: 50%;
         z-index: 220;
         max-width: min(440px, 94vw);
-        padding: 12px 20px;
+        padding: 10px 12px 10px 18px;
         border-radius: 10px;
         font-size: 14px;
         line-height: 1.4;
-        text-align: center;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
         border: 1px solid var(--color-border-tertiary);
         background: #1a2332;
@@ -1084,10 +1083,41 @@
         opacity: 0;
         transform: translateX(-50%) translateY(16px);
         transition: transform 0.28s ease, opacity 0.28s ease;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: left;
+      }
+      #admin-toast-host .admin-toast__msg {
+        flex: 1;
+        min-width: 0;
+      }
+      #admin-toast-host .admin-toast__close {
+        flex-shrink: 0;
+        width: 32px;
+        height: 32px;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--color-text-secondary);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, sans-serif;
+      }
+      #admin-toast-host .admin-toast__close:hover {
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
       }
       #admin-toast-host.admin-toast.admin-toast--show {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
       }
       #admin-toast-host.admin-toast--success {
         border-color: #166534;
@@ -1454,6 +1484,7 @@
           <div class="nav-item" data-page="support-tickets">
             <span class="nav-icon">✉</span>
             Tickets support
+            <span class="nav-badge red" id="badge-support-tickets" hidden></span>
           </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
@@ -4000,7 +4031,17 @@
       role="status"
       aria-live="polite"
       aria-atomic="true"
-    ></div>
+    >
+      <span class="admin-toast__msg" id="admin-toast-msg"></span>
+      <button
+        type="button"
+        class="admin-toast__close"
+        id="admin-toast-close"
+        aria-label="Fermer la notification"
+      >
+        ×
+      </button>
+    </div>
 
     <script
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
@@ -4013,9 +4054,10 @@
       /** Brief confirmation toast (bottom of viewport). variant: success | error */
       function showAdminToast(message, variant) {
         const el = $("#admin-toast-host");
+        const msgEl = $("#admin-toast-msg");
         if (!el) return;
         const v = variant === "error" ? "error" : "success";
-        el.textContent = message;
+        if (msgEl) msgEl.textContent = message;
         el.className = "admin-toast admin-toast--" + v;
         if (adminToastTimer) clearTimeout(adminToastTimer);
         requestAnimationFrame(() => {
@@ -4025,6 +4067,18 @@
           el.classList.remove("admin-toast--show");
         }, 3200);
       }
+
+      (function wireAdminToastClose() {
+        const btn = document.getElementById("admin-toast-close");
+        if (!btn || btn.dataset.wired === "1") return;
+        btn.dataset.wired = "1";
+        btn.addEventListener("click", () => {
+          const el = $("#admin-toast-host");
+          if (adminToastTimer) clearTimeout(adminToastTimer);
+          adminToastTimer = null;
+          if (el) el.classList.remove("admin-toast--show");
+        });
+      })();
 
       /** In-app modal (no window.alert). */
       function showAlertModal(title, message, opts = {}) {
@@ -5526,6 +5580,8 @@
           if (e && e.message === "403-admin") return;
           tb.innerHTML =
             '<tr><td colspan="6" style="color:#f87171">Erreur réseau.</td></tr>';
+        } finally {
+          void refreshSupportTicketBadge();
         }
       }
 
@@ -6178,6 +6234,28 @@
           const e2 = $("#st-err-vast");
           if (e2) e2.textContent = s.erreur;
           $("#badge-lib").textContent = s.disponible;
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+        } finally {
+          void refreshSupportTicketBadge();
+        }
+      }
+
+      async function refreshSupportTicketBadge() {
+        const el = $("#badge-support-tickets");
+        if (!el) return;
+        try {
+          const r = await api("/api/admin/support-tickets/pending-count");
+          if (!r.ok) return;
+          const j = await r.json();
+          const n = Number(j.pending) || 0;
+          if (n <= 0) {
+            el.textContent = "";
+            el.hidden = true;
+            return;
+          }
+          el.textContent = String(n);
+          el.hidden = false;
         } catch (e) {
           if (e && e.message === "403-admin") return;
         }
