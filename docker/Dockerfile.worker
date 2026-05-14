@@ -31,7 +31,7 @@ RUN pip3 install --no-cache-dir -r requirements-worker.txt
 COPY . .
 
 # Non-root user (same uid/gid as Dockerfile.api for shared volume tmp_data:/tmp/redwood)
-RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents && \
+RUN mkdir -p /tmp/redwood/uploads /tmp/redwood/torrents /tmp/redwood/torrent_blobs && \
     groupadd --gid 1000 redwood && \
     useradd --uid 1000 --gid redwood --home-dir /app --shell /bin/false redwood && \
     chown -R redwood:redwood /app /tmp/redwood
