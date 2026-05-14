@@ -131,11 +131,12 @@ class Settings(BaseSettings):
     # Optional flat estimate for local worker transcode (€ per minute of output), 0 = hide local line.
     BILLING_LOCAL_TRANSCODE_EUR_PER_MINUTE: float = 0.0
 
-    # Watch pages: optional Coinzilla tag (e.g. popunder). Paste the async script URL from the publisher dashboard.
-    WATCH_ADS_COINZILLA_ENABLED: bool = False
-    WATCH_ADS_COINZILLA_SCRIPT_SRC: str = ""
-    # If your snippet uses data-zone (or similar), set the zone id here; otherwise leave empty.
-    WATCH_ADS_COINZILLA_ZONE_ID: str = ""
+    # Watch film page: optional A-ADS (acceptable.a-ads.com) banner. Unit id from publisher dashboard.
+    WATCH_ADS_AADS_ENABLED: bool = False
+    WATCH_ADS_AADS_UNIT_ID: str = ""
+    # Login / register pages: optional A-ADS sticky bottom unit (separate id from film page).
+    WATCH_ADS_AADS_AUTH_ENABLED: bool = False
+    WATCH_ADS_AADS_AUTH_UNIT_ID: str = ""
 
     TORRENT_AUTO_RETRY_ENABLED: bool = True
     TORRENT_AUTO_RETRY_MAX: int = 5

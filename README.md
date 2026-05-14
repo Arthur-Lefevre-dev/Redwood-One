@@ -144,7 +144,7 @@ scripts/       # seed_admin.py, cleanup_redwood_tmp.sh, scripts SQL optionnels (
 | `/api/series/*` | Liste des séries, détail par `series_key` (saisons / épisodes) |
 | `/api/support-tickets/*` | Spectateur connecté : création de ticket, liste, détail, réponses |
 | `/api/donations/progress` | Spectateur connecté : objectif, avancement, fenêtre de campagne, adresses de dépôt (lecture seule) |
-| `/api/public/watch-ads` | JSON sans auth : configuration optionnelle du tag Coinzilla pour `/watch/film.html` (voir variables `WATCH_ADS_COINZILLA_*`) |
+| `/api/public/watch-ads` | JSON sans auth : **A-ADS** optionnel — `aads` (page film), `aads_auth` (connexion / inscription) ; variables `WATCH_ADS_AADS_*` et `WATCH_ADS_AADS_AUTH_*` |
 | `/api/admin/*` | Ressources admin : catalogue / films, upload, torrents, file Celery, sync S3, utilisateurs, invitations, estimation coûts **Vast**, dons crypto, **tickets support** ; `GET /api/admin/library-meta` (totaux bibliothèque). Pour les épisodes : `GET /api/admin/films?content_kind=series_episode&paginate_by=series_show` pagine par **bloc série** (défaut `episode` = dix lignes épisode). |
 
 Documentation interactive Swagger : `http://localhost:8000/docs` si vous exposez le port de l’API (ex. `docker compose port api 8000` ou profil de debug). Avec la config nginx fournie, seul le préfixe `/api/` est proxifié vers FastAPI : les routes `/docs` et `/openapi.json` ne sont pas servies sur le port 80 tant qu’elles ne sont pas ajoutées à nginx.
