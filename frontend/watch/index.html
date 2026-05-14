@@ -787,6 +787,14 @@
         panel.hidden = true;
         document.getElementById('latest-head').textContent = 'Derniers ajouts';
         renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
+        if (typeof window.refreshAllRowCarousels === 'function') {
+          requestAnimationFrame(function () {
+            window.refreshAllRowCarousels();
+            requestAnimationFrame(function () {
+              window.refreshAllRowCarousels();
+            });
+          });
+        }
         return;
       }
       browse.hidden = true;
@@ -808,6 +816,14 @@
       document.getElementById('search-series-head').hidden = !hasS;
       document.getElementById('row-search-series').hidden = !hasS;
       document.getElementById('search-empty').style.display = !hasF && !hasS ? 'block' : 'none';
+      if (typeof window.refreshAllRowCarousels === 'function') {
+        requestAnimationFrame(function () {
+          window.refreshAllRowCarousels();
+          requestAnimationFrame(function () {
+            window.refreshAllRowCarousels();
+          });
+        });
+      }
     }
 
     function renderLatestCards(container, list, opts) {

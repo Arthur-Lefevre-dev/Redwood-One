@@ -714,6 +714,33 @@ const ROW_CAROUSEL_SVG_PREV =
 const ROW_CAROUSEL_SVG_NEXT =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M10 18l6-6-6-6"/></svg>';
 
+/** True if the track is shown (not [hidden] / display:none on self or ancestor). */
+function rowScrollTrackIsDisplayed(track) {
+  if (!track || !track.isConnected) return false;
+  if (typeof track.checkVisibility === 'function') {
+    try {
+      return track.checkVisibility({ checkOpacity: false, checkVisibilityCSS: true });
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  var el = track;
+  while (el) {
+    if (el.hidden) return false;
+    var st = window.getComputedStyle(el);
+    if (st.display === 'none' || st.visibility === 'hidden') return false;
+    el = el.parentElement;
+  }
+  return true;
+}
+
+function hideRowCarouselNav(prev, next) {
+  prev.setAttribute('hidden', '');
+  next.setAttribute('hidden', '');
+  prev.disabled = true;
+  next.disabled = true;
+}
+
 /**
  * Wrap horizontal .row-scroll rows: hide scrollbar, prev/next scroll.
  * Skips tracks already inside .row-carousel. Safe to call multiple times.
@@ -752,6 +779,10 @@ function initRowCarousels() {
     }
 
     function updateArrows() {
+      if (!rowScrollTrackIsDisplayed(track) || track.children.length === 0) {
+        hideRowCarouselNav(prev, next);
+        return;
+      }
       var sl = view.scrollLeft;
       var max = view.scrollWidth - view.clientWidth - 2;
       var overflow = max > 4;
@@ -761,6 +792,8 @@ function initRowCarousels() {
       prev.disabled = sl <= 2;
       next.disabled = sl >= max;
     }
+
+    wrap._redwoodRowCarouselSync = updateArrows;
 
     prev.addEventListener('click', function () {
       view.scrollBy({
@@ -782,6 +815,13 @@ function initRowCarousels() {
       ro.observe(track);
     }
     updateArrows();
+  });
+}
+
+/** Recompute prev/next visibility for all row carousels (e.g. after search toggles [hidden] on a track). */
+function refreshAllRowCarousels() {
+  document.querySelectorAll('.row-carousel').forEach(function (w) {
+    if (typeof w._redwoodRowCarouselSync === 'function') w._redwoodRowCarouselSync();
   });
 }
 
@@ -807,3 +847,4 @@ window.initViewerAnnouncement = initViewerAnnouncement;
 window.watchEscapeHtml = watchEscapeHtml;
 window.initWatchNavInviteIcons = initWatchNavInviteIcons;
 window.initRowCarousels = initRowCarousels;
+window.refreshAllRowCarousels = refreshAllRowCarousels;
