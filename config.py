@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     VAST_TRANSCODE_DISK_GB: int = 32
     VAST_TRANSCODE_URL_TTL_SEC: int = 7200
     VAST_TRANSCODE_POLL_INTERVAL_SEC: int = 15
+    # While waiting for S3 output, poll Vast GET /instances/{id}/ at most this often (seconds).
+    VAST_TRANSCODE_INSTANCE_CHECK_SEC: int = 60
     VAST_TRANSCODE_MAX_WAIT_SEC: int = 7200
     # Seconds to wait in onstart for /dev/nvidia0 (Vast can attach GPU nodes slightly after boot).
     VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC: int = 90

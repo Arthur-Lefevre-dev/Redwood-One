@@ -4,7 +4,9 @@
 #
 # Run on the VPS (from docker/):
 #   docker compose exec worker bash /app/scripts/cleanup_redwood_tmp.sh --yes --all
-# Or dry-run:
+# If worker is not running, use a one-off container (same image + tmp volume):
+#   docker compose run --rm worker bash /app/scripts/cleanup_redwood_tmp.sh --dry-run --all
+# Dry-run with exec (requires worker up):
 #   docker compose exec worker bash /app/scripts/cleanup_redwood_tmp.sh --dry-run --all
 #
 # Stop active encodes/uploads before using --uploads or --all (otherwise you may delete in-use files).

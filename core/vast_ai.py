@@ -1,4 +1,4 @@
-"""Vast.ai REST client (GPU marketplace) — search offers, create / destroy instances. Comments in English."""
+"""Vast.ai REST client (GPU marketplace) — search offers, create instances, read instance status, destroy. Comments in English."""
 
 from __future__ import annotations
 
@@ -275,6 +275,35 @@ def is_no_such_ask_error(exc: BaseException) -> bool:
     """True if create_instance failed because the bundle offer id is gone (stale admin pick)."""
     s = str(exc).lower()
     return "no_such_ask" in s or "is not available" in s
+
+
+def get_instance(instance_id: int) -> Optional[Dict[str, Any]]:
+    """
+    GET /instances/{id}/?owner=me — return the instance row (same shape as vastai show instance --raw).
+
+    Returns None if the contract does not exist (HTTP 404). Raises RuntimeError on other errors
+    (auth, unexpected payload). Use during long polls to detect external destroy or host loss.
+    """
+    api_key = require_vast_api_key()
+    url = f"{_api_root()}/instances/{int(instance_id)}/"
+    with httpx.Client(timeout=45.0) as client:
+        r = client.get(url, headers=_bearer_headers(api_key), params={"owner": "me"})
+        try:
+            data = r.json()
+        except Exception:
+            data = {"raw": (r.text or "")[:2000]}
+        if r.status_code == 404:
+            if isinstance(data, dict) and data.get("error") == "no_such_instance":
+                return None
+            return None
+        if r.status_code >= 400:
+            raise RuntimeError(f"vast get_instance HTTP {r.status_code}: {data}")
+    if not isinstance(data, dict):
+        raise RuntimeError(f"vast get_instance: unexpected JSON type {type(data)}")
+    row = data.get("instances")
+    if not isinstance(row, dict):
+        raise RuntimeError(f"vast get_instance: missing or invalid 'instances' in response keys={list(data.keys())}")
+    return row
 
 
 def destroy_instance(instance_id: int) -> Dict[str, Any]:

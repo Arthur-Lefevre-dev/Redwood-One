@@ -223,6 +223,7 @@ def run_vast_transcode_test(
     ttl = int(s.VAST_TRANSCODE_URL_TTL_SEC)
     poll_sec = max(5, int(s.VAST_TRANSCODE_POLL_INTERVAL_SEC))
     max_wait = max(120, int(s.VAST_TRANSCODE_MAX_WAIT_SEC))
+    instance_check_sec = max(30, int(getattr(s, "VAST_TRANSCODE_INSTANCE_CHECK_SEC", 60) or 60))
     inst_id: Optional[int] = None
 
     def meta(**kw: Any) -> None:
@@ -390,9 +391,32 @@ def run_vast_transcode_test(
             )
             deadline = time.monotonic() + max_wait
             no_gpu_abort = False
+            last_instance_check = time.monotonic()
             while time.monotonic() < deadline:
                 if is_cancel_requested(rid):
                     raise RuntimeError("Cancelled by user")
+                if time.monotonic() - last_instance_check >= instance_check_sec:
+                    last_instance_check = time.monotonic()
+                    try:
+                        inst_row = vast_ai.get_instance(inst_id)
+                    except Exception:
+                        logger.warning(
+                            "vast_remote_transcode: get_instance failed id=%s (transient API?); retry next interval",
+                            inst_id,
+                            exc_info=True,
+                        )
+                    else:
+                        if inst_row is None:
+                            raise RuntimeError(
+                                f"Vast instance {inst_id} no longer exists (API 404). "
+                                "The contract was destroyed or is unavailable; transcoding cannot continue."
+                            )
+                        st = str(inst_row.get("actual_status") or "").strip().lower()
+                        if st in ("exited", "offline"):
+                            raise RuntimeError(
+                                f"Vast instance {inst_id} is not usable (actual_status={st!r}). "
+                                "The container stopped or the host went offline; transcoding cannot continue."
+                            )
                 sz = object_size_or_none(output_key)
                 if sz is not None and sz > 256_000:
                     time.sleep(5)

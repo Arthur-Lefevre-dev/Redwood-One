@@ -6556,8 +6556,23 @@
         _prevVastCeleryQueueByTaskId = next;
       }
 
+      /** Keys of queue rows whose task-details <details> was open (survives list rebuild on auto-refresh). */
+      function readOpenQueueDetailKeys(listEl) {
+        const keys = new Set();
+        if (!listEl) return keys;
+        listEl
+          .querySelectorAll(".queue-item details.queue-task-collapse[open]")
+          .forEach((det) => {
+            const row = det.closest(".queue-item");
+            const k = row && row.getAttribute("data-queue-detail-key");
+            if (k) keys.add(k);
+          });
+        return keys;
+      }
+
       function fillPipelineQueueList(listEl, items) {
         if (!listEl) return;
+        const restoreOpen = readOpenQueueDetailKeys(listEl);
         listEl.innerHTML = "";
         if (!items || items.length === 0) {
           const empty = document.createElement("div");
@@ -6570,6 +6585,7 @@
         items.forEach((i) => {
           const row = document.createElement("div");
           row.className = "queue-item";
+          row.setAttribute("data-queue-detail-key", "p:" + String(i.id));
           const st = i.statut;
           const pill =
             st === "erreur"
@@ -6649,6 +6665,8 @@
           if (tx) subParts.push(tx);
           if (tline) subParts.push(tline);
           row.querySelector(".qi-task-details-body").textContent = subParts.join("\n");
+          const detEl = row.querySelector("details.queue-task-collapse");
+          if (detEl && restoreOpen.has("p:" + String(i.id))) detEl.open = true;
           listEl.appendChild(row);
         });
       }
@@ -6694,6 +6712,7 @@
         const items = q.items || [];
         meta.textContent = `${items.length} tâche(s) Celery Vast`;
         detectVastCeleryQueueTransitions(items);
+        const restoreOpenVast = readOpenQueueDetailKeys(list);
         list.innerHTML = "";
         if (items.length === 0) {
           const empty = document.createElement("div");
@@ -6709,9 +6728,10 @@
         items.forEach((i) => {
           const row = document.createElement("div");
           row.className = "queue-item";
+          const tid = i.task_id ? String(i.task_id) : "";
+          if (tid) row.setAttribute("data-queue-detail-key", "v:" + tid);
           const pill = i.kind === "active" ? "s-transcoding" : "s-waiting";
           const label = i.kind === "active" ? "Actif" : "Réservé";
-          const tid = i.task_id ? String(i.task_id) : "";
           const cancelVastBtn = tid
             ? ` <button type="button" class="btn vast-celery-cancel" data-task-id="${tid}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
             : "";
@@ -6759,6 +6779,8 @@
           row.querySelector(".qi-task-details-body").textContent = subBits
             .filter(Boolean)
             .join("\n");
+          const detVast = row.querySelector("details.queue-task-collapse");
+          if (detVast && tid && restoreOpenVast.has("v:" + tid)) detVast.open = true;
           list.appendChild(row);
         });
       }
