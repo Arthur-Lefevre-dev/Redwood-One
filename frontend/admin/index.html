@@ -1525,7 +1525,7 @@
           <div class="nav-section">Communication</div>
           <div class="nav-item" data-page="announcement">
             <span class="nav-icon">◆</span>
-            Annonce spectateurs
+            Annonces (spectateur / login)
           </div>
           <div class="nav-item" data-page="donations">
             <span class="nav-icon">◈</span>
@@ -2360,10 +2360,10 @@
           <section class="page" id="page-announcement">
             <header class="topbar">
               <div>
-                <div class="page-title">Annonce spectateurs</div>
+                <div class="page-title">Annonces</div>
                 <div class="page-sub">
-                  Message global pour les utilisateurs connectés (espace
-                  spectateur)
+                  Bannière spectateurs connectés + annonces pages connexion /
+                  inscription (sans compte)
                 </div>
               </div>
             </header>
@@ -2439,6 +2439,155 @@
                     style="margin-left: 8px"
                   >
                     Effacer l’annonce
+                  </button>
+                </div>
+              </div>
+              <div class="card" style="margin-top: 16px">
+                <div class="card-head">
+                  <div class="card-title">Annonces connexion / inscription</div>
+                </div>
+                <div
+                  class="card-body"
+                  style="
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.55;
+                  "
+                >
+                  <p style="margin-bottom: 12px">
+                    Texte affiché sur <code>login.html</code> et
+                    <code>register.html</code> (API publique, sans HTML dans le
+                    corps). « Les deux » = même encart sur les deux pages.
+                  </p>
+                  <div style="overflow-x: auto; margin-bottom: 14px">
+                    <table class="film-table" style="min-width: 520px">
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Emplacement</th>
+                          <th>Titre</th>
+                          <th>Extrait</th>
+                          <th>Actif</th>
+                          <th>Ordre</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody id="apa-tbody"></tbody>
+                    </table>
+                  </div>
+                  <input type="hidden" id="apa-edit-id" value="" />
+                  <label for="apa-placement">Emplacement</label>
+                  <select
+                    id="apa-placement"
+                    style="
+                      display: block;
+                      width: 100%;
+                      max-width: 280px;
+                      margin-bottom: 10px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                    "
+                  >
+                    <option value="login">Connexion uniquement</option>
+                    <option value="register">Inscription uniquement</option>
+                    <option value="both">Les deux pages</option>
+                  </select>
+                  <label for="apa-title">Titre (optionnel)</label>
+                  <input
+                    type="text"
+                    id="apa-title"
+                    maxlength="200"
+                    placeholder="Ex. Maintenance prévue"
+                    style="
+                      display: block;
+                      width: 100%;
+                      margin-bottom: 10px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                    "
+                  />
+                  <label for="apa-body">Message</label>
+                  <textarea
+                    id="apa-body"
+                    style="
+                      display: block;
+                      width: 100%;
+                      min-height: 100px;
+                      margin-bottom: 10px;
+                      padding: 8px;
+                      border-radius: 8px;
+                      border: 1px solid var(--color-border-secondary);
+                      background: #0f0f0f;
+                      color: var(--color-text-primary);
+                      font-family: var(--font-sans);
+                      font-size: 13px;
+                      resize: vertical;
+                    "
+                  ></textarea>
+                  <div
+                    style="
+                      display: flex;
+                      flex-wrap: wrap;
+                      gap: 12px;
+                      align-items: center;
+                      margin-bottom: 10px;
+                    "
+                  >
+                    <div>
+                      <label for="apa-sort">Ordre d’affichage</label>
+                      <input
+                        type="number"
+                        id="apa-sort"
+                        value="0"
+                        min="-1000"
+                        max="1000"
+                        style="
+                          width: 100px;
+                          margin-left: 8px;
+                          padding: 8px;
+                          border-radius: 8px;
+                          border: 1px solid var(--color-border-secondary);
+                          background: #0f0f0f;
+                          color: var(--color-text-primary);
+                        "
+                      />
+                    </div>
+                    <label
+                      style="
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        cursor: pointer;
+                      "
+                    >
+                      <input type="checkbox" id="apa-active" checked />
+                      Annonce active
+                    </label>
+                  </div>
+                  <p
+                    id="apa-status"
+                    style="
+                      font-size: 11px;
+                      color: var(--color-text-tertiary);
+                      margin-bottom: 10px;
+                    "
+                  ></p>
+                  <button type="button" class="btn btn-primary" id="apa-save">
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    id="apa-new"
+                    style="margin-left: 8px"
+                  >
+                    Nouvelle annonce
                   </button>
                 </div>
               </div>
@@ -4810,7 +4959,10 @@
         if (nav) nav.classList.add("active");
         adminSyncMobileNavTitle(p);
         adminCloseMobileNav();
-        if (p === "announcement") loadViewerAnnouncementAdmin();
+        if (p === "announcement") {
+          loadViewerAnnouncementAdmin();
+          loadAuthPageAnnouncementsAdmin();
+        }
         if (p === "donations") loadDonationsAdmin();
         if (p === "support-tickets") void loadSupportTicketsAdmin();
         if (p === "films") loadLibrary();
@@ -6022,6 +6174,219 @@
           st.textContent = "Erreur réseau.";
         }
       });
+
+      function apaPlacementLabel(p) {
+        if (p === "login") return "Connexion";
+        if (p === "register") return "Inscription";
+        if (p === "both") return "Les deux";
+        return p || "—";
+      }
+
+      function apaClearForm() {
+        const idEl = $("#apa-edit-id");
+        if (idEl) idEl.value = "";
+        const pl = $("#apa-placement");
+        if (pl) pl.value = "login";
+        const ti = $("#apa-title");
+        if (ti) ti.value = "";
+        const bd = $("#apa-body");
+        if (bd) bd.value = "";
+        const so = $("#apa-sort");
+        if (so) so.value = "0";
+        const ac = $("#apa-active");
+        if (ac) ac.checked = true;
+      }
+
+      function apaFillForm(row) {
+        apaClearForm();
+        const idEl = $("#apa-edit-id");
+        if (idEl) idEl.value = String(row.id);
+        const pl = $("#apa-placement");
+        if (pl) pl.value = row.placement || "login";
+        const ti = $("#apa-title");
+        if (ti) ti.value = row.title || "";
+        const bd = $("#apa-body");
+        if (bd) bd.value = row.body || "";
+        const so = $("#apa-sort");
+        if (so) so.value = String(row.sort_order ?? 0);
+        const ac = $("#apa-active");
+        if (ac) ac.checked = !!row.is_active;
+        const st = $("#apa-status");
+        if (st)
+          st.textContent =
+            "Édition n°" + row.id + " — modifiez puis Enregistrer.";
+      }
+
+      function apaRenderTable(items) {
+        const tb = $("#apa-tbody");
+        if (!tb) return;
+        tb.innerHTML = "";
+        if (!items || !items.length) {
+          const tr = document.createElement("tr");
+          const td = document.createElement("td");
+          td.colSpan = 7;
+          td.style.opacity = "0.75";
+          td.textContent =
+            "Aucune annonce. Utilisez le formulaire ci-dessous puis Enregistrer.";
+          tr.appendChild(td);
+          tb.appendChild(tr);
+          return;
+        }
+        for (const row of items) {
+          const tr = document.createElement("tr");
+          const tdId = document.createElement("td");
+          tdId.textContent = String(row.id);
+          const tdPl = document.createElement("td");
+          tdPl.textContent = apaPlacementLabel(row.placement);
+          const tdTi = document.createElement("td");
+          tdTi.textContent = (row.title || "").trim() || "—";
+          const tdEx = document.createElement("td");
+          const preview = (row.body || "").replace(/\s+/g, " ").trim();
+          tdEx.textContent =
+            preview.length > 80 ? preview.slice(0, 80) + "…" : preview || "—";
+          const tdAc = document.createElement("td");
+          tdAc.textContent = row.is_active ? "oui" : "non";
+          const tdSo = document.createElement("td");
+          tdSo.textContent = String(row.sort_order ?? 0);
+          const tdOp = document.createElement("td");
+          const bEdit = document.createElement("button");
+          bEdit.type = "button";
+          bEdit.className = "btn";
+          bEdit.textContent = "Éditer";
+          bEdit.addEventListener("click", () => apaFillForm(row));
+          const bDel = document.createElement("button");
+          bDel.type = "button";
+          bDel.className = "btn";
+          bDel.style.marginLeft = "6px";
+          bDel.textContent = "Supprimer";
+          bDel.addEventListener("click", async () => {
+            if (!confirm("Supprimer l’annonce n°" + row.id + " ?")) return;
+            const st = $("#apa-status");
+            if (st) st.textContent = "Suppression…";
+            try {
+              const r = await api(
+                "/api/admin/auth-page-announcements/" + row.id,
+                { method: "DELETE" },
+              );
+              if (!r.ok) {
+                if (st) st.textContent = "Échec suppression.";
+                return;
+              }
+              apaClearForm();
+              if (st) st.textContent = "Supprimé.";
+              await loadAuthPageAnnouncementsAdmin();
+            } catch (e) {
+              if (e && e.message === "403-admin") return;
+              if (st) st.textContent = "Erreur réseau.";
+            }
+          });
+          tdOp.appendChild(bEdit);
+          tdOp.appendChild(bDel);
+          tr.appendChild(tdId);
+          tr.appendChild(tdPl);
+          tr.appendChild(tdTi);
+          tr.appendChild(tdEx);
+          tr.appendChild(tdAc);
+          tr.appendChild(tdSo);
+          tr.appendChild(tdOp);
+          tb.appendChild(tr);
+        }
+      }
+
+      async function loadAuthPageAnnouncementsAdmin() {
+        const tb = $("#apa-tbody");
+        if (!tb) return;
+        const st = $("#apa-status");
+        try {
+          const r = await api("/api/admin/auth-page-announcements");
+          if (!r.ok) {
+            if (st)
+              st.textContent =
+                "Impossible de charger les annonces (pages connexion / inscription).";
+            return;
+          }
+          const j = await r.json();
+          apaRenderTable(j.items || []);
+        } catch (e) {
+          if (e && e.message === "403-admin") return;
+          if (st) st.textContent = "Erreur réseau.";
+        }
+      }
+
+      const apaSaveBtn = $("#apa-save");
+      if (apaSaveBtn) {
+        apaSaveBtn.addEventListener("click", async () => {
+          const st = $("#apa-status");
+          const id = ($("#apa-edit-id") && $("#apa-edit-id").value || "").trim();
+          const placement = $("#apa-placement")
+            ? $("#apa-placement").value
+            : "login";
+          const title = ($("#apa-title") && $("#apa-title").value) || "";
+          const body = ($("#apa-body") && $("#apa-body").value || "").trim();
+          const sort = parseInt(
+            ($("#apa-sort") && $("#apa-sort").value) || "0",
+            10,
+          );
+          const active = $("#apa-active") ? $("#apa-active").checked : true;
+          if (!body) {
+            if (st) st.textContent = "Le message est obligatoire.";
+            return;
+          }
+          if (st) st.textContent = "Enregistrement…";
+          try {
+            let r;
+            if (id) {
+              r = await api("/api/admin/auth-page-announcements/" + id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  placement,
+                  title: title.trim(),
+                  body,
+                  sort_order: Number.isFinite(sort) ? sort : 0,
+                  is_active: active,
+                }),
+              });
+            } else {
+              r = await api("/api/admin/auth-page-announcements", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  placement,
+                  title: title.trim(),
+                  body,
+                  sort_order: Number.isFinite(sort) ? sort : 0,
+                  is_active: active,
+                }),
+              });
+            }
+            if (!r.ok) {
+              let t = "Échec";
+              try {
+                const j = await r.json();
+                if (j.detail) t = typeof j.detail === "string" ? j.detail : t;
+              } catch (_) {}
+              if (st) st.textContent = t;
+              return;
+            }
+            if (st) st.textContent = "Enregistré.";
+            apaClearForm();
+            await loadAuthPageAnnouncementsAdmin();
+          } catch (e) {
+            if (e && e.message === "403-admin") return;
+            if (st) st.textContent = "Erreur réseau.";
+          }
+        });
+      }
+
+      const apaNewBtn = $("#apa-new");
+      if (apaNewBtn) {
+        apaNewBtn.addEventListener("click", () => {
+          apaClearForm();
+          const st = $("#apa-status");
+          if (st) st.textContent = "Nouvelle annonce (formulaire vide).";
+        });
+      }
 
       function isoUtcToDatetimeLocal(iso) {
         if (!iso || typeof iso !== "string") return "";

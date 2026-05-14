@@ -696,6 +696,26 @@ def _widen_series_meta_poster_columns() -> None:
             )
 
 
+def _init_postgres_unaccent_flag() -> None:
+    """When PostgreSQL + contrib unaccent is available, film catalog search can match François / Francois."""
+    engine.info.pop("has_unaccent", None)
+    if engine.dialect.name != "postgresql":
+        engine.info["has_unaccent"] = False
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent"))
+        engine.info["has_unaccent"] = True
+        logger.info("database: unaccent extension enabled for catalog search")
+    except Exception as exc:
+        engine.info["has_unaccent"] = False
+        logger.warning(
+            "database: unaccent extension unavailable (%s); multi-token search still works, "
+            "accent-insensitive match may be limited",
+            exc,
+        )
+
+
 def init_db() -> None:
     """Create all tables (development / first boot)."""
     Base.metadata.create_all(bind=engine)
@@ -719,6 +739,7 @@ def init_db() -> None:
     _ensure_donation_settings_extended_columns()
     _widen_series_meta_poster_columns()
     _ensure_support_ticket_thread_schema()
+    _init_postgres_unaccent_flag()
 
 
 def get_db() -> Generator[Session, None, None]:

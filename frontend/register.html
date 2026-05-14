@@ -7,7 +7,34 @@
   <style>
     :root { --bg:#0a0a0a; --card:#141414; --border:#2a2a2a; --text:#f5f5f5; --muted:#a3a3a3; --accent:#8B2500; }
     * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:grid; place-items:center; padding:24px; }
+    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); margin:0; min-height:100vh; }
+    .auth-page-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px 16px;
+    }
+    .auth-announcements-host[hidden] { display: none !important; }
+    .auth-announcements-host {
+      width: min(420px, 100%);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .auth-announcement {
+      border: 1px solid #854d0e;
+      background: rgba(180, 83, 9, 0.14);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #fef3c7;
+    }
+    .auth-announcement-title { font-weight: 600; margin-bottom: 6px; color: #fde68a; }
+    .auth-announcement-body { white-space: pre-wrap; word-break: break-word; }
     .card { width:min(420px,100%); background:var(--card); border:1px solid var(--border); border-radius:12px; padding:28px; }
     h1 { font-size:1.25rem; margin-bottom:4px; }
     .sub { color:var(--muted); font-size:.85rem; margin-bottom:22px; line-height:1.5; }
@@ -21,7 +48,9 @@
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="auth-page-wrap">
+    <div id="auth-announcements" class="auth-announcements-host" hidden aria-live="polite"></div>
+    <div class="card">
     <h1>Créer un compte</h1>
     <p class="sub">Un code d’invitation fourni par un administrateur est requis (sauf si l’instance est en mode ouvert).</p>
     <form id="f">
@@ -41,7 +70,38 @@
     <p class="err" id="err"></p>
     <p class="ok" id="ok">Compte créé. Redirection…</p>
     <p class="links"><a href="/login.html">Déjà un compte ? Connexion</a></p>
+    </div>
   </div>
+  <script>
+    (function () {
+      var host = document.getElementById('auth-announcements');
+      if (!host) return;
+      fetch('/api/public/auth-page-announcements?placement=register', { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (data) {
+          var items = (data && data.items) || [];
+          if (!items.length) return;
+          host.removeAttribute('hidden');
+          items.forEach(function (item) {
+            var box = document.createElement('div');
+            box.className = 'auth-announcement';
+            box.setAttribute('role', 'status');
+            if (item.title) {
+              var h = document.createElement('div');
+              h.className = 'auth-announcement-title';
+              h.textContent = item.title;
+              box.appendChild(h);
+            }
+            var p = document.createElement('div');
+            p.className = 'auth-announcement-body';
+            p.textContent = item.body || '';
+            box.appendChild(p);
+            host.appendChild(box);
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
   <script>
     document.getElementById('f').addEventListener('submit', async (e) => {
       e.preventDefault();

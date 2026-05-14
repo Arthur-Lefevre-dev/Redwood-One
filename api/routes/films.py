@@ -8,11 +8,12 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import Text, cast, func, or_
+from sqlalchemy import Text, cast, func, literal, or_
 from sqlalchemy.orm import Session
 
 from api.deps import get_current_user, require_admin
 from config import get_settings
+from core.catalog_search import escape_like_pattern_fragment, split_search_tokens
 from core.imdbapi import metadata_from_imdb_title_id, parse_imdb_tt
 from core.series_grouping import normalize_series_group_key
 from core.series_playback import next_episode_id, prev_episode_id
@@ -45,6 +46,37 @@ def _filename_for_enrich(f: Film) -> str:
     return f"{t}.mp4"
 
 logger = logging.getLogger(__name__)
+
+
+def _film_search_token_clause(token: str, *, use_unaccent: bool):
+    """
+    One search token must match at least one text field (OR).
+    Multiple tokens are combined with AND at the query level so e.g. actor
+    "François Damiens" still matches JSON cast where names are not contiguous.
+    """
+    if not token or not str(token).strip():
+        return None
+    pat = f"%{escape_like_pattern_fragment(str(token).strip())}%"
+    esc = "\\"
+    if use_unaccent:
+        lit = literal(pat)
+        ua = lambda col: func.unaccent(func.coalesce(cast(col, Text), ""))
+        return or_(
+            ua(Film.titre).ilike(func.unaccent(lit)),
+            ua(Film.titre_original).ilike(func.unaccent(lit)),
+            ua(Film.realisateur).ilike(func.unaccent(lit)),
+            ua(Film.synopsis).ilike(func.unaccent(lit)),
+            ua(Film.acteurs).ilike(func.unaccent(lit)),
+            ua(Film.genres).ilike(func.unaccent(lit)),
+        )
+    return or_(
+        Film.titre.ilike(pat, escape=esc),
+        Film.titre_original.ilike(pat, escape=esc),
+        Film.realisateur.ilike(pat, escape=esc),
+        Film.synopsis.ilike(pat, escape=esc),
+        cast(Film.acteurs, Text).ilike(pat, escape=esc),
+        cast(Film.genres, Text).ilike(pat, escape=esc),
+    )
 
 
 class RefreshImdbApiBody(BaseModel):
@@ -182,17 +214,15 @@ def list_films(
         query = query.filter(cast(Film.acteurs, Text).ilike(f"%{actor.strip()}%"))
     if genre and genre.strip():
         query = query.filter(cast(Film.genres, Text).ilike(f"%{genre.strip()}%"))
-    if q:
-        like = f"%{q}%"
-        clauses = [
-            Film.titre.ilike(like),
-            Film.titre_original.ilike(like),
-            Film.realisateur.ilike(like),
-            Film.synopsis.ilike(like),
-            cast(Film.acteurs, Text).ilike(like),
-            cast(Film.genres, Text).ilike(like),
-        ]
-        query = query.filter(or_(*clauses))
+    if q and str(q).strip():
+        bind = db.get_bind()
+        use_unaccent = bool(
+            bind.dialect.name == "postgresql" and bind.engine.info.get("has_unaccent")
+        )
+        for token in split_search_tokens(q):
+            clause = _film_search_token_clause(token, use_unaccent=use_unaccent)
+            if clause is not None:
+                query = query.filter(clause)
     query = query.order_by(Film.date_ajout.desc())
     if limit is not None:
         return query.offset(offset).limit(limit).all()

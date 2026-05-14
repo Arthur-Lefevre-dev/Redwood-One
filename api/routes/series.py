@@ -22,21 +22,25 @@ router = APIRouter(prefix="/api/series", tags=["series"])
 
 def _series_matches_search(rep: Film, title: str, canon: str, sk_list: List[str], needle: str) -> bool:
     """Match query against show title, keys, episode row metadata, director, cast, synopsis."""
-    if not needle:
+    from core.catalog_search import fold_matching_ascii, split_search_tokens
+
+    tokens = split_search_tokens(needle)
+    if not tokens:
         return True
-    n = needle.lower()
     chunks = [
-        (title or "").lower(),
-        " ".join(sk_list).lower(),
-        canon.lower(),
-        (rep.series_title or "").lower(),
-        (rep.titre or "").lower(),
-        (rep.realisateur or "").lower(),
-        ((rep.synopsis or "").lower() if rep.synopsis else ""),
+        (title or ""),
+        " ".join(sk_list),
+        canon,
+        (rep.series_title or ""),
+        (rep.titre or ""),
+        (rep.realisateur or ""),
+        (rep.synopsis or "") if rep.synopsis else "",
     ]
     if rep.acteurs:
-        chunks.append(str(rep.acteurs).lower())
-    return any(n in c for c in chunks if c)
+        chunks.append(str(rep.acteurs))
+    combined = " ".join(chunks)
+    ch = fold_matching_ascii(combined).lower()
+    return all(fold_matching_ascii(t).lower() in ch for t in tokens)
 
 
 def _merge_show_meta_rows(rows: List[SeriesShowMeta]) -> tuple[Optional[str], Optional[str]]:

@@ -35,6 +35,7 @@ from core.upload import save_upload_stream
 from core.s3 import delete_object_key, object_size_or_none, upload_file
 from core.vast_transcode_cancel import cancel_vast_transcode_test, store_job_envelope
 from db.models import (
+    AuthPageAnnouncement,
     ContentKind,
     Film,
     FilmSource,
@@ -1959,6 +1960,129 @@ def admin_put_viewer_announcement(
         "ends_at": ends.strftime("%Y-%m-%dT%H:%M:%SZ") if ends else None,
         "active": _is_active(row),
     }
+
+
+_PLACEMENTS = frozenset({"login", "register", "both"})
+
+
+def _normalize_auth_page_placement(raw: str) -> str:
+    p = (raw or "").strip().lower()
+    if p not in _PLACEMENTS:
+        raise HTTPException(status_code=400, detail="placement must be login, register, or both")
+    return p
+
+
+def _serialize_auth_page_announcement_admin(row: AuthPageAnnouncement) -> Dict[str, Any]:
+    ca = row.created_at
+    ua = row.updated_at
+    return {
+        "id": row.id,
+        "placement": row.placement,
+        "title": row.title or "",
+        "body": row.body or "",
+        "is_active": bool(row.is_active),
+        "sort_order": int(row.sort_order or 0),
+        "created_at": ca.strftime("%Y-%m-%dT%H:%M:%SZ") if ca else None,
+        "updated_at": ua.strftime("%Y-%m-%dT%H:%M:%SZ") if ua else None,
+    }
+
+
+class AuthPageAnnouncementCreateBody(BaseModel):
+    placement: str
+    title: str = ""
+    body: str = Field(..., min_length=1, max_length=8000)
+    is_active: bool = True
+    sort_order: int = Field(default=0, ge=-1000, le=1000)
+
+
+class AuthPageAnnouncementPatchBody(BaseModel):
+    placement: Optional[str] = None
+    title: Optional[str] = None
+    body: Optional[str] = Field(default=None, max_length=8000)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(default=None, ge=-1000, le=1000)
+
+
+@router.get("/auth-page-announcements")
+def admin_list_auth_page_announcements(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rows = (
+        db.query(AuthPageAnnouncement)
+        .order_by(AuthPageAnnouncement.sort_order.asc(), AuthPageAnnouncement.id.asc())
+        .all()
+    )
+    return {"items": [_serialize_auth_page_announcement_admin(r) for r in rows]}
+
+
+@router.post("/auth-page-announcements")
+def admin_create_auth_page_announcement(
+    body: AuthPageAnnouncementCreateBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    placement = _normalize_auth_page_placement(body.placement)
+    msg = (body.body or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="body is required")
+    now = datetime.now(timezone.utc)
+    row = AuthPageAnnouncement(
+        placement=placement,
+        title=(body.title or "").strip() or None,
+        body=msg,
+        is_active=bool(body.is_active),
+        sort_order=int(body.sort_order),
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _serialize_auth_page_announcement_admin(row)
+
+
+@router.patch("/auth-page-announcements/{announcement_id}")
+def admin_patch_auth_page_announcement(
+    announcement_id: int,
+    body: AuthPageAnnouncementPatchBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = db.get(AuthPageAnnouncement, int(announcement_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    if body.placement is not None:
+        row.placement = _normalize_auth_page_placement(body.placement)
+    if body.title is not None:
+        row.title = (body.title or "").strip() or None
+    if body.body is not None:
+        b = (body.body or "").strip()
+        if not b:
+            raise HTTPException(status_code=400, detail="body cannot be empty")
+        row.body = b
+    if body.is_active is not None:
+        row.is_active = bool(body.is_active)
+    if body.sort_order is not None:
+        row.sort_order = int(body.sort_order)
+    row.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(row)
+    return _serialize_auth_page_announcement_admin(row)
+
+
+@router.delete("/auth-page-announcements/{announcement_id}")
+def admin_delete_auth_page_announcement(
+    announcement_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = db.get(AuthPageAnnouncement, int(announcement_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    db.delete(row)
+    db.commit()
+    return {"ok": True}
 
 
 def _strip_addr(s: Optional[str]) -> Optional[str]:

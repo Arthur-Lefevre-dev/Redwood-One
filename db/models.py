@@ -263,6 +263,24 @@ class ViewerAnnouncement(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class AuthPageAnnouncement(Base):
+    """Admin-managed notices on public login / register pages (plain text body)."""
+
+    __tablename__ = "auth_page_announcements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # "login" | "register" | "both" (shown on both pages)
+    placement: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (Index("ix_auth_page_announcements_active_placement", "is_active", "placement"),)
+
+
 class SupportTicket(Base):
     """Viewer-submitted support ticket (content request, bug, suggestion, account, …)."""
 

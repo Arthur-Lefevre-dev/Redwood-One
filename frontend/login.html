@@ -19,9 +19,39 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      display: grid;
-      place-items: center;
+      margin: 0;
     }
+    .auth-page-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px 16px;
+    }
+    .auth-announcements-host[hidden] { display: none !important; }
+    .auth-announcements-host {
+      width: min(400px, 92vw);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .auth-announcement {
+      border: 1px solid #854d0e;
+      background: rgba(180, 83, 9, 0.14);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #fef3c7;
+    }
+    .auth-announcement-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #fde68a;
+    }
+    .auth-announcement-body { white-space: pre-wrap; word-break: break-word; }
     .card {
       width: min(400px, 92vw);
       background: var(--card);
@@ -94,7 +124,9 @@
   </style>
 </head>
 <body>
-  <div class="card">
+  <div class="auth-page-wrap">
+    <div id="auth-announcements" class="auth-announcements-host" hidden aria-live="polite"></div>
+    <div class="card">
     <h1>Espace spectateur</h1>
     <p class="sub">Connexion pour regarder le catalogue</p>
     <form id="f">
@@ -122,7 +154,38 @@
     <p class="links">
       <a href="/register.html">Créer un compte</a>
     </p>
+    </div>
   </div>
+  <script>
+    (function () {
+      const host = document.getElementById('auth-announcements');
+      if (!host) return;
+      fetch('/api/public/auth-page-announcements?placement=login', { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (data) {
+          var items = (data && data.items) || [];
+          if (!items.length) return;
+          host.removeAttribute('hidden');
+          items.forEach(function (item) {
+            var box = document.createElement('div');
+            box.className = 'auth-announcement';
+            box.setAttribute('role', 'status');
+            if (item.title) {
+              var h = document.createElement('div');
+              h.className = 'auth-announcement-title';
+              h.textContent = item.title;
+              box.appendChild(h);
+            }
+            var p = document.createElement('div');
+            p.className = 'auth-announcement-body';
+            p.textContent = item.body || '';
+            box.appendChild(p);
+            host.appendChild(box);
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
   <script>
     (function () {
       const inp = document.getElementById('p');
