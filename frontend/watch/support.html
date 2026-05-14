@@ -95,7 +95,7 @@
     <section>
       <h2>Mes tickets</h2>
       <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Cliquez sur un ticket pour voir la conversation et répondre.</p>
-      <div id="tk-list"><p style="font-size:13px;color:var(--muted)">Chargement…</p></div>
+      <div id="tk-list"></div>
     </section>
   </main>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
@@ -303,6 +303,8 @@
 
     async function refreshList() {
       const host = document.getElementById('tk-list');
+      const main = document.querySelector('main');
+      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
       try {
         const data = await apiJson('/api/support-tickets');
         renderTickets(data.tickets || []);
@@ -311,6 +313,8 @@
           '<p class="msg err" style="display:block">Impossible de charger les tickets : ' +
           escapeHtml(e.message || e) +
           '</p>';
+      } finally {
+        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
       }
     }
 

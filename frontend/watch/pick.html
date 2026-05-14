@@ -239,6 +239,7 @@
     document.getElementById('pick-score-min').addEventListener('input', () => renderPickActiveFilters());
 
     document.getElementById('btn-surprise').addEventListener('click', async () => {
+      if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow('Choix en cours…');
       try {
         const p = new URLSearchParams();
         if (pickDirector) p.set('director', pickDirector);
@@ -253,6 +254,8 @@
         location.href = '/watch/film.html?id=' + f.id;
       } catch (_) {
         alert('Impossible de tirer un titre (catalogue vide ou aucun film ne correspond à ces filtres).');
+      } finally {
+        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
       }
     });
 
@@ -270,6 +273,8 @@
     });
 
     async function boot() {
+      if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow();
+      try {
       const me = await apiJson('/api/auth/me');
       const prefs =
         me.preferences && me.preferences.favorite_genres ? me.preferences.favorite_genres : [];
@@ -285,6 +290,9 @@
       renderTasteGrid();
       refreshPickChips();
       renderPickActiveFilters();
+      } finally {
+        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
+      }
     }
 
     document.getElementById('taste-search').addEventListener('input', () => renderTasteGrid());

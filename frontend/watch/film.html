@@ -390,6 +390,8 @@
     });
 
     async function boot() {
+      if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow('Chargement du film…');
+      try {
       await apiJson('/api/auth/me');
       if (!id) { location.href = '/watch/'; return; }
       const f = await apiJson('/api/films/' + id);
@@ -621,6 +623,9 @@
 
       sim.innerHTML = '';
       loadSimilarFilmsPage();
+      } finally {
+        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
+      }
     }
     if (typeof initRowCarousels === 'function') initRowCarousels();
     boot().catch((e) => {

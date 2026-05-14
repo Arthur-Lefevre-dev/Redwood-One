@@ -800,10 +800,17 @@
       browse.hidden = true;
       panel.hidden = false;
       document.getElementById('search-main-title').textContent = 'Résultats : « ' + q + ' »';
-      const [films, series] = await Promise.all([
-        apiJson('/api/films?q=' + encodeURIComponent(q)),
-        apiJson('/api/series?q=' + encodeURIComponent(q)),
-      ]);
+      if (typeof watchHomeSearchLoadingBar === 'function') watchHomeSearchLoadingBar(panel, true);
+      let films;
+      let series;
+      try {
+        [films, series] = await Promise.all([
+          apiJson('/api/films?q=' + encodeURIComponent(q)),
+          apiJson('/api/series?q=' + encodeURIComponent(q)),
+        ]);
+      } finally {
+        if (typeof watchHomeSearchLoadingBar === 'function') watchHomeSearchLoadingBar(panel, false);
+      }
       renderCards(document.getElementById('row-search-films'), films.slice(0, 48), {
         markNew: false,
         latestTopN: 0,
@@ -936,12 +943,19 @@
         });
       } catch (_) {}
     }
+    if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow();
     initRowCarousels();
-    boot().catch((e) => {
-      if (e && e.message === '401') { location.href = '/login.html'; return; }
-      console.error(e);
-      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
-    });
+    (async function () {
+      try {
+        await boot();
+      } catch (e) {
+        if (e && e.message === '401') { location.href = '/login.html'; return; }
+        console.error(e);
+        alert('Chargement impossible : ' + (e && e.message ? e.message : e));
+      } finally {
+        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
+      }
+    })();
   </script>
 </body>
 </html>

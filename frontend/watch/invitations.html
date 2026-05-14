@@ -387,12 +387,20 @@
       setTimeout(() => { b.textContent = prev; }, 1600);
     });
 
-    loadMe().catch((e) => {
-      if (e && e.message === '401') { window.location.href = '/login.html'; return; }
-      console.error(e);
-      alert('Impossible de charger le profil : ' + (e.message || e));
-      window.location.href = '/watch/';
-    });
+    (async function () {
+      const main = document.querySelector('main');
+      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
+      try {
+        await loadMe();
+      } catch (e) {
+        if (e && e.message === '401') { window.location.href = '/login.html'; return; }
+        console.error(e);
+        alert('Impossible de charger le profil : ' + (e.message || e));
+        window.location.href = '/watch/';
+      } finally {
+        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
+      }
+    })();
   </script>
 </body>
 </html>

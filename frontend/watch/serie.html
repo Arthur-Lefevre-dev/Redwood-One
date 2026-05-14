@@ -258,6 +258,9 @@
 
     async function bootList(q) {
       disconnectSeriesListObserver();
+      const listRoot = document.getElementById('main-list');
+      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(listRoot);
+      try {
       const needle = (q || '').trim();
       seriesListState = { offset: 0, needle, loading: false, done: false };
       const g = document.getElementById('series-grid');
@@ -287,6 +290,9 @@
       seriesListState.offset += rows.length;
       if (rows.length < SERIES_PAGE) seriesListState.done = true;
       setupSeriesListObserver();
+      } finally {
+        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(listRoot);
+      }
     }
 
     function applySerieTmdbScore(note) {
@@ -422,6 +428,8 @@
     });
 
     async function boot() {
+      if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow();
+      try {
       await apiJson('/api/auth/me');
       const listQ = (params.get('q') || '').trim();
       document.getElementById('nav-q').value = listQ;
@@ -431,6 +439,9 @@
       } else {
         showList();
         await bootList(listQ);
+      }
+      } finally {
+        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
       }
     }
     boot().catch((e) => {

@@ -97,29 +97,36 @@
       }, 350);
     });
 
-    apiJson('/api/auth/me').then(async () => {
-      const genres = await apiJson('/api/films/genres-summary');
-      const gEl = document.getElementById('cats');
-      genres.forEach(g => {
-        const c = document.createElement('div');
-        c.className = 'cat-card';
-        const poster = (g.poster_url && String(g.poster_url)) || (g.poster_path ? posterUrl(g.poster_path) : '');
-        const bg = poster
-          ? `<div class="cat-card-bg" style="background-image:url('${poster.replace(/'/g, "\\'")}')"></div><div class="cat-card-shade"></div>`
-          : '';
-        c.innerHTML = bg + '<div class="accent-bar"></div><div class="cat-card-inner"><div class="name"></div><div class="count"></div></div>';
-        c.querySelector('.name').textContent = g.name;
-        c.querySelector('.count').textContent = g.count + ' titre' + (g.count > 1 ? 's' : '');
-        c.onclick = () => {
-          location.href = '/watch/films.html?genre=' + encodeURIComponent(g.name);
-        };
-        gEl.appendChild(c);
-      });
-    }).catch((e) => {
-      if (e && e.message === '401') { location.href = '/login.html'; return; }
-      console.error(e);
-      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
-    });
+    (async function () {
+      const main = document.querySelector('main');
+      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
+      try {
+        await apiJson('/api/auth/me');
+        const genres = await apiJson('/api/films/genres-summary');
+        const gEl = document.getElementById('cats');
+        genres.forEach(g => {
+          const c = document.createElement('div');
+          c.className = 'cat-card';
+          const poster = (g.poster_url && String(g.poster_url)) || (g.poster_path ? posterUrl(g.poster_path) : '');
+          const bg = poster
+            ? `<div class="cat-card-bg" style="background-image:url('${poster.replace(/'/g, "\\'")}')"></div><div class="cat-card-shade"></div>`
+            : '';
+          c.innerHTML = bg + '<div class="accent-bar"></div><div class="cat-card-inner"><div class="name"></div><div class="count"></div></div>';
+          c.querySelector('.name').textContent = g.name;
+          c.querySelector('.count').textContent = g.count + ' titre' + (g.count > 1 ? 's' : '');
+          c.onclick = () => {
+            location.href = '/watch/films.html?genre=' + encodeURIComponent(g.name);
+          };
+          gEl.appendChild(c);
+        });
+      } catch (e) {
+        if (e && e.message === '401') { location.href = '/login.html'; return; }
+        console.error(e);
+        alert('Chargement impossible : ' + (e && e.message ? e.message : e));
+      } finally {
+        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
+      }
+    })();
   </script>
 </body>
 </html>

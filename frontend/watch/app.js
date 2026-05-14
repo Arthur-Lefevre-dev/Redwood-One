@@ -692,6 +692,139 @@ async function initViewerAnnouncement() {
   }
 }
 
+// ── Page loading overlays (watch HTML pages) ─────────────────────────────
+
+let _watchLoadingStylesInjected = false;
+let _watchPageLoadingDepth = 0;
+
+function injectWatchLoadingStyles() {
+  if (_watchLoadingStylesInjected) return;
+  _watchLoadingStylesInjected = true;
+  const s = document.createElement('style');
+  s.id = 'watch-loading-style-tag';
+  s.textContent = `
+    #watch-page-loading[hidden]{display:none!important}
+    #watch-page-loading{
+      position:fixed;inset:0;z-index:99999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+      background:rgba(10,10,10,.82);backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+      padding:24px;
+    }
+    body.watch-page-loading-active{overflow:hidden}
+    .watch-page-loading-spinner{
+      width:46px;height:46px;border-radius:50%;
+      border:3px solid rgba(255,255,255,.1);
+      border-top-color:#fecaca;
+      animation:watch-loading-spin .78s linear infinite;
+    }
+    @keyframes watch-loading-spin{to{transform:rotate(360deg)}}
+    .watch-page-loading-text{
+      margin:0;color:#e8e8e8;font-size:15px;font-weight:500;letter-spacing:.02em;text-align:center;max-width:320px;
+    }
+    @media (prefers-reduced-motion:reduce){
+      .watch-page-loading-spinner{animation:none;border-top-color:rgba(254,202,202,.5);opacity:.9}
+    }
+    .watch-scoped-loading-host{position:relative!important}
+    .watch-scoped-loading{
+      position:absolute;inset:0;z-index:40;
+      display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;
+      background:rgba(10,10,10,.62);backdrop-filter:blur(4px);
+      -webkit-backdrop-filter:blur(4px);
+    }
+    .watch-scoped-loading[hidden]{display:none!important}
+    .watch-scoped-loading .watch-page-loading-spinner{width:40px;height:40px;border-width:2.5px}
+    .watch-inline-loading-bar{
+      height:3px;border-radius:999px;width:100%;max-width:min(520px,92vw);margin:0 auto 14px;
+      background:linear-gradient(90deg,#2a1814,#fecaca,#ea580c,#fecaca,#2a1814);
+      background-size:220% 100%;
+      animation:watch-loading-shimmer 1.15s ease-in-out infinite;
+    }
+    @keyframes watch-loading-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+    @media (prefers-reduced-motion:reduce){
+      .watch-inline-loading-bar{animation:none;opacity:.55;background:#333}
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+/** Full-screen dimmed overlay + spinner; supports nested show/hide via depth counter. */
+function watchPageLoadingShow(message) {
+  injectWatchLoadingStyles();
+  _watchPageLoadingDepth++;
+  document.body.classList.add('watch-page-loading-active');
+  let el = document.getElementById('watch-page-loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'watch-page-loading';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.innerHTML =
+      '<div class="watch-page-loading-spinner" aria-hidden="true"></div>' +
+      '<p class="watch-page-loading-text"></p>';
+    document.body.appendChild(el);
+  }
+  const t = el.querySelector('.watch-page-loading-text');
+  if (t) t.textContent = message != null && String(message).trim() ? String(message).trim() : 'Chargement…';
+  el.removeAttribute('hidden');
+}
+
+function watchPageLoadingHide() {
+  _watchPageLoadingDepth = Math.max(0, _watchPageLoadingDepth - 1);
+  if (_watchPageLoadingDepth > 0) return;
+  document.body.classList.remove('watch-page-loading-active');
+  const el = document.getElementById('watch-page-loading');
+  if (el) el.setAttribute('hidden', '');
+}
+
+/**
+ * Semi-opaque overlay on a host (e.g. main) while a section refetches.
+ * Inserts one direct child .watch-scoped-loading.
+ */
+function watchScopedLoadingShow(host) {
+  injectWatchLoadingStyles();
+  if (!host || !host.appendChild) return;
+  host.classList.add('watch-scoped-loading-host');
+  let layer = host.querySelector(':scope > .watch-scoped-loading');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'watch-scoped-loading';
+    layer.setAttribute('role', 'status');
+    layer.setAttribute('aria-live', 'polite');
+    layer.innerHTML =
+      '<div class="watch-page-loading-spinner" aria-hidden="true"></div>' +
+      '<p class="watch-page-loading-text" style="font-size:13px;margin:0">Chargement…</p>';
+    host.appendChild(layer);
+  }
+  layer.removeAttribute('hidden');
+}
+
+function watchScopedLoadingHide(host) {
+  if (!host) return;
+  const layer = host.querySelector(':scope > .watch-scoped-loading');
+  if (layer) layer.setAttribute('hidden', '');
+  host.classList.remove('watch-scoped-loading-host');
+}
+
+/** Thin animated bar at top of home search panel (index). */
+function watchHomeSearchLoadingBar(panel, show) {
+  injectWatchLoadingStyles();
+  if (!panel) return;
+  const cls = 'watch-inline-loading-bar';
+  let bar = panel.querySelector('.' + cls);
+  if (!show) {
+    if (bar) bar.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = cls;
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', 'Chargement des résultats');
+    panel.insertBefore(bar, panel.firstChild);
+  }
+}
+
 /** SVG for admin shortcut in the mobile drawer (aligns with Invitations row). */
 function watchNavDrawerAdminIconSvg() {
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>';
@@ -848,3 +981,8 @@ window.watchEscapeHtml = watchEscapeHtml;
 window.initWatchNavInviteIcons = initWatchNavInviteIcons;
 window.initRowCarousels = initRowCarousels;
 window.refreshAllRowCarousels = refreshAllRowCarousels;
+window.watchPageLoadingShow = watchPageLoadingShow;
+window.watchPageLoadingHide = watchPageLoadingHide;
+window.watchScopedLoadingShow = watchScopedLoadingShow;
+window.watchScopedLoadingHide = watchScopedLoadingHide;
+window.watchHomeSearchLoadingBar = watchHomeSearchLoadingBar;

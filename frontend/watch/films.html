@@ -116,6 +116,9 @@
     }
 
     async function loadFilms() {
+      const main = document.querySelector('main');
+      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
+      try {
       const f = readFiltersFromUrl();
       document.getElementById('nav-q').value = f.q;
       const rows = await apiJson(buildListApiQuery(f));
@@ -155,6 +158,9 @@
         card.querySelector('.t').textContent = sub ? film.titre + '\n' + sub : film.titre;
         g.appendChild(card);
       });
+      } finally {
+        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
+      }
     }
 
     let searchTimer;
