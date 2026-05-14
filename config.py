@@ -134,9 +134,14 @@ class Settings(BaseSettings):
     # Watch film page: optional A-ADS (acceptable.a-ads.com) banner. Unit id from publisher dashboard.
     WATCH_ADS_AADS_ENABLED: bool = False
     WATCH_ADS_AADS_UNIT_ID: str = ""
+    # Optional smaller-screen unit (e.g. Adaptive mobile snippet); if empty, desktop unit is reused with mobile layout.
+    WATCH_ADS_AADS_MOBILE_UNIT_ID: str = ""
     # Login / register pages: optional A-ADS sticky bottom unit (separate id from film page).
     WATCH_ADS_AADS_AUTH_ENABLED: bool = False
     WATCH_ADS_AADS_AUTH_UNIT_ID: str = ""
+    # Optional sticky top strip on login / register for wide viewports (desktop A-ADS).
+    WATCH_ADS_AADS_AUTH_TOP_ENABLED: bool = False
+    WATCH_ADS_AADS_AUTH_TOP_UNIT_ID: str = ""
 
     TORRENT_AUTO_RETRY_ENABLED: bool = True
     TORRENT_AUTO_RETRY_MAX: int = 5

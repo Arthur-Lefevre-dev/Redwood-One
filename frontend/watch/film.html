@@ -338,6 +338,7 @@
   </main>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
   <script src="/watch/js/watch-ads-loader.js"></script>
+  <script src="/watch/js/watch-adblock-notice.js"></script>
   <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
   <script src="/watch/app.js"></script>
   <script>
@@ -570,6 +571,27 @@
         btn.style.removeProperty('display');
       }
       player.on('ready', revealPlyrCaptionsButton);
+      if (!video.dataset.redwoodSpaceToggleBound) {
+        video.dataset.redwoodSpaceToggleBound = '1';
+        document.addEventListener(
+          'keydown',
+          (ev) => {
+            if (ev.code !== 'Space' && ev.key !== ' ') return;
+            if (ev.target === video) return;
+            const tgt = ev.target;
+            if (tgt && typeof tgt.closest === 'function') {
+              if (tgt.closest('input, textarea, select, [contenteditable="true"], button, a, summary')) return;
+            }
+            const trailerEl = document.getElementById('trailer-modal');
+            if (trailerEl && !trailerEl.hidden) return;
+            const adModalEl = document.getElementById('film-ad-modal');
+            if (adModalEl && !adModalEl.hidden) return;
+            ev.preventDefault();
+            player.togglePlay();
+          },
+          true,
+        );
+      }
       video.addEventListener('loadedmetadata', revealPlyrCaptionsButton);
       setTimeout(revealPlyrCaptionsButton, 400);
       const playerWrap = document.querySelector('.player-wrap');
