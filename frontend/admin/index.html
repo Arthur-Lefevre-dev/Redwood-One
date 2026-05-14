@@ -541,6 +541,39 @@
         white-space: pre-line;
         line-height: 1.45;
       }
+      /* Collapsible task metadata (pipeline + Vast Celery queues) */
+      .queue-task-collapse {
+        margin-top: 6px;
+        border-radius: var(--border-radius-md);
+        border: 0.5px solid var(--color-border-tertiary);
+        background: rgba(0, 0, 0, 0.2);
+      }
+      .queue-task-collapse > summary {
+        cursor: pointer;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--color-text-secondary);
+        padding: 6px 10px;
+        list-style: none;
+        user-select: none;
+      }
+      .queue-task-collapse > summary::-webkit-details-marker {
+        display: none;
+      }
+      .queue-task-collapse > summary::before {
+        content: "▸ ";
+        display: inline-block;
+        width: 1em;
+        color: var(--color-text-tertiary);
+      }
+      .queue-task-collapse[open] > summary::before {
+        content: "▾ ";
+      }
+      .qi-task-details-body {
+        padding: 8px 10px 10px;
+        margin: 0;
+        border-top: 0.5px solid var(--color-border-tertiary);
+      }
       .qi-status {
         flex-shrink: 0;
       }
@@ -1375,6 +1408,11 @@
           flex-wrap: wrap;
           align-items: flex-start;
           gap: 10px;
+        }
+        .queue-task-collapse > summary {
+          min-height: 40px;
+          display: flex;
+          align-items: center;
         }
         .qi-status {
           width: 100%;
@@ -4523,6 +4561,13 @@
         if (j.meta && j.meta.remote_out_time_ms) {
           line += " · ffmpeg out_time_ms=" + j.meta.remote_out_time_ms;
         }
+        if (
+          j.meta &&
+          j.meta.vast_instance_id != null &&
+          Number.isFinite(Number(j.meta.vast_instance_id))
+        ) {
+          line += " · instance ID " + j.meta.vast_instance_id;
+        }
         $("#vast-task-line").textContent = line;
         const pct =
           j.state === "SUCCESS"
@@ -6566,8 +6611,11 @@
       <div class="qi-icon">▶</div>
       <div class="qi-info">
         <div class="qi-title"></div>
-        <div class="qi-sub"></div>
         <div class="progress-bar"><div class="progress-fill" style="width:${progW}%"></div></div>
+        <details class="queue-task-collapse">
+          <summary>Détails de la tâche</summary>
+          <div class="qi-sub qi-task-details-body"></div>
+        </details>
       </div>
       <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelBtn}${retryVastBtn}${retryLocalBtn}</div>`;
           row.querySelector(".qi-title").textContent = i.filename || "#" + i.id;
@@ -6589,11 +6637,18 @@
               " · tâche Celery Vast : " +
               tid.slice(0, 12) +
               (tid.length > 12 ? "…" : "");
+            if (
+              i.vast_instance_id != null &&
+              i.vast_instance_id !== undefined &&
+              Number.isFinite(Number(i.vast_instance_id))
+            ) {
+              base += " · instance ID : " + String(i.vast_instance_id);
+            }
           }
           const subParts = [base];
           if (tx) subParts.push(tx);
           if (tline) subParts.push(tline);
-          row.querySelector(".qi-sub").textContent = subParts.join("\n");
+          row.querySelector(".qi-task-details-body").textContent = subParts.join("\n");
           listEl.appendChild(row);
         });
       }
@@ -6664,7 +6719,10 @@
       <div class="qi-icon">☁</div>
       <div class="qi-info">
         <div class="qi-title"></div>
-        <div class="qi-sub"></div>
+        <details class="queue-task-collapse">
+          <summary>Détails de la tâche</summary>
+          <div class="qi-sub qi-task-details-body"></div>
+        </details>
       </div>
       <div class="qi-status"><span class="status-pill ${pill}">${label}</span>${cancelVastBtn}</div>`;
           const ft = (i.film_title || "").trim();
@@ -6687,11 +6745,20 @@
           else if (i.job_source === "admin_upload")
             subBits.push("Origine : test admin (upload onglet Vast)");
           if (tid) subBits.push("Celery " + tid.slice(0, 14) + (tid.length > 14 ? "…" : ""));
+          if (
+            i.vast_instance_id != null &&
+            i.vast_instance_id !== undefined &&
+            Number.isFinite(Number(i.vast_instance_id))
+          ) {
+            subBits.push("instance ID : " + String(i.vast_instance_id));
+          }
           if (i.job_token)
             subBits.push("jeton " + String(i.job_token).slice(0, 10) + "…");
           subBits.push(i.worker || "");
           if (!ft && i.args) subBits.push(String(i.args).slice(0, 160));
-          row.querySelector(".qi-sub").textContent = subBits.filter(Boolean).join(" · ");
+          row.querySelector(".qi-task-details-body").textContent = subBits
+            .filter(Boolean)
+            .join("\n");
           list.appendChild(row);
         });
       }

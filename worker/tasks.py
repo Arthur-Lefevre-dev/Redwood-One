@@ -414,7 +414,7 @@ def process_film_task(self, film_id: int, local_path: str):
             s3.close()
 
 
-@app.task(name="worker.tasks.vast_transcode_test_task", bind=True, max_retries=0)
+@app.task(name="worker.tasks.vast_transcode_test_task", bind=True, max_retries=0, track_started=True)
 def vast_transcode_test_task(
     self,
     job_token: str,

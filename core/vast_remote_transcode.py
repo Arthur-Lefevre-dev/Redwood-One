@@ -367,6 +367,13 @@ def run_vast_transcode_test(
             if raw_nid is None:
                 raise RuntimeError(f"Vast create_instance returned no new_contract: {raw!r}")
             inst_id = int(raw_nid)
+            logger.info(
+                "vast_transcode Celery task_id=%s vast_instance_id=%s offer_id=%s round=%s",
+                rid,
+                inst_id,
+                oid,
+                gpu_round,
+            )
 
             meta(
                 step="wait_output_on_s3",

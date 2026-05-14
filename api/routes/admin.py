@@ -810,6 +810,29 @@ def _film_retry_local_upload_available(f: Film) -> bool:
     return bool(p and os.path.isfile(p))
 
 
+def _vast_instance_id_from_celery_task_id(task_id: Optional[str]) -> Optional[int]:
+    """Vast contract id from Celery result meta (worker.tasks.vast_transcode_test_task PROGRESS)."""
+    tid = (task_id or "").strip()
+    if not tid:
+        return None
+    try:
+        from celery.result import AsyncResult
+
+        from worker.tasks import app as celery_app
+
+        res = AsyncResult(tid, app=celery_app)
+        info = res.info
+        if not isinstance(info, dict):
+            return None
+        raw = info.get("vast_instance_id")
+        if raw is None:
+            return None
+        return int(raw)
+    except Exception:
+        logger.debug("vast_instance_id lookup failed for task_id=%s", tid, exc_info=True)
+        return None
+
+
 @router.get("/queue")
 def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     items = (
@@ -831,6 +854,13 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
         if f.statut == FilmStatut.erreur:
             sub = f.erreur_message or "Erreur"
         pct = f.pipeline_progress or (50 if f.statut == FilmStatut.en_cours else 0)
+        tid = getattr(f, "pipeline_celery_task_id", None)
+        tkind = (getattr(f, "pipeline_celery_task_kind", None) or "").strip()
+        vast_inst = (
+            _vast_instance_id_from_celery_task_id(str(tid).strip() if tid else "")
+            if tkind == "vast_transcode" and tid
+            else None
+        )
         out.append(
             {
                 "id": f.id,
@@ -842,8 +872,9 @@ def admin_queue(db: Session = Depends(get_db), _: User = Depends(require_admin))
                 "source": f.source.value,
                 "torrent_stats": f.torrent_stats,
                 "transcode_target": getattr(f, "transcode_target", None) or "local",
-                "celery_task_id": getattr(f, "pipeline_celery_task_id", None),
+                "celery_task_id": tid,
                 "celery_task_kind": getattr(f, "pipeline_celery_task_kind", None),
+                "vast_instance_id": vast_inst,
                 "vast_retryable": _film_vast_retryable(f),
                 "retry_local_available": _film_retry_local_upload_available(f),
             }
@@ -2524,6 +2555,8 @@ def admin_transcode_vast_queue(db: Session = Depends(get_db), _: User = Depends(
     """
     import ast
 
+    from celery.result import AsyncResult
+
     from core.vast_transcode_cancel import read_job_envelope
     from worker.tasks import app as celery_app
 
@@ -2599,6 +2632,14 @@ def admin_transcode_vast_queue(db: Session = Depends(get_db), _: User = Depends(
                         row = db.get(Film, int(fid))
                         if row and (row.titre or "").strip():
                             entry["film_title"] = (row.titre or "").strip()[:512]
+                    try:
+                        ar = AsyncResult(str(tid), app=celery_app)
+                        if isinstance(ar.info, dict):
+                            vi = ar.info.get("vast_instance_id")
+                            if vi is not None:
+                                entry["vast_instance_id"] = int(vi)
+                    except Exception:
+                        logger.debug("vast queue: no instance meta for task_id=%s", tid, exc_info=True)
                     items.append(entry)
     except Exception as e:
         logger.exception("transcode vast queue")
