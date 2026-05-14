@@ -972,6 +972,80 @@
         margin-top: 6px;
         line-height: 1.35;
       }
+      /* Floating dock: local video uploads (XHR progress) visible on all admin pages */
+      .floating-upload-dock {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        width: min(380px, calc(100vw - 32px));
+        max-height: min(52vh, 440px);
+        z-index: 160;
+        display: none;
+        flex-direction: column;
+        background: var(--color-background-primary);
+        border: 0.5px solid var(--color-border-secondary);
+        border-radius: var(--border-radius-lg);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+      }
+      .floating-upload-dock.is-visible {
+        display: flex;
+      }
+      .floating-upload-dock-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 0.5px solid var(--color-border-tertiary);
+        background: var(--color-background-secondary);
+        flex-shrink: 0;
+      }
+      .floating-upload-dock-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--color-text-primary);
+      }
+      .floating-upload-dock-count {
+        font-size: 10px;
+        font-weight: 600;
+        min-width: 1.4em;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(139, 37, 0, 0.35);
+        color: #fecaca;
+        text-align: center;
+      }
+      .floating-upload-dock-min {
+        font-size: 11px;
+        padding: 4px 10px;
+        line-height: 1;
+      }
+      .floating-upload-dock.floating-upload-dock-collapsed .floating-upload-dock-body {
+        display: none;
+      }
+      .floating-upload-dock-body {
+        overflow-y: auto;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 0;
+      }
+      @media (max-width: 768px) {
+        .floating-upload-dock {
+          right: 10px;
+          bottom: 10px;
+          width: calc(100vw - 20px);
+          max-height: 46vh;
+        }
+      }
+      .upload-inline-hint {
+        font-size: 11px;
+        color: var(--color-text-tertiary);
+        margin: 8px 0 0;
+        line-height: 1.45;
+      }
       .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -1783,7 +1857,12 @@
                         id="upload-progress-list"
                         class="upload-progress-list"
                         aria-live="polite"
+                        hidden
                       ></div>
+                      <p class="upload-inline-hint" id="upload-inline-hint">
+                        Progression des envois vers le serveur : panneau flottant
+                        <strong>Uploads locaux</strong> en bas à droite.
+                      </p>
                       <button
                         class="btn btn-primary"
                         style="width: 100%"
@@ -4288,6 +4367,36 @@
       >
         ×
       </button>
+    </div>
+
+    <div
+      id="floating-upload-dock"
+      class="floating-upload-dock"
+      aria-label="Uploads vidéo locaux"
+    >
+      <div class="floating-upload-dock-header">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="floating-upload-dock-title">Uploads locaux</span>
+          <span class="floating-upload-dock-count" id="floating-upload-dock-count"
+            >0</span
+          >
+        </div>
+        <button
+          type="button"
+          class="btn floating-upload-dock-min"
+          id="floating-upload-dock-min"
+          title="Réduire ou agrandir la liste"
+          aria-expanded="true"
+          aria-controls="floating-upload-dock-list"
+        >
+          ▾
+        </button>
+      </div>
+      <div
+        class="floating-upload-dock-body"
+        id="floating-upload-dock-list"
+        aria-live="polite"
+      ></div>
     </div>
 
     <script
@@ -8719,19 +8828,53 @@
 
       let uploadJobSeq = 0;
 
+      function floatingUploadDockEl() {
+        return $("#floating-upload-dock");
+      }
+
       function uploadProgressListEl() {
-        return $("#upload-progress-list");
+        return $("#floating-upload-dock-list");
+      }
+
+      function updateFloatingUploadDockCount() {
+        const list = uploadProgressListEl();
+        const badge = $("#floating-upload-dock-count");
+        if (badge && list) badge.textContent = String(list.children.length);
       }
 
       function ensureUploadListVisible() {
-        const list = uploadProgressListEl();
-        list.classList.add("is-active");
+        const dock = floatingUploadDockEl();
+        if (dock) {
+          dock.classList.add("is-visible");
+          dock.classList.remove("floating-upload-dock-collapsed");
+        }
+        const minBtn = $("#floating-upload-dock-min");
+        if (minBtn) {
+          minBtn.setAttribute("aria-expanded", "true");
+          minBtn.textContent = "▾";
+        }
+        updateFloatingUploadDockCount();
+      }
+
+      const floatingUploadDockMinBtn = $("#floating-upload-dock-min");
+      if (floatingUploadDockMinBtn) {
+        floatingUploadDockMinBtn.addEventListener("click", () => {
+          const dock = floatingUploadDockEl();
+          if (!dock) return;
+          const collapsed = dock.classList.toggle("floating-upload-dock-collapsed");
+          floatingUploadDockMinBtn.setAttribute(
+            "aria-expanded",
+            collapsed ? "false" : "true",
+          );
+          floatingUploadDockMinBtn.textContent = collapsed ? "▸" : "▾";
+        });
       }
 
       function uploadWithProgress(file) {
+        const list = uploadProgressListEl();
+        if (!list) return;
         ensureUploadListVisible();
         const id = "upload-job-" + ++uploadJobSeq;
-        const list = uploadProgressListEl();
         const row = document.createElement("div");
         row.className = "upload-job";
         row.id = id;
@@ -8757,6 +8900,7 @@
         row.appendChild(track);
         row.appendChild(msgEl);
         list.appendChild(row);
+        updateFloatingUploadDockCount();
 
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/api/admin/upload");
