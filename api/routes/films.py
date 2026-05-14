@@ -27,7 +27,7 @@ from core.tmdb import (
 )
 from core.trailers_util import merge_trailer_lists, trailers_from_json_column
 from db.models import ContentKind, Film, FilmStatut, User
-from db.session import get_db
+from db.session import catalog_search_uses_postgres_unaccent, get_db
 
 router = APIRouter(prefix="/api/films", tags=["films"])
 
@@ -217,7 +217,7 @@ def list_films(
     if q and str(q).strip():
         bind = db.get_bind()
         use_unaccent = bool(
-            bind.dialect.name == "postgresql" and bind.engine.info.get("has_unaccent")
+            bind.dialect.name == "postgresql" and catalog_search_uses_postgres_unaccent()
         )
         for token in split_search_tokens(q):
             clause = _film_search_token_clause(token, use_unaccent=use_unaccent)

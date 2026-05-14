@@ -2,7 +2,7 @@
 
 import logging
 from contextlib import contextmanager
-from typing import Generator
+from typing import Generator, Optional
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
@@ -27,6 +27,14 @@ engine = create_engine(_settings.DATABASE_URL, **_engine_kw)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 logger = logging.getLogger(__name__)
+
+# Set by _init_postgres_unaccent_flag() during init_db(); not all SQLAlchemy Engine builds expose .info.
+_CATALOG_UNACCENT_AVAILABLE: Optional[bool] = None
+
+
+def catalog_search_uses_postgres_unaccent() -> bool:
+    """True when init_db() enabled PostgreSQL unaccent for film text search."""
+    return _CATALOG_UNACCENT_AVAILABLE is True
 
 
 def _ensure_films_trailer_columns() -> None:
@@ -698,17 +706,18 @@ def _widen_series_meta_poster_columns() -> None:
 
 def _init_postgres_unaccent_flag() -> None:
     """When PostgreSQL + contrib unaccent is available, film catalog search can match François / Francois."""
-    engine.info.pop("has_unaccent", None)
+    global _CATALOG_UNACCENT_AVAILABLE
+    _CATALOG_UNACCENT_AVAILABLE = None
     if engine.dialect.name != "postgresql":
-        engine.info["has_unaccent"] = False
+        _CATALOG_UNACCENT_AVAILABLE = False
         return
     try:
         with engine.begin() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS unaccent"))
-        engine.info["has_unaccent"] = True
+        _CATALOG_UNACCENT_AVAILABLE = True
         logger.info("database: unaccent extension enabled for catalog search")
     except Exception as exc:
-        engine.info["has_unaccent"] = False
+        _CATALOG_UNACCENT_AVAILABLE = False
         logger.warning(
             "database: unaccent extension unavailable (%s); multi-token search still works, "
             "accent-insensitive match may be limited",
