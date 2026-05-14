@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from celery import Celery
 from celery.schedules import crontab
@@ -71,6 +71,75 @@ def _find_video_file(root: Path) -> Optional[str]:
             if best is None or p.stat().st_size > best.stat().st_size:
                 best = p
     return str(best) if best else None
+
+
+def _find_all_video_paths_sorted(job_dir: Path) -> List[str]:
+    """All video files under the torrent job directory, sorted by relative path."""
+    paths: List[str] = []
+    if job_dir.is_file() and job_dir.suffix.lower() in VIDEO_EXTS:
+        return [str(job_dir)]
+    for p in job_dir.rglob("*"):
+        if p.is_file() and p.suffix.lower() in VIDEO_EXTS:
+            paths.append(str(p))
+    paths.sort(key=lambda s: Path(s).as_posix().lower())
+    return paths
+
+
+def _pick_torrent_video_paths_for_content_kind(kind: object, paths: List[str]) -> List[str]:
+    """
+    For series_episode, keep every video file. For film (or unknown), keep a single file
+    (largest) when the torrent contains multiple videos.
+    """
+    from db.models import ContentKind
+
+    if not paths:
+        return paths
+    if kind == ContentKind.series_episode or str(kind).split(".")[-1] == "series_episode":
+        return paths
+    if len(paths) == 1:
+        return paths
+    largest = max(paths, key=lambda fp: Path(fp).stat().st_size)
+    logger.info(
+        "torrent multi-file non-series: using largest video only (%s)",
+        Path(largest).name,
+    )
+    return [largest]
+
+
+def _series_pack_rows(
+    db,
+    parent_id: int,
+    video_paths: List[str],
+) -> List[Tuple[int, str]]:
+    """
+    Map each video path to a Film id. Parent row absorbs episode 0; extra DB rows for the rest.
+    Caller must commit after this returns (this function commits).
+    """
+    from db.models import ContentKind, Film, FilmSource, FilmStatut
+
+    parent = db.get(Film, int(parent_id))
+    if not parent:
+        return []
+    first = video_paths[0]
+    parent.titre = Path(first).name
+    parent.pipeline_progress = 10
+    parent.torrent_stats = None
+    out: List[Tuple[int, str]] = [(int(parent_id), first)]
+    for vp in video_paths[1:]:
+        child = Film(
+            titre=Path(vp).name,
+            source=FilmSource.torrent,
+            statut=FilmStatut.en_cours,
+            pipeline_progress=10,
+            content_kind=ContentKind.series_episode,
+            transcode_target=parent.transcode_target,
+            vast_offer_id=parent.vast_offer_id,
+        )
+        db.add(child)
+        db.flush()
+        out.append((int(child.id), vp))
+    db.commit()
+    return out
 
 
 def _persist_torrent_stats(film_id: int, stats: dict) -> None:
@@ -170,30 +239,48 @@ def download_torrent_task(
         _fail_film(film_id, str(e)[:8000])
         return
 
-    video = _find_video_file(job_dir)
-    if not video:
+    all_paths = _find_all_video_paths_sorted(job_dir)
+    if not all_paths:
         _fail_film(film_id, "no video file found after torrent download")
         return
 
-    from db.models import Film, FilmTraitement
+    from celery import chain
+
+    from db.models import ContentKind, Film, FilmTraitement
     from db.session import SessionLocal
 
+    db = SessionLocal()
     target = "local"
     vast_oid: Optional[int] = None
-    film_title_for_vast = Path(video).name
-    db = SessionLocal()
+    pack: List[Tuple[int, str]] = []
     try:
-        f = db.get(Film, film_id)
-        if f:
-            f.titre = Path(video).name
-            film_title_for_vast = (f.titre or "").strip() or film_title_for_vast
-            f.pipeline_progress = 10
-            f.torrent_stats = None
+        parent = db.get(Film, film_id)
+        if not parent:
+            _fail_film(film_id, "film row missing after torrent download")
+            return
+        target = (parent.transcode_target or "local").lower().strip()
+        if target not in ("local", "vast"):
+            target = "local"
+        vast_oid = parent.vast_offer_id
+        paths = _pick_torrent_video_paths_for_content_kind(parent.content_kind, all_paths)
+        if not paths:
+            _fail_film(film_id, "no video file found after torrent download")
+            return
+        is_series = parent.content_kind == ContentKind.series_episode
+        if is_series and len(paths) > 1:
+            pack = _series_pack_rows(db, film_id, paths)
+            logger.info(
+                "torrent series pack parent_film_id=%s episode_files=%s",
+                film_id,
+                len(pack),
+            )
+        else:
+            first = paths[0]
+            parent.titre = Path(first).name
+            parent.pipeline_progress = 10
+            parent.torrent_stats = None
             db.commit()
-            target = (f.transcode_target or "local").lower().strip()
-            if target not in ("local", "vast"):
-                target = "local"
-            vast_oid = f.vast_offer_id
+            pack = [(int(film_id), first)]
     finally:
         db.close()
 
@@ -204,65 +291,80 @@ def download_torrent_task(
                 "VAST_API_KEY manquante : impossible d’exécuter le transcodage Vast après le torrent.",
             )
             return
-        ext = Path(video).suffix.lower()
-        if ext not in VIDEO_EXTS:
-            _fail_film(
-                film_id,
-                f"Extension non prise en charge pour Vast après torrent : {ext}",
-            )
-            return
         import uuid as uuid_mod
 
         from core.s3 import upload_file
-        from core.vast_transcode_cancel import store_job_envelope
 
-        job_token = uuid_mod.uuid4().hex
-        s3_in = f"vast-test/{job_token}/input{ext}"
+        uploads: List[Tuple[int, str, str, str]] = []
         try:
-            upload_file(video, s3_in)
+            for fid, vpath in pack:
+                ext = Path(vpath).suffix.lower()
+                if ext not in VIDEO_EXTS:
+                    _fail_film(
+                        int(fid),
+                        f"Extension non prise en charge pour Vast après torrent : {ext}",
+                    )
+                    return
+                job_token = uuid_mod.uuid4().hex
+                s3_in = f"vast-test/{job_token}/input{ext}"
+                upload_file(vpath, s3_in)
+                try:
+                    os.remove(vpath)
+                except OSError:
+                    pass
+                uploads.append((int(fid), job_token, ext, Path(vpath).name))
         except Exception as e:
             logger.exception("torrent->vast S3 upload film_id=%s", film_id)
             _fail_film(film_id, str(e)[:8000])
             return
         finally:
-            try:
-                os.remove(video)
-            except OSError:
-                pass
             shutil.rmtree(job_dir, ignore_errors=True)
 
         oid = int(vast_oid) if vast_oid is not None and int(vast_oid) > 0 else None
+        sigs = [
+            vast_transcode_test_task.si(jt, ext, oid, fid, title, "torrent_vast")
+            for fid, jt, ext, title in uploads
+        ]
         try:
-            async_res = vast_transcode_test_task.delay(job_token, ext, oid, film_id)
+            async_res = chain(*sigs).delay()
         except Exception as e:
             logger.exception("torrent->vast Celery enqueue film_id=%s", film_id)
             _fail_film(film_id, str(e)[:8000])
             return
-        store_job_envelope(
-            async_res.id,
-            job_token,
-            ext,
-            film_id=film_id,
-            film_title=film_title_for_vast,
-            source="torrent_vast",
-        )
         db2 = SessionLocal()
         try:
-            f2 = db2.get(Film, film_id)
-            if f2:
-                f2.pipeline_progress = 12
-                f2.traitement = FilmTraitement.transcode
-                f2.pipeline_celery_task_id = async_res.id
-                f2.pipeline_celery_task_kind = "vast_transcode"
-                f2.vast_pending_job_token = job_token
-                f2.vast_pending_input_ext = ext
-                db2.commit()
+            head = True
+            for fid, jt, ext, title in uploads:
+                f2 = db2.get(Film, fid)
+                if f2:
+                    f2.pipeline_progress = 12
+                    f2.traitement = FilmTraitement.transcode
+                    f2.vast_pending_job_token = jt
+                    f2.vast_pending_input_ext = ext
+                    if head:
+                        f2.pipeline_celery_task_id = async_res.id
+                        f2.pipeline_celery_task_kind = "vast_transcode"
+                        head = False
+                    else:
+                        f2.pipeline_celery_task_id = None
+                        f2.pipeline_celery_task_kind = None
+            db2.commit()
         finally:
             db2.close()
         return
 
-    arp = process_film_task.delay(film_id, video)
-    _set_film_pipeline_task(film_id, arp.id, "process_film")
+    sigs = [process_film_task.si(int(fid), str(p)) for fid, p in pack]
+    try:
+        async_res = chain(*sigs).delay()
+    except Exception as e:
+        logger.exception("torrent->local Celery enqueue film_id=%s", film_id)
+        _fail_film(film_id, str(e)[:8000])
+        return
+    _set_film_pipeline_task(
+        int(film_id),
+        async_res.id,
+        "process_series_pack" if len(pack) > 1 else "process_film",
+    )
 
 
 def _fail_film(film_id: int, message: str) -> None:
@@ -421,11 +523,24 @@ def vast_transcode_test_task(
     src_ext: str,
     offer_id: Optional[int] = None,
     film_id: Optional[int] = None,
+    film_title: Optional[str] = None,
+    envelope_source: str = "admin",
 ):
     """Transcode one file on a Vast GPU instance (S3 presigned URLs + onstart). Costs Vast rental until destroyed."""
     from core.vast_film_finalize import mark_film_vast_task_failed
     from core.vast_remote_transcode import run_vast_transcode_test
+    from core.vast_transcode_cancel import store_job_envelope
 
+    tid = str(getattr(self.request, "id", "") or "").strip()
+    if tid and film_id is not None and int(film_id) > 0:
+        store_job_envelope(
+            tid,
+            job_token,
+            src_ext,
+            film_id=int(film_id),
+            film_title=(film_title or "").strip() or None,
+            source=(envelope_source or "admin")[:64],
+        )
     try:
         return run_vast_transcode_test(self, job_token, src_ext, offer_id, film_id=film_id)
     except Exception as e:
