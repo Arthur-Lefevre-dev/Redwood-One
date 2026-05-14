@@ -42,4 +42,6 @@ RUN sed -i 's/\r$//' /redwood-tmp-entrypoint.sh && chmod +x /redwood-tmp-entrypo
 USER root
 ENTRYPOINT ["/redwood-tmp-entrypoint.sh"]
 
-CMD ["celery", "-A", "worker.tasks", "worker", "--loglevel=info", "--concurrency=4"]
+# Concurrency per worker process; scale replicas with compose (see docker-compose.yml / env.example).
+ENV CELERY_WORKER_CONCURRENCY=4
+CMD ["sh", "-c", "exec celery -A worker.tasks worker --loglevel=info --concurrency=${CELERY_WORKER_CONCURRENCY:-4}"]

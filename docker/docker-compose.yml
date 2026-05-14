@@ -62,11 +62,13 @@ services:
     networks:
       - redwood_net
 
+  # Celery consumer(s). No fixed container_name so you can run several in parallel, e.g.:
+  #   docker compose up -d --scale worker=10
+  # Tune per-process parallelism with CELERY_WORKER_CONCURRENCY in .env (default 4).
   worker:
     build:
       context: ..
       dockerfile: docker/Dockerfile.worker
-    container_name: redwood_worker
     restart: unless-stopped
     env_file: .env
     volumes:
