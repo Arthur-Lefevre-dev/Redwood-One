@@ -1,560 +1,737 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
-  <title>Redwood Plus</title>
-  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
+    <title>Redwood Plus</title>
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
     <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-home.css" />
-</head>
-<body>
-  <nav>
-    <a class="brand" href="/watch/">Redwood Plus</a>
-    <div class="nav-mid">
-      <input type="search" class="nav-search" id="nav-q" placeholder="Films, séries, acteurs, réalisateurs…" autocomplete="off" />
-    </div>
-    <div class="nav-end">
-      <a href="/watch/">Accueil</a>
-      <a href="/watch/films.html">Films</a>
-      <a href="/watch/serie.html">Séries</a>
-      <a href="/watch/categories.html">Catégories</a>
-      <a href="/watch/pick.html">Choisir pour moi</a>
-      <a href="/watch/invitations.html" class="nav-invite-link" aria-label="Invitations" title="Invitations"></a>
-      <div class="nav-user-wrap" id="nav-user-wrap">
-        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
-          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
-          <span class="nav-user-name" id="nav-user-name">…</span>
-        </button>
-        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
-          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
-          <a href="/watch/support.html" role="menuitem">Support</a>
-          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
-          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
+    <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+    <link rel="stylesheet" href="/css/redwood-watch-home.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/watch/">Redwood Plus</a>
+      <div class="nav-mid">
+        <input
+          type="search"
+          class="nav-search"
+          id="nav-q"
+          placeholder="Films, séries, acteurs, réalisateurs…"
+          autocomplete="off"
+        />
+      </div>
+      <div class="nav-end">
+        <a href="/watch/">Accueil</a>
+        <a href="/watch/films.html">Films</a>
+        <a href="/watch/serie.html">Séries</a>
+        <a href="/watch/categories.html">Catégories</a>
+        <a href="/watch/pick.html">Choisir pour moi</a>
+        <a
+          href="/watch/invitations.html"
+          class="nav-invite-link"
+          aria-label="Invitations"
+          title="Invitations"
+        ></a>
+        <div class="nav-user-wrap" id="nav-user-wrap">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-user-menu"
+          >
+            <span class="nav-user-avatar" aria-hidden="true"
+              ><span id="nav-user-initials">…</span></span
+            >
+            <span class="nav-user-name" id="nav-user-name">…</span>
+          </button>
+          <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+            <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+            <a href="/watch/support.html" role="menuitem">Support</a>
+            <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+            <button
+              type="button"
+              class="nav-logout-btn"
+              role="menuitem"
+              id="nav-logout"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </div>
+    </nav>
+    <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+    <div id="donation-goal-bar" class="donation-goal-bar" hidden></div>
+    <div id="home-search" class="home-search-panel" hidden>
+      <h2 class="row-head" id="search-main-title" style="margin: 0 0 6px">
+        Recherche
+      </h2>
+      <p
+        style="
+          margin: 0 0 8px;
+          font-size: 13px;
+          color: var(--muted);
+          line-height: 1.5;
+          max-width: 720px;
+        "
+      >
+        Résultats parmi les <strong>films</strong> et les
+        <strong>séries</strong> (titres, réalisateurs, acteurs, synopsis).
+      </p>
+      <h3 class="search-sub" id="search-films-head">Films</h3>
+      <div class="row-scroll" id="row-search-films"></div>
+      <h3 class="search-sub" id="search-series-head">Séries</h3>
+      <div class="row-scroll" id="row-search-series"></div>
+      <p
+        id="search-empty"
+        class="empty"
+        style="display: none; margin-top: 16px; padding: 20px"
+      >
+        Aucun résultat pour cette recherche.
+      </p>
     </div>
-  </nav>
-  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
-  <div id="donation-goal-bar" class="donation-goal-bar" hidden></div>
-  <div id="home-search" class="home-search-panel" hidden>
-    <h2 class="row-head" id="search-main-title" style="margin:0 0 6px">Recherche</h2>
-    <p style="margin:0 0 8px;font-size:13px;color:var(--muted);line-height:1.5;max-width:720px">
-      Résultats parmi les <strong>films</strong> et les <strong>séries</strong> (titres, réalisateurs, acteurs, synopsis).
-    </p>
-    <h3 class="search-sub" id="search-films-head">Films</h3>
-    <div class="row-scroll" id="row-search-films"></div>
-    <h3 class="search-sub" id="search-series-head">Séries</h3>
-    <div class="row-scroll" id="row-search-series"></div>
-    <p id="search-empty" class="empty" style="display:none;margin-top:16px;padding:20px">Aucun résultat pour cette recherche.</p>
-  </div>
-  <div id="home-browse">
-  <section class="hero-carousel-wrap" id="hero-carousel" aria-roledescription="carrousel" aria-label="Trois suggestions aléatoires — films et séries">
-    <div class="hero-carousel-viewport" id="hero-viewport">
-      <div class="hero-carousel-track" id="hero-track" role="list"></div>
+    <div id="home-browse">
+      <section
+        class="hero-carousel-wrap"
+        id="hero-carousel"
+        aria-roledescription="carrousel"
+        aria-label="Trois suggestions aléatoires — films et séries"
+      >
+        <div class="hero-carousel-viewport" id="hero-viewport">
+          <div class="hero-carousel-track" id="hero-track" role="list"></div>
+        </div>
+        <button
+          type="button"
+          class="hero-carousel-btn hero-carousel-prev"
+          id="hero-prev"
+          aria-label="Slide précédent"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M14 18l-6-6 6-6"
+            />
+          </svg>
+        </button>
+        <button
+          type="button"
+          class="hero-carousel-btn hero-carousel-next"
+          id="hero-next"
+          aria-label="Slide suivant"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M10 18l6-6-6-6"
+            />
+          </svg>
+        </button>
+        <div
+          class="hero-carousel-dots"
+          id="hero-dots"
+          role="tablist"
+          aria-label="Choisir un slide"
+          hidden
+        ></div>
+      </section>
+      <div class="row-head">
+        <h2 id="latest-head">Derniers ajouts</h2>
+      </div>
+      <div class="row-scroll" id="row-latest"></div>
+      <div class="row-head"><h2>Séries</h2></div>
+      <div class="row-scroll" id="row-series"></div>
+      <div class="row-head"><h2>Tendances</h2></div>
+      <div class="row-scroll" id="row-featured"></div>
     </div>
-    <button type="button" class="hero-carousel-btn hero-carousel-prev" id="hero-prev" aria-label="Slide précédent" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M14 18l-6-6 6-6"/></svg>
-    </button>
-    <button type="button" class="hero-carousel-btn hero-carousel-next" id="hero-next" aria-label="Slide suivant" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" d="M10 18l6-6-6-6"/></svg>
-    </button>
-    <div class="hero-carousel-dots" id="hero-dots" role="tablist" aria-label="Choisir un slide" hidden></div>
-  </section>
-  <div class="row-head">
-    <h2 id="latest-head">Derniers ajouts</h2>
-  </div>
-  <div class="row-scroll" id="row-latest"></div>
-  <div class="row-head"><h2>Séries</h2></div>
-  <div class="row-scroll" id="row-series"></div>
-  <div class="row-head"><h2>Tendances</h2></div>
-  <div class="row-scroll" id="row-featured"></div>
-  </div>
-  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
-  <script src="/watch/app.js"></script>
-  <script>
-    function isNewTitle(f) {
-      const raw = f.date_ajout || f.dateAjout;
-      if (!raw) return false;
-      const d = new Date(raw);
-      if (Number.isNaN(d.getTime())) return false;
-      return (Date.now() - d.getTime()) / 864e5 <= 45;
-    }
-
-    let homeLatest = [];
-    let homeFeatured = [];
-
-    var HERO_SPOTLIGHT_COUNT = 3;
-    var HERO_AUTOPLAY_MS = 7800;
-    var _heroCarousel = { index: 0, count: 0, timer: null };
-
-    function shuffleArray(arr) {
-      var a = arr.slice();
-      for (var i = a.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var t = a[i];
-        a[i] = a[j];
-        a[j] = t;
-      }
-      return a;
-    }
-
-    /**
-     * Spotlight slides: random mix of films + series. When both pools are non-empty,
-     * keeps at least one film and one series, third pick is random from the rest.
-     */
-    function pickHeroSpotlight(films, series) {
-      var out = [];
-      var fPool = shuffleArray(films || []);
-      var sPool = shuffleArray(series || []);
-      var hasF = fPool.length > 0;
-      var hasS = sPool.length > 0;
-      var n = HERO_SPOTLIGHT_COUNT;
-
-      if (hasF && hasS) {
-        out.push({ kind: 'film', data: fPool.shift() });
-        out.push({ kind: 'series', data: sPool.shift() });
-        var rest = [];
-        fPool.forEach(function (x) {
-          rest.push({ kind: 'film', data: x });
-        });
-        sPool.forEach(function (x) {
-          rest.push({ kind: 'series', data: x });
-        });
-        rest = shuffleArray(rest);
-        if (rest.length) out.push(rest[0]);
-      } else if (hasF) {
-        fPool.slice(0, n).forEach(function (x) {
-          out.push({ kind: 'film', data: x });
-        });
-      } else if (hasS) {
-        sPool.slice(0, n).forEach(function (x) {
-          out.push({ kind: 'series', data: x });
-        });
+    <footer>
+      © Redwood Plus — This product uses the TMDB API but is not endorsed or
+      certified by TMDB.
+    </footer>
+    <script src="/watch/app.js"></script>
+    <script>
+      function isNewTitle(f) {
+        const raw = f.date_ajout || f.dateAjout;
+        if (!raw) return false;
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return false;
+        return (Date.now() - d.getTime()) / 864e5 <= 45;
       }
 
-      return out.slice(0, n);
-    }
+      let homeLatest = [];
+      let homeFeatured = [];
 
-    function heroCarouselStopTimer() {
-      if (_heroCarousel.timer) {
-        clearInterval(_heroCarousel.timer);
-        _heroCarousel.timer = null;
+      var HERO_SPOTLIGHT_COUNT = 3;
+      var HERO_AUTOPLAY_MS = 7800;
+      var _heroCarousel = { index: 0, count: 0, timer: null };
+
+      function shuffleArray(arr) {
+        var a = arr.slice();
+        for (var i = a.length - 1; i > 0; i--) {
+          var j = Math.floor(Math.random() * (i + 1));
+          var t = a[i];
+          a[i] = a[j];
+          a[j] = t;
+        }
+        return a;
       }
-    }
 
-    function heroCarouselStartTimer() {
-      heroCarouselStopTimer();
-      var wrap = document.getElementById('hero-carousel');
-      if (!wrap || _heroCarousel.count < 2) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      _heroCarousel.timer = setInterval(function () {
-        heroGoTo(_heroCarousel.index + 1, true);
-      }, HERO_AUTOPLAY_MS);
-    }
+      /**
+       * Spotlight slides: random mix of films + series. When both pools are non-empty,
+       * keeps at least one film and one series, third pick is random from the rest.
+       */
+      function pickHeroSpotlight(films, series) {
+        var out = [];
+        var fPool = shuffleArray(films || []);
+        var sPool = shuffleArray(series || []);
+        var hasF = fPool.length > 0;
+        var hasS = sPool.length > 0;
+        var n = HERO_SPOTLIGHT_COUNT;
 
-    function heroGoTo(i, animate) {
-      var vp = document.getElementById('hero-viewport');
-      var track = document.getElementById('hero-track');
-      var wrap = document.getElementById('hero-carousel');
-      if (!vp || !track || !wrap || _heroCarousel.count < 1) return;
-      _heroCarousel.index =
-        ((i % _heroCarousel.count) + _heroCarousel.count) % _heroCarousel.count;
-      var w = vp.getBoundingClientRect().width || 1;
-      if (!animate) wrap.classList.add('hero-carousel--instant');
-      else wrap.classList.remove('hero-carousel--instant');
-      track.style.transform = 'translateX(' + -(_heroCarousel.index * w) + 'px)';
-      if (!animate) {
+        if (hasF && hasS) {
+          out.push({ kind: "film", data: fPool.shift() });
+          out.push({ kind: "series", data: sPool.shift() });
+          var rest = [];
+          fPool.forEach(function (x) {
+            rest.push({ kind: "film", data: x });
+          });
+          sPool.forEach(function (x) {
+            rest.push({ kind: "series", data: x });
+          });
+          rest = shuffleArray(rest);
+          if (rest.length) out.push(rest[0]);
+        } else if (hasF) {
+          fPool.slice(0, n).forEach(function (x) {
+            out.push({ kind: "film", data: x });
+          });
+        } else if (hasS) {
+          sPool.slice(0, n).forEach(function (x) {
+            out.push({ kind: "series", data: x });
+          });
+        }
+
+        return out.slice(0, n);
+      }
+
+      function heroCarouselStopTimer() {
+        if (_heroCarousel.timer) {
+          clearInterval(_heroCarousel.timer);
+          _heroCarousel.timer = null;
+        }
+      }
+
+      function heroCarouselStartTimer() {
+        heroCarouselStopTimer();
+        var wrap = document.getElementById("hero-carousel");
+        if (!wrap || _heroCarousel.count < 2) return;
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+          return;
+        _heroCarousel.timer = setInterval(function () {
+          heroGoTo(_heroCarousel.index + 1, true);
+        }, HERO_AUTOPLAY_MS);
+      }
+
+      function heroGoTo(i, animate) {
+        var vp = document.getElementById("hero-viewport");
+        var track = document.getElementById("hero-track");
+        var wrap = document.getElementById("hero-carousel");
+        if (!vp || !track || !wrap || _heroCarousel.count < 1) return;
+        _heroCarousel.index =
+          ((i % _heroCarousel.count) + _heroCarousel.count) %
+          _heroCarousel.count;
+        var w = vp.getBoundingClientRect().width || 1;
+        if (!animate) wrap.classList.add("hero-carousel--instant");
+        else wrap.classList.remove("hero-carousel--instant");
+        track.style.transform =
+          "translateX(" + -(_heroCarousel.index * w) + "px)";
+        if (!animate) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              wrap.classList.remove("hero-carousel--instant");
+            });
+          });
+        }
+        var dots = document.getElementById("hero-dots");
+        if (dots) {
+          var buttons = dots.querySelectorAll("button");
+          for (var j = 0; j < buttons.length; j++) {
+            buttons[j].setAttribute(
+              "aria-selected",
+              j === _heroCarousel.index ? "true" : "false",
+            );
+          }
+        }
+      }
+
+      function heroApplyMetrics(animate) {
+        var vp = document.getElementById("hero-viewport");
+        var track = document.getElementById("hero-track");
+        if (!vp || !track) return;
+        var w = vp.getBoundingClientRect().width || 1;
+        var slides = track.querySelectorAll(".hero-slide");
+        for (var s = 0; s < slides.length; s++) {
+          slides[s].style.width = w + "px";
+          slides[s].style.flexShrink = "0";
+        }
+        heroGoTo(_heroCarousel.index, animate);
+      }
+
+      var _heroResizeScheduled = null;
+      function heroOnResize() {
+        clearTimeout(_heroResizeScheduled);
+        _heroResizeScheduled = setTimeout(function () {
+          heroApplyMetrics(false);
+        }, 100);
+      }
+
+      function initHeroCarousel(heroEntries) {
+        var track = document.getElementById("hero-track");
+        var prev = document.getElementById("hero-prev");
+        var next = document.getElementById("hero-next");
+        var dotsHost = document.getElementById("hero-dots");
+        var wrap = document.getElementById("hero-carousel");
+        var vp = document.getElementById("hero-viewport");
+        if (!track || !wrap) return;
+
+        heroCarouselStopTimer();
+        track.innerHTML = "";
+        track.style.transform = "";
+        if (dotsHost) {
+          dotsHost.innerHTML = "";
+          dotsHost.hidden = true;
+        }
+
+        var list = heroEntries && heroEntries.length ? heroEntries : [];
+
+        function addSlide(entry) {
+          var kind = entry.kind;
+          var raw = entry.data;
+          var titre = kind === "film" ? raw.titre : raw.title || "Série";
+          var synopsis = (kind === "film" ? raw.synopsis : raw.synopsis) || "";
+          if (!synopsis && kind === "series") {
+            var nEp = Number(raw.episode_count) || 0;
+            var nSe = Number(raw.season_count) || 0;
+            synopsis =
+              "Série · " +
+              (nEp === 1 ? "1 épisode" : nEp + " épisodes") +
+              " · " +
+              (nSe === 1 ? "1 saison" : nSe + " saisons");
+          }
+          var posterPath = raw.poster_path;
+          var slide = document.createElement("div");
+          slide.className = "hero hero-slide";
+          slide.setAttribute("role", "listitem");
+          if (kind === "film" && raw.id != null) {
+            var fid = raw.id;
+            slide.dataset.filmId = String(fid);
+            slide.style.cursor = "pointer";
+            slide.tabIndex = 0;
+            slide.addEventListener("click", function () {
+              location.href = "/watch/film.html?id=" + fid;
+            });
+            slide.addEventListener("keydown", function (e) {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                location.href = "/watch/film.html?id=" + fid;
+              }
+            });
+          } else if (kind === "series" && raw.series_key) {
+            var sk = raw.series_key;
+            slide.dataset.seriesKey = sk;
+            slide.style.cursor = "pointer";
+            slide.tabIndex = 0;
+            slide.addEventListener("click", function () {
+              location.href = "/watch/serie.html?key=" + encodeURIComponent(sk);
+            });
+            slide.addEventListener("keydown", function (e) {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                location.href =
+                  "/watch/serie.html?key=" + encodeURIComponent(sk);
+              }
+            });
+          }
+          var desc =
+            synopsis.slice(0, 220) + (synopsis.length > 220 ? "…" : "");
+          if (posterPath) {
+            var pu = posterUrl(posterPath);
+            slide.classList.add("has-backdrop");
+            slide.style.backgroundImage =
+              "linear-gradient(105deg,rgba(10,10,10,.93) 0%,rgba(10,10,10,.55) 42%,rgba(10,10,10,.25) 72%)," +
+              "linear-gradient(180deg,rgba(10,10,10,.15) 0%,rgba(10,10,10,.88) 100%)," +
+              "url('" +
+              pu.replace(/'/g, "\\'") +
+              "')";
+          } else {
+            slide.classList.remove("has-backdrop");
+            slide.style.backgroundImage = "";
+          }
+          slide.innerHTML =
+            '<div class="hero-inner"><p class="hero-kind"></p><h1></h1><p class="hero-blurb"></p></div>';
+          slide.querySelector(".hero-kind").textContent =
+            kind === "film" ? "Film" : "Série";
+          slide.querySelector("h1").textContent = titre;
+          slide.querySelector(".hero-blurb").textContent = desc;
+          track.appendChild(slide);
+        }
+
+        if (list.length) {
+          for (var fi = 0; fi < list.length; fi++) {
+            addSlide(list[fi]);
+          }
+        } else {
+          var slide = document.createElement("div");
+          slide.className = "hero hero-slide";
+          slide.setAttribute("role", "listitem");
+          slide.classList.remove("has-backdrop");
+          slide.style.backgroundImage = "";
+          slide.innerHTML =
+            '<div class="hero-inner"><p class="hero-kind">Redwood Plus</p><h1>Bienvenue</h1><p class="hero-blurb">Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.</p></div>';
+          track.appendChild(slide);
+        }
+
+        _heroCarousel.count = track.querySelectorAll(".hero-slide").length;
+        _heroCarousel.index = 0;
+
+        var multi = _heroCarousel.count > 1;
+        if (prev) {
+          prev.hidden = !multi;
+          prev.disabled = !multi;
+          prev.onclick = function () {
+            heroGoTo(_heroCarousel.index - 1, true);
+            heroCarouselStartTimer();
+          };
+        }
+        if (next) {
+          next.hidden = !multi;
+          next.disabled = !multi;
+          next.onclick = function () {
+            heroGoTo(_heroCarousel.index + 1, true);
+            heroCarouselStartTimer();
+          };
+        }
+        if (dotsHost && multi) {
+          dotsHost.hidden = false;
+          for (var j = 0; j < _heroCarousel.count; j++) {
+            (function (idx) {
+              var b = document.createElement("button");
+              b.type = "button";
+              b.setAttribute("role", "tab");
+              b.setAttribute("aria-label", "Afficher le slide " + (idx + 1));
+              b.setAttribute("aria-selected", idx === 0 ? "true" : "false");
+              b.addEventListener("click", function () {
+                heroGoTo(idx, true);
+                heroCarouselStartTimer();
+              });
+              dotsHost.appendChild(b);
+            })(j);
+          }
+        }
+
+        wrap.onmouseenter = function () {
+          heroCarouselStopTimer();
+        };
+        wrap.onmouseleave = function () {
+          heroCarouselStartTimer();
+        };
+
+        wrap.onkeydown = function (e) {
+          if (!multi) return;
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            heroGoTo(_heroCarousel.index - 1, true);
+            heroCarouselStartTimer();
+          } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            heroGoTo(_heroCarousel.index + 1, true);
+            heroCarouselStartTimer();
+          }
+        };
+        wrap.tabIndex = multi ? 0 : -1;
+
+        if (vp) {
+          var startX = null;
+          vp.addEventListener(
+            "touchstart",
+            function (e) {
+              if (!multi || !e.touches[0]) return;
+              startX = e.touches[0].clientX;
+            },
+            { passive: true },
+          );
+          vp.addEventListener(
+            "touchend",
+            function (e) {
+              if (!multi || startX == null) return;
+              var endX = e.changedTouches[0] && e.changedTouches[0].clientX;
+              var dx = endX - startX;
+              startX = null;
+              if (endX == null || Math.abs(dx) < 50) return;
+              if (dx > 0) {
+                heroGoTo(_heroCarousel.index - 1, true);
+              } else {
+                heroGoTo(_heroCarousel.index + 1, true);
+              }
+              heroCarouselStartTimer();
+            },
+            { passive: true },
+          );
+        }
+
+        if (!window.__redwoodHeroResizeBound) {
+          window.__redwoodHeroResizeBound = true;
+          window.addEventListener("resize", heroOnResize);
+        }
+
         requestAnimationFrame(function () {
           requestAnimationFrame(function () {
-            wrap.classList.remove('hero-carousel--instant');
-          });
-        });
-      }
-      var dots = document.getElementById('hero-dots');
-      if (dots) {
-        var buttons = dots.querySelectorAll('button');
-        for (var j = 0; j < buttons.length; j++) {
-          buttons[j].setAttribute('aria-selected', j === _heroCarousel.index ? 'true' : 'false');
-        }
-      }
-    }
-
-    function heroApplyMetrics(animate) {
-      var vp = document.getElementById('hero-viewport');
-      var track = document.getElementById('hero-track');
-      if (!vp || !track) return;
-      var w = vp.getBoundingClientRect().width || 1;
-      var slides = track.querySelectorAll('.hero-slide');
-      for (var s = 0; s < slides.length; s++) {
-        slides[s].style.width = w + 'px';
-        slides[s].style.flexShrink = '0';
-      }
-      heroGoTo(_heroCarousel.index, animate);
-    }
-
-    var _heroResizeScheduled = null;
-    function heroOnResize() {
-      clearTimeout(_heroResizeScheduled);
-      _heroResizeScheduled = setTimeout(function () {
-        heroApplyMetrics(false);
-      }, 100);
-    }
-
-    function initHeroCarousel(heroEntries) {
-      var track = document.getElementById('hero-track');
-      var prev = document.getElementById('hero-prev');
-      var next = document.getElementById('hero-next');
-      var dotsHost = document.getElementById('hero-dots');
-      var wrap = document.getElementById('hero-carousel');
-      var vp = document.getElementById('hero-viewport');
-      if (!track || !wrap) return;
-
-      heroCarouselStopTimer();
-      track.innerHTML = '';
-      track.style.transform = '';
-      if (dotsHost) {
-        dotsHost.innerHTML = '';
-        dotsHost.hidden = true;
-      }
-
-      var list = heroEntries && heroEntries.length ? heroEntries : [];
-
-      function addSlide(entry) {
-        var kind = entry.kind;
-        var raw = entry.data;
-        var titre = kind === 'film' ? raw.titre : raw.title || 'Série';
-        var synopsis = (kind === 'film' ? raw.synopsis : raw.synopsis) || '';
-        if (!synopsis && kind === 'series') {
-          var nEp = Number(raw.episode_count) || 0;
-          var nSe = Number(raw.season_count) || 0;
-          synopsis =
-            'Série · ' +
-            (nEp === 1 ? '1 épisode' : nEp + ' épisodes') +
-            ' · ' +
-            (nSe === 1 ? '1 saison' : nSe + ' saisons');
-        }
-        var posterPath = raw.poster_path;
-        var slide = document.createElement('div');
-        slide.className = 'hero hero-slide';
-        slide.setAttribute('role', 'listitem');
-        if (kind === 'film' && raw.id != null) {
-          var fid = raw.id;
-          slide.dataset.filmId = String(fid);
-          slide.style.cursor = 'pointer';
-          slide.tabIndex = 0;
-          slide.addEventListener('click', function () {
-            location.href = '/watch/film.html?id=' + fid;
-          });
-          slide.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              location.href = '/watch/film.html?id=' + fid;
-            }
-          });
-        } else if (kind === 'series' && raw.series_key) {
-          var sk = raw.series_key;
-          slide.dataset.seriesKey = sk;
-          slide.style.cursor = 'pointer';
-          slide.tabIndex = 0;
-          slide.addEventListener('click', function () {
-            location.href =
-              '/watch/serie.html?key=' + encodeURIComponent(sk);
-          });
-          slide.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              location.href =
-                '/watch/serie.html?key=' + encodeURIComponent(sk);
-            }
-          });
-        }
-        var desc =
-          synopsis.slice(0, 220) + (synopsis.length > 220 ? '…' : '');
-        if (posterPath) {
-          var pu = posterUrl(posterPath);
-          slide.classList.add('has-backdrop');
-          slide.style.backgroundImage =
-            'linear-gradient(105deg,rgba(10,10,10,.93) 0%,rgba(10,10,10,.55) 42%,rgba(10,10,10,.25) 72%),' +
-            'linear-gradient(180deg,rgba(10,10,10,.15) 0%,rgba(10,10,10,.88) 100%),' +
-            "url('" + pu.replace(/'/g, "\\'") + "')";
-        } else {
-          slide.classList.remove('has-backdrop');
-          slide.style.backgroundImage = '';
-        }
-        slide.innerHTML =
-          '<div class="hero-inner"><p class="hero-kind"></p><h1></h1><p class="hero-blurb"></p></div>';
-        slide.querySelector('.hero-kind').textContent =
-          kind === 'film' ? 'Film' : 'Série';
-        slide.querySelector('h1').textContent = titre;
-        slide.querySelector('.hero-blurb').textContent = desc;
-        track.appendChild(slide);
-      }
-
-      if (list.length) {
-        for (var fi = 0; fi < list.length; fi++) {
-          addSlide(list[fi]);
-        }
-      } else {
-        var slide = document.createElement('div');
-        slide.className = 'hero hero-slide';
-        slide.setAttribute('role', 'listitem');
-        slide.classList.remove('has-backdrop');
-        slide.style.backgroundImage = '';
-        slide.innerHTML =
-          '<div class="hero-inner"><p class="hero-kind">Redwood Plus</p><h1>Bienvenue</h1><p class="hero-blurb">Découvrez le catalogue, la page Films (genres, acteurs, TMDB) ou tirez au sort un titre sur Choisir pour moi.</p></div>';
-        track.appendChild(slide);
-      }
-
-      _heroCarousel.count = track.querySelectorAll('.hero-slide').length;
-      _heroCarousel.index = 0;
-
-      var multi = _heroCarousel.count > 1;
-      if (prev) {
-        prev.hidden = !multi;
-        prev.disabled = !multi;
-        prev.onclick = function () {
-          heroGoTo(_heroCarousel.index - 1, true);
-          heroCarouselStartTimer();
-        };
-      }
-      if (next) {
-        next.hidden = !multi;
-        next.disabled = !multi;
-        next.onclick = function () {
-          heroGoTo(_heroCarousel.index + 1, true);
-          heroCarouselStartTimer();
-        };
-      }
-      if (dotsHost && multi) {
-        dotsHost.hidden = false;
-        for (var j = 0; j < _heroCarousel.count; j++) {
-          (function (idx) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.setAttribute('role', 'tab');
-            b.setAttribute('aria-label', 'Afficher le slide ' + (idx + 1));
-            b.setAttribute('aria-selected', idx === 0 ? 'true' : 'false');
-            b.addEventListener('click', function () {
-              heroGoTo(idx, true);
-              heroCarouselStartTimer();
-            });
-            dotsHost.appendChild(b);
-          })(j);
-        }
-      }
-
-      wrap.onmouseenter = function () {
-        heroCarouselStopTimer();
-      };
-      wrap.onmouseleave = function () {
-        heroCarouselStartTimer();
-      };
-
-      wrap.onkeydown = function (e) {
-        if (!multi) return;
-        if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          heroGoTo(_heroCarousel.index - 1, true);
-          heroCarouselStartTimer();
-        } else if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          heroGoTo(_heroCarousel.index + 1, true);
-          heroCarouselStartTimer();
-        }
-      };
-      wrap.tabIndex = multi ? 0 : -1;
-
-      if (vp) {
-        var startX = null;
-        vp.addEventListener(
-          'touchstart',
-          function (e) {
-            if (!multi || !e.touches[0]) return;
-            startX = e.touches[0].clientX;
-          },
-          { passive: true }
-        );
-        vp.addEventListener(
-          'touchend',
-          function (e) {
-            if (!multi || startX == null) return;
-            var endX = e.changedTouches[0] && e.changedTouches[0].clientX;
-            var dx = endX - startX;
-            startX = null;
-            if (endX == null || Math.abs(dx) < 50) return;
-            if (dx > 0) {
-              heroGoTo(_heroCarousel.index - 1, true);
-            } else {
-              heroGoTo(_heroCarousel.index + 1, true);
-            }
+            heroApplyMetrics(false);
             heroCarouselStartTimer();
-          },
-          { passive: true }
+          });
+        });
+      }
+
+      /** Base URL for SVG assets under frontend/watch/assets/crypto-donations/ (nginx: /watch/...). */
+      function donationCryptoIconsBase() {
+        var p = window.location.pathname || "";
+        var ix = p.indexOf("/watch");
+        if (ix >= 0)
+          return p.slice(0, ix + "/watch".length) + "/assets/crypto-donations";
+        return "/watch/assets/crypto-donations";
+      }
+
+      function donationWalletButtonModifier(walletId) {
+        var known = { btc: 1, polygon: 1, solana: 1, xrp: 1, tron: 1 };
+        return known[walletId] ? walletId : "default";
+      }
+
+      function donationWalletIconHtml(walletId) {
+        var fileById = {
+          btc: "bitcoin",
+          polygon: "polygon",
+          solana: "solana",
+          xrp: "xrp",
+          tron: "tron",
+        };
+        var baseName = fileById[walletId];
+        if (!baseName) {
+          return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#666"/></svg>';
+        }
+        var src = donationCryptoIconsBase() + "/" + baseName + ".svg";
+        return (
+          '<img class="don-crypto-ico" src="' +
+          src +
+          '" alt="" width="22" height="22" decoding="async" loading="lazy" />'
         );
       }
 
-      if (!window.__redwoodHeroResizeBound) {
-        window.__redwoodHeroResizeBound = true;
-        window.addEventListener('resize', heroOnResize);
+      async function copyDonationAddress(addr, btn) {
+        const lbl = btn.querySelector(".don-wallet-lbl");
+        const prev = lbl ? lbl.textContent : "";
+        try {
+          await navigator.clipboard.writeText(addr);
+          if (lbl) lbl.textContent = "Copié !";
+          setTimeout(function () {
+            if (lbl) lbl.textContent = prev;
+          }, 1600);
+        } catch (_) {
+          window.prompt("Copiez cette adresse :", addr);
+        }
       }
 
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () {
-          heroApplyMetrics(false);
-          heroCarouselStartTimer();
-        });
-      });
-    }
-
-    /** Base URL for SVG assets under frontend/watch/assets/crypto-donations/ (nginx: /watch/...). */
-    function donationCryptoIconsBase() {
-      var p = window.location.pathname || '';
-      var ix = p.indexOf('/watch');
-      if (ix >= 0) return p.slice(0, ix + '/watch'.length) + '/assets/crypto-donations';
-      return '/watch/assets/crypto-donations';
-    }
-
-    function donationWalletButtonModifier(walletId) {
-      var known = { btc: 1, polygon: 1, solana: 1, xrp: 1, tron: 1 };
-      return known[walletId] ? walletId : 'default';
-    }
-
-    function donationWalletIconHtml(walletId) {
-      var fileById = { btc: 'bitcoin', polygon: 'polygon', solana: 'solana', xrp: 'xrp', tron: 'tron' };
-      var baseName = fileById[walletId];
-      if (!baseName) {
-        return '<svg class="don-crypto-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#666"/></svg>';
-      }
-      var src = donationCryptoIconsBase() + '/' + baseName + '.svg';
-      return (
-        '<img class="don-crypto-ico" src="' +
-        src +
-        '" alt="" width="22" height="22" decoding="async" loading="lazy" />'
-      );
-    }
-
-    async function copyDonationAddress(addr, btn) {
-      const lbl = btn.querySelector('.don-wallet-lbl');
-      const prev = lbl ? lbl.textContent : '';
-      try {
-        await navigator.clipboard.writeText(addr);
-        if (lbl) lbl.textContent = 'Copié !';
-        setTimeout(function () { if (lbl) lbl.textContent = prev; }, 1600);
-      } catch (_) {
-        window.prompt('Copiez cette adresse :', addr);
-      }
-    }
-
-    function renderDonationBar(don) {
-      const donEl = document.getElementById('donation-goal-bar');
-      if (!donEl) return;
-      if (!don || !don.visible || !(don.goal_eur > 0)) {
-        donEl.hidden = true;
-        donEl.innerHTML = '';
-        return;
-      }
-      const raised = typeof don.raised_eur === 'number' ? don.raised_eur : 0;
-      const goal = don.goal_eur;
-      const pct = typeof don.progress_percent === 'number' ? don.progress_percent : 0;
-      const fmt = function (n) {
-        return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
-      };
-      let periodHtml = '';
-      if (don.period_start_utc && don.period_end_utc) {
-        const opts = { dateStyle: 'short', timeStyle: 'short' };
-        const a = new Date(don.period_start_utc.endsWith('Z') ? don.period_start_utc : don.period_start_utc + 'Z');
-        const b = new Date(don.period_end_utc.endsWith('Z') ? don.period_end_utc : don.period_end_utc + 'Z');
-        periodHtml =
-          '<p class="don-meta" style="margin-top:8px">Période : ' +
-          a.toLocaleString('fr-FR', opts) +
-          ' — ' +
-          b.toLocaleString('fr-FR', opts) +
-          '</p>';
-      }
-      const wallets = don.wallets && don.wallets.length ? don.wallets : [];
-      let walletsBlock = '';
-      if (wallets.length) {
-        walletsBlock =
-          '<p class="don-wallets-h">Faire un don — cliquez pour copier l’adresse</p><div class="don-wallets" id="don-wallets-host"></div>';
-      }
-      donEl.hidden = false;
-      donEl.innerHTML =
-        '<div class="don-row"><span class="don-label">Soutien du projet</span><span><strong>' +
-        fmt(raised) +
-        '</strong> / ' +
-        fmt(goal) +
-        ' · ' +
-        pct.toFixed(1) +
-        ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
-        Math.min(100, pct) +
-        '%"></div></div>' +
-        periodHtml +
-        walletsBlock;
-      const host = document.getElementById('don-wallets-host');
-      if (host) {
-        wallets.forEach(function (w) {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className =
-            'don-wallet-btn don-wallet-btn--' + donationWalletButtonModifier(w.id);
-          btn.setAttribute('aria-label', 'Copier adresse ' + w.label);
-          btn.title = w.address;
-          btn.innerHTML = donationWalletIconHtml(w.id) + '<span class="don-wallet-lbl">' + w.symbol + '</span>';
-          btn.addEventListener('click', function () {
-            copyDonationAddress(w.address, btn);
+      function renderDonationBar(don) {
+        const donEl = document.getElementById("donation-goal-bar");
+        if (!donEl) return;
+        if (!don || !don.visible || !(don.goal_eur > 0)) {
+          donEl.hidden = true;
+          donEl.innerHTML = "";
+          return;
+        }
+        const raised = typeof don.raised_eur === "number" ? don.raised_eur : 0;
+        const goal = don.goal_eur;
+        const pct =
+          typeof don.progress_percent === "number" ? don.progress_percent : 0;
+        const fmt = function (n) {
+          return new Intl.NumberFormat("fr-FR", {
+            style: "currency",
+            currency: "EUR",
+            maximumFractionDigits: 0,
+          }).format(n);
+        };
+        let periodHtml = "";
+        if (don.period_start_utc && don.period_end_utc) {
+          const opts = { dateStyle: "short", timeStyle: "short" };
+          const a = new Date(
+            don.period_start_utc.endsWith("Z")
+              ? don.period_start_utc
+              : don.period_start_utc + "Z",
+          );
+          const b = new Date(
+            don.period_end_utc.endsWith("Z")
+              ? don.period_end_utc
+              : don.period_end_utc + "Z",
+          );
+          periodHtml =
+            '<p class="don-meta" style="margin-top:8px">Période : ' +
+            a.toLocaleString("fr-FR", opts) +
+            " — " +
+            b.toLocaleString("fr-FR", opts) +
+            "</p>";
+        }
+        const wallets = don.wallets && don.wallets.length ? don.wallets : [];
+        let walletsBlock = "";
+        if (wallets.length) {
+          walletsBlock =
+            '<p class="don-wallets-h">Faire un don — cliquez pour copier l’adresse</p><div class="don-wallets" id="don-wallets-host"></div>';
+        }
+        donEl.hidden = false;
+        donEl.innerHTML =
+          '<div class="don-row"><span class="don-label">Soutien du projet</span><span><strong>' +
+          fmt(raised) +
+          "</strong> / " +
+          fmt(goal) +
+          " · " +
+          pct.toFixed(1) +
+          ' %</span></div><div class="don-track"><div class="don-fill" style="width:' +
+          Math.min(100, pct) +
+          '%"></div></div>' +
+          periodHtml +
+          walletsBlock;
+        const host = document.getElementById("don-wallets-host");
+        if (host) {
+          wallets.forEach(function (w) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className =
+              "don-wallet-btn don-wallet-btn--" +
+              donationWalletButtonModifier(w.id);
+            btn.setAttribute("aria-label", "Copier adresse " + w.label);
+            btn.title = w.address;
+            btn.innerHTML =
+              donationWalletIconHtml(w.id) +
+              '<span class="don-wallet-lbl">' +
+              w.symbol +
+              "</span>";
+            btn.addEventListener("click", function () {
+              copyDonationAddress(w.address, btn);
+            });
+            host.appendChild(btn);
           });
-          host.appendChild(btn);
+        }
+      }
+
+      async function refreshDonationBar() {
+        const don = await apiJson("/api/donations/progress");
+        renderDonationBar(don);
+      }
+
+      async function fetchRecentSeriesForHome(limit) {
+        try {
+          return await apiJson("/api/series/recent?limit=" + limit);
+        } catch (e) {
+          // Production may run an older API without GET /api/series/recent (404 Not Found).
+          if (e && e.status === 404) return [];
+          throw e;
+        }
+      }
+
+      function renderSeriesSearchCards(container, list) {
+        container.innerHTML = "";
+        list.forEach((s) => {
+          const el = document.createElement("div");
+          el.className = "card";
+          el.onclick = () => {
+            location.href =
+              "/watch/serie.html?key=" + encodeURIComponent(s.series_key);
+          };
+          const img = s.poster_path ? posterUrl(s.poster_path) : "";
+          const nEp = Number(s.episode_count) || 0;
+          const nSe = Number(s.season_count) || 0;
+          const epLabel = nEp === 1 ? "1 ép." : nEp + " ép.";
+          const seLabel = nSe === 1 ? "1 saison" : nSe + " saisons";
+          el.innerHTML =
+            '<div class="card-media"><img src="' +
+            img +
+            '" alt="" loading="lazy" onerror="this.style.opacity=.3" /></div><div class="t"></div>';
+          el.querySelector(".t").textContent =
+            s.title + " · " + epLabel + " · " + seLabel;
+          container.appendChild(el);
         });
       }
-    }
 
-    async function refreshDonationBar() {
-      const don = await apiJson('/api/donations/progress');
-      renderDonationBar(don);
-    }
-
-    async function fetchRecentSeriesForHome(limit) {
-      try {
-        return await apiJson('/api/series/recent?limit=' + limit);
-      } catch (e) {
-        // Production may run an older API without GET /api/series/recent (404 Not Found).
-        if (e && e.status === 404) return [];
-        throw e;
-      }
-    }
-
-    function renderSeriesSearchCards(container, list) {
-      container.innerHTML = '';
-      list.forEach((s) => {
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.onclick = () => { location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key); };
-        const img = s.poster_path ? posterUrl(s.poster_path) : '';
-        const nEp = Number(s.episode_count) || 0;
-        const nSe = Number(s.season_count) || 0;
-        const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
-        const seLabel = nSe === 1 ? '1 saison' : nSe + ' saisons';
-        el.innerHTML =
-          '<div class="card-media"><img src="' +
-          img +
-          '" alt="" loading="lazy" onerror="this.style.opacity=.3" /></div><div class="t"></div>';
-        el.querySelector('.t').textContent = s.title + ' · ' + epLabel + ' · ' + seLabel;
-        container.appendChild(el);
-      });
-    }
-
-    async function runHomeSearch(q) {
-      const browse = document.getElementById('home-browse');
-      const panel = document.getElementById('home-search');
-      if (!q) {
-        browse.hidden = false;
-        panel.hidden = true;
-        document.getElementById('latest-head').textContent = 'Derniers ajouts';
-        renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
-        if (typeof window.refreshAllRowCarousels === 'function') {
+      async function runHomeSearch(q) {
+        const browse = document.getElementById("home-browse");
+        const panel = document.getElementById("home-search");
+        if (!q) {
+          browse.hidden = false;
+          panel.hidden = true;
+          document.getElementById("latest-head").textContent =
+            "Derniers ajouts";
+          renderLatestCards(document.getElementById("row-latest"), homeLatest, {
+            markNew: true,
+            latestTopN: 12,
+          });
+          if (typeof window.refreshAllRowCarousels === "function") {
+            requestAnimationFrame(function () {
+              window.refreshAllRowCarousels();
+              requestAnimationFrame(function () {
+                window.refreshAllRowCarousels();
+              });
+            });
+          }
+          return;
+        }
+        browse.hidden = true;
+        panel.hidden = false;
+        document.getElementById("search-main-title").textContent =
+          "Résultats : « " + q + " »";
+        if (typeof watchHomeSearchLoadingBar === "function")
+          watchHomeSearchLoadingBar(panel, true);
+        let films;
+        let series;
+        try {
+          [films, series] = await Promise.all([
+            apiJson("/api/films?q=" + encodeURIComponent(q)),
+            apiJson("/api/series?q=" + encodeURIComponent(q)),
+          ]);
+        } finally {
+          if (typeof watchHomeSearchLoadingBar === "function")
+            watchHomeSearchLoadingBar(panel, false);
+        }
+        renderCards(
+          document.getElementById("row-search-films"),
+          films.slice(0, 48),
+          {
+            markNew: false,
+            latestTopN: 0,
+          },
+        );
+        renderSeriesSearchCards(
+          document.getElementById("row-search-series"),
+          series.slice(0, 48),
+        );
+        const hasF = films.length > 0;
+        const hasS = series.length > 0;
+        document.getElementById("search-films-head").hidden = !hasF;
+        document.getElementById("row-search-films").hidden = !hasF;
+        document.getElementById("search-series-head").hidden = !hasS;
+        document.getElementById("row-search-series").hidden = !hasS;
+        document.getElementById("search-empty").style.display =
+          !hasF && !hasS ? "block" : "none";
+        if (typeof window.refreshAllRowCarousels === "function") {
           requestAnimationFrame(function () {
             window.refreshAllRowCarousels();
             requestAnimationFrame(function () {
@@ -562,167 +739,155 @@
             });
           });
         }
-        return;
       }
-      browse.hidden = true;
-      panel.hidden = false;
-      document.getElementById('search-main-title').textContent = 'Résultats : « ' + q + ' »';
-      if (typeof watchHomeSearchLoadingBar === 'function') watchHomeSearchLoadingBar(panel, true);
-      let films;
-      let series;
-      try {
-        [films, series] = await Promise.all([
-          apiJson('/api/films?q=' + encodeURIComponent(q)),
-          apiJson('/api/series?q=' + encodeURIComponent(q)),
-        ]);
-      } finally {
-        if (typeof watchHomeSearchLoadingBar === 'function') watchHomeSearchLoadingBar(panel, false);
-      }
-      renderCards(document.getElementById('row-search-films'), films.slice(0, 48), {
-        markNew: false,
-        latestTopN: 0,
-      });
-      renderSeriesSearchCards(document.getElementById('row-search-series'), series.slice(0, 48));
-      const hasF = films.length > 0;
-      const hasS = series.length > 0;
-      document.getElementById('search-films-head').hidden = !hasF;
-      document.getElementById('row-search-films').hidden = !hasF;
-      document.getElementById('search-series-head').hidden = !hasS;
-      document.getElementById('row-search-series').hidden = !hasS;
-      document.getElementById('search-empty').style.display = !hasF && !hasS ? 'block' : 'none';
-      if (typeof window.refreshAllRowCarousels === 'function') {
-        requestAnimationFrame(function () {
-          window.refreshAllRowCarousels();
-          requestAnimationFrame(function () {
-            window.refreshAllRowCarousels();
-          });
-        });
-      }
-    }
 
-    function renderLatestCards(container, list, opts) {
-      const markNew = opts && opts.markNew;
-      const latestTopN = opts && typeof opts.latestTopN === 'number' ? opts.latestTopN : null;
-      container.innerHTML = '';
-      list.forEach((item, i) => {
-        const el = document.createElement('div');
-        el.className = 'card';
-        const isSeries = item.kind === 'series';
-        el.onclick = () => {
+      function renderLatestCards(container, list, opts) {
+        const markNew = opts && opts.markNew;
+        const latestTopN =
+          opts && typeof opts.latestTopN === "number" ? opts.latestTopN : null;
+        container.innerHTML = "";
+        list.forEach((item, i) => {
+          const el = document.createElement("div");
+          el.className = "card";
+          const isSeries = item.kind === "series";
+          el.onclick = () => {
+            if (isSeries) {
+              location.href =
+                "/watch/serie.html?key=" + encodeURIComponent(item.series_key);
+            } else {
+              location.href = "/watch/film.html?id=" + item.id;
+            }
+          };
+          const img = item.poster_path ? posterUrl(item.poster_path) : "";
+          const showNew =
+            markNew &&
+            (isNewTitle(item) || (latestTopN != null && i < latestTopN));
+          const newBadge = showNew ? '<span class="badge-new">NEW</span>' : "";
+          el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" />${newBadge}</div><div class="t"></div>`;
+          const t = el.querySelector(".t");
           if (isSeries) {
-            location.href = '/watch/serie.html?key=' + encodeURIComponent(item.series_key);
+            const nEp = Number(item.episode_count) || 0;
+            const epLabel = nEp === 1 ? "1 ép." : nEp + " ép.";
+            t.textContent = (item.title || "Série") + " · Série · " + epLabel;
           } else {
-            location.href = '/watch/film.html?id=' + item.id;
+            t.textContent = item.titre;
           }
-        };
-        const img = item.poster_path ? posterUrl(item.poster_path) : '';
-        const showNew =
-          markNew &&
-          (isNewTitle(item) || (latestTopN != null && i < latestTopN));
-        const newBadge = showNew ? '<span class="badge-new">NEW</span>' : '';
-        el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" />${newBadge}</div><div class="t"></div>`;
-        const t = el.querySelector('.t');
-        if (isSeries) {
-          const nEp = Number(item.episode_count) || 0;
-          const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
-          t.textContent = (item.title || 'Série') + ' · Série · ' + epLabel;
-        } else {
-          t.textContent = item.titre;
-        }
-        container.appendChild(el);
-      });
-    }
-
-    function renderCards(container, list, opts) {
-      const markNew = opts && opts.markNew;
-      const latestTopN = opts && typeof opts.latestTopN === 'number' ? opts.latestTopN : null;
-      container.innerHTML = '';
-      list.forEach((f, i) => {
-        const el = document.createElement('div');
-        el.className = 'card';
-        el.onclick = () => location.href = '/watch/film.html?id=' + f.id;
-        const img = f.poster_path ? posterUrl(f.poster_path) : '';
-        const showNew = markNew && (isNewTitle(f) || (latestTopN != null && i < latestTopN));
-        const newBadge = showNew ? '<span class="badge-new">NEW</span>' : '';
-        // Badge after <img> so it stacks above the poster (image would cover an earlier sibling).
-        el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" />${newBadge}</div><div class="t"></div>`;
-        el.querySelector('.t').textContent = f.titre;
-        container.appendChild(el);
-      });
-    }
-
-    let searchTimer;
-    document.getElementById('nav-q').addEventListener('input', () => {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
-        const q = document.getElementById('nav-q').value.trim();
-        runHomeSearch(q).catch((e) => {
-          if (e && e.message === '401') { location.href = '/login.html'; return; }
-          console.error(e);
+          container.appendChild(el);
         });
-      }, 280);
-    });
-
-    async function boot() {
-      await apiJson('/api/auth/me');
-
-      const [featured, latestFilms, recentSeries] = await Promise.all([
-        apiJson('/api/films/featured'),
-        apiJson('/api/films/latest?limit=48'),
-        fetchRecentSeriesForHome(48),
-      ]);
-      const merged = [];
-      latestFilms.forEach((f) => merged.push(Object.assign({ kind: 'film' }, f)));
-      recentSeries.forEach((s) => merged.push(Object.assign({ kind: 'series' }, s)));
-      merged.sort((a, b) => {
-        const ta = new Date(a.date_ajout || 0).getTime();
-        const tb = new Date(b.date_ajout || 0).getTime();
-        return tb - ta;
-      });
-      homeLatest = merged.slice(0, 24);
-
-      initHeroCarousel(pickHeroSpotlight(latestFilms, recentSeries));
-
-      homeFeatured = featured;
-      renderLatestCards(document.getElementById('row-latest'), homeLatest, { markNew: true, latestTopN: 12 });
-      renderCards(document.getElementById('row-featured'), homeFeatured);
-
-      try {
-        await refreshDonationBar();
-        if (window.__redwoodDonationPoll) clearInterval(window.__redwoodDonationPoll);
-        window.__redwoodDonationPoll = setInterval(function () {
-          refreshDonationBar().catch(function () {});
-        }, 3600000);
-      } catch (_) {}
-
-      try {
-        const series = await apiJson('/api/series');
-        const rs = document.getElementById('row-series');
-        rs.innerHTML = '';
-        series.slice(0, 16).forEach((s) => {
-          const el = document.createElement('div');
-          el.className = 'card';
-          el.onclick = () => { location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key); };
-          const img = s.poster_path ? posterUrl(s.poster_path) : '';
-          el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /></div><div class="t"></div>`;
-          el.querySelector('.t').textContent = s.title + ' · ' + s.episode_count + ' ép.';
-          rs.appendChild(el);
-        });
-      } catch (_) {}
-    }
-    if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow();
-    initRowCarousels();
-    (async function () {
-      try {
-        await boot();
-      } catch (e) {
-        if (e && e.message === '401') { location.href = '/login.html'; return; }
-        console.error(e);
-        alert('Chargement impossible : ' + (e && e.message ? e.message : e));
-      } finally {
-        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
       }
-    })();
-  </script>
-</body>
+
+      function renderCards(container, list, opts) {
+        const markNew = opts && opts.markNew;
+        const latestTopN =
+          opts && typeof opts.latestTopN === "number" ? opts.latestTopN : null;
+        container.innerHTML = "";
+        list.forEach((f, i) => {
+          const el = document.createElement("div");
+          el.className = "card";
+          el.onclick = () => (location.href = "/watch/film.html?id=" + f.id);
+          const img = f.poster_path ? posterUrl(f.poster_path) : "";
+          const showNew =
+            markNew &&
+            (isNewTitle(f) || (latestTopN != null && i < latestTopN));
+          const newBadge = showNew ? '<span class="badge-new">NEW</span>' : "";
+          // Badge after <img> so it stacks above the poster (image would cover an earlier sibling).
+          el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" />${newBadge}</div><div class="t"></div>`;
+          el.querySelector(".t").textContent = f.titre;
+          container.appendChild(el);
+        });
+      }
+
+      let searchTimer;
+      document.getElementById("nav-q").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const q = document.getElementById("nav-q").value.trim();
+          runHomeSearch(q).catch((e) => {
+            if (e && e.message === "401") {
+              location.href = "/login.html";
+              return;
+            }
+            console.error(e);
+          });
+        }, 280);
+      });
+
+      async function boot() {
+        await apiJson("/api/auth/me");
+
+        const [featured, latestFilms, recentSeries] = await Promise.all([
+          apiJson("/api/films/featured"),
+          apiJson("/api/films/latest?limit=48"),
+          fetchRecentSeriesForHome(48),
+        ]);
+        const merged = [];
+        latestFilms.forEach((f) =>
+          merged.push(Object.assign({ kind: "film" }, f)),
+        );
+        recentSeries.forEach((s) =>
+          merged.push(Object.assign({ kind: "series" }, s)),
+        );
+        merged.sort((a, b) => {
+          const ta = new Date(a.date_ajout || 0).getTime();
+          const tb = new Date(b.date_ajout || 0).getTime();
+          return tb - ta;
+        });
+        homeLatest = merged.slice(0, 24);
+
+        initHeroCarousel(pickHeroSpotlight(latestFilms, recentSeries));
+
+        homeFeatured = featured;
+        renderLatestCards(document.getElementById("row-latest"), homeLatest, {
+          markNew: true,
+          latestTopN: 12,
+        });
+        renderCards(document.getElementById("row-featured"), homeFeatured);
+
+        try {
+          await refreshDonationBar();
+          if (window.__redwoodDonationPoll)
+            clearInterval(window.__redwoodDonationPoll);
+          window.__redwoodDonationPoll = setInterval(function () {
+            refreshDonationBar().catch(function () {});
+          }, 3600000);
+        } catch (_) {}
+
+        try {
+          const series = await apiJson("/api/series");
+          const rs = document.getElementById("row-series");
+          rs.innerHTML = "";
+          series.slice(0, 16).forEach((s) => {
+            const el = document.createElement("div");
+            el.className = "card";
+            el.onclick = () => {
+              location.href =
+                "/watch/serie.html?key=" + encodeURIComponent(s.series_key);
+            };
+            const img = s.poster_path ? posterUrl(s.poster_path) : "";
+            el.innerHTML = `<div class="card-media"><img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.3" /></div><div class="t"></div>`;
+            el.querySelector(".t").textContent =
+              s.title + " · " + s.episode_count + " ép.";
+            rs.appendChild(el);
+          });
+        } catch (_) {}
+      }
+      if (typeof watchPageLoadingShow === "function") watchPageLoadingShow();
+      initRowCarousels();
+      (async function () {
+        try {
+          await boot();
+        } catch (e) {
+          if (e && e.message === "401") {
+            location.href = "/login.html";
+            return;
+          }
+          console.error(e);
+          alert("Chargement impossible : " + (e && e.message ? e.message : e));
+        } finally {
+          if (typeof watchPageLoadingHide === "function")
+            watchPageLoadingHide();
+        }
+      })();
+    </script>
+  </body>
 </html>

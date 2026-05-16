@@ -1,89 +1,132 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
-  <title>Catégories — Redwood Plus</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
+    <title>Catégories — Redwood Plus</title>
     <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-categories.css" />
-</head>
-<body>
-  <nav>
-    <a class="brand" href="/watch/">Redwood Plus</a>
-    <input type="search" class="nav-search" id="nav-q" placeholder="Rechercher des films…" />
-    <div class="nav-end">
-      <a href="/watch/">Accueil</a>
-      <a href="/watch/films.html">Films</a>
-      <a href="/watch/serie.html">Séries</a>
-      <a href="/watch/categories.html">Catégories</a>
-      <a href="/watch/pick.html">Choisir pour moi</a>
-      <a href="/watch/invitations.html" class="nav-invite-link" aria-label="Invitations" title="Invitations"></a>
-      <div class="nav-user-wrap" id="nav-user-wrap">
-        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
-          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
-          <span class="nav-user-name" id="nav-user-name">…</span>
-        </button>
-        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
-          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
-          <a href="/watch/support.html" role="menuitem">Support</a>
-          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
-          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
+    <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+    <link rel="stylesheet" href="/css/redwood-watch-categories.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/watch/">Redwood Plus</a>
+      <input
+        type="search"
+        class="nav-search"
+        id="nav-q"
+        placeholder="Rechercher des films…"
+      />
+      <div class="nav-end">
+        <a href="/watch/">Accueil</a>
+        <a href="/watch/films.html">Films</a>
+        <a href="/watch/serie.html">Séries</a>
+        <a href="/watch/categories.html">Catégories</a>
+        <a href="/watch/pick.html">Choisir pour moi</a>
+        <a
+          href="/watch/invitations.html"
+          class="nav-invite-link"
+          aria-label="Invitations"
+          title="Invitations"
+        ></a>
+        <div class="nav-user-wrap" id="nav-user-wrap">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-user-menu"
+          >
+            <span class="nav-user-avatar" aria-hidden="true"
+              ><span id="nav-user-initials">…</span></span
+            >
+            <span class="nav-user-name" id="nav-user-name">…</span>
+          </button>
+          <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+            <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+            <a href="/watch/support.html" role="menuitem">Support</a>
+            <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+            <button
+              type="button"
+              class="nav-logout-btn"
+              role="menuitem"
+              id="nav-logout"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </nav>
-  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
-  <main>
-    <h1>Parcourir par catégorie</h1>
-    <p class="lead">Chaque vignette illustre le genre avec une affiche tirée au hasard d’un film du catalogue. Cliquez pour ouvrir la liste des films.</p>
-    <div class="cat-grid" id="cats"></div>
-  </main>
-  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
-  <script src="/watch/app.js"></script>
-  <script>
-    let navSearchTimer;
-    document.getElementById('nav-q').addEventListener('input', () => {
-      clearTimeout(navSearchTimer);
-      const q = document.getElementById('nav-q').value.trim();
-      navSearchTimer = setTimeout(() => {
-        if (q) {
-          location.href = '/watch/films.html?q=' + encodeURIComponent(q);
-        }
-      }, 350);
-    });
+    </nav>
+    <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+    <main>
+      <h1>Parcourir par catégorie</h1>
+      <p class="lead">
+        Chaque vignette illustre le genre avec une affiche tirée au hasard d’un
+        film du catalogue. Cliquez pour ouvrir la liste des films.
+      </p>
+      <div class="cat-grid" id="cats"></div>
+    </main>
+    <footer>
+      © Redwood Plus — This product uses the TMDB API but is not endorsed or
+      certified by TMDB.
+    </footer>
+    <script src="/watch/app.js"></script>
+    <script>
+      let navSearchTimer;
+      document.getElementById("nav-q").addEventListener("input", () => {
+        clearTimeout(navSearchTimer);
+        const q = document.getElementById("nav-q").value.trim();
+        navSearchTimer = setTimeout(() => {
+          if (q) {
+            location.href = "/watch/films.html?q=" + encodeURIComponent(q);
+          }
+        }, 350);
+      });
 
-    (async function () {
-      const main = document.querySelector('main');
-      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
-      try {
-        await apiJson('/api/auth/me');
-        const genres = await apiJson('/api/films/genres-summary');
-        const gEl = document.getElementById('cats');
-        genres.forEach(g => {
-          const c = document.createElement('div');
-          c.className = 'cat-card';
-          const poster = (g.poster_url && String(g.poster_url)) || (g.poster_path ? posterUrl(g.poster_path) : '');
-          const bg = poster
-            ? `<div class="cat-card-bg" style="background-image:url('${poster.replace(/'/g, "\\'")}')"></div><div class="cat-card-shade"></div>`
-            : '';
-          c.innerHTML = bg + '<div class="accent-bar"></div><div class="cat-card-inner"><div class="name"></div><div class="count"></div></div>';
-          c.querySelector('.name').textContent = g.name;
-          c.querySelector('.count').textContent = g.count + ' titre' + (g.count > 1 ? 's' : '');
-          c.onclick = () => {
-            location.href = '/watch/films.html?genre=' + encodeURIComponent(g.name);
-          };
-          gEl.appendChild(c);
-        });
-      } catch (e) {
-        if (e && e.message === '401') { location.href = '/login.html'; return; }
-        console.error(e);
-        alert('Chargement impossible : ' + (e && e.message ? e.message : e));
-      } finally {
-        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
-      }
-    })();
-  </script>
-</body>
+      (async function () {
+        const main = document.querySelector("main");
+        if (typeof watchScopedLoadingShow === "function")
+          watchScopedLoadingShow(main);
+        try {
+          await apiJson("/api/auth/me");
+          const genres = await apiJson("/api/films/genres-summary");
+          const gEl = document.getElementById("cats");
+          genres.forEach((g) => {
+            const c = document.createElement("div");
+            c.className = "cat-card";
+            const poster =
+              (g.poster_url && String(g.poster_url)) ||
+              (g.poster_path ? posterUrl(g.poster_path) : "");
+            const bg = poster
+              ? `<div class="cat-card-bg" style="background-image:url('${poster.replace(/'/g, "\\'")}')"></div><div class="cat-card-shade"></div>`
+              : "";
+            c.innerHTML =
+              bg +
+              '<div class="accent-bar"></div><div class="cat-card-inner"><div class="name"></div><div class="count"></div></div>';
+            c.querySelector(".name").textContent = g.name;
+            c.querySelector(".count").textContent =
+              g.count + " titre" + (g.count > 1 ? "s" : "");
+            c.onclick = () => {
+              location.href =
+                "/watch/films.html?genre=" + encodeURIComponent(g.name);
+            };
+            gEl.appendChild(c);
+          });
+        } catch (e) {
+          if (e && e.message === "401") {
+            location.href = "/login.html";
+            return;
+          }
+          console.error(e);
+          alert("Chargement impossible : " + (e && e.message ? e.message : e));
+        } finally {
+          if (typeof watchScopedLoadingHide === "function")
+            watchScopedLoadingHide(main);
+        }
+      })();
+    </script>
+  </body>
 </html>

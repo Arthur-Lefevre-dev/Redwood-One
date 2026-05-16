@@ -1,323 +1,436 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
-  <title>Invitations — Redwood Plus</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
+    <title>Invitations — Redwood Plus</title>
     <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-invitations.css" />
-</head>
-<body>
-  <nav>
-    <a class="brand" href="/watch/">Redwood Plus</a>
-    <div class="nav-end">
-      <a href="/watch/">Accueil</a>
-      <a href="/watch/films.html">Films</a>
-      <a href="/watch/serie.html">Séries</a>
-      <a href="/watch/categories.html">Catégories</a>
-      <a href="/watch/pick.html">Choisir pour moi</a>
-      <a href="/watch/invitations.html" class="nav-invite-link nav-invite-link--current" aria-label="Invitations" title="Invitations"></a>
-      <div class="nav-user-wrap" id="nav-user-wrap">
-        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
-          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
-          <span class="nav-user-name" id="nav-user-name">…</span>
+    <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+    <link rel="stylesheet" href="/css/redwood-watch-invitations.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/watch/">Redwood Plus</a>
+      <div class="nav-end">
+        <a href="/watch/">Accueil</a>
+        <a href="/watch/films.html">Films</a>
+        <a href="/watch/serie.html">Séries</a>
+        <a href="/watch/categories.html">Catégories</a>
+        <a href="/watch/pick.html">Choisir pour moi</a>
+        <a
+          href="/watch/invitations.html"
+          class="nav-invite-link nav-invite-link--current"
+          aria-label="Invitations"
+          title="Invitations"
+        ></a>
+        <div class="nav-user-wrap" id="nav-user-wrap">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-user-menu"
+          >
+            <span class="nav-user-avatar" aria-hidden="true"
+              ><span id="nav-user-initials">…</span></span
+            >
+            <span class="nav-user-name" id="nav-user-name">…</span>
+          </button>
+          <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+            <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+            <a href="/watch/support.html" role="menuitem">Support</a>
+            <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+            <button
+              type="button"
+              class="nav-logout-btn"
+              role="menuitem"
+              id="nav-logout"
+            >
+              Déconnexion
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+    <main>
+      <h1>Invitations</h1>
+      <p class="lead">
+        Invitez des personnes à créer un compte viewer. Le nombre d’invitations
+        <strong>par mois</strong> dépend de votre <strong>rang</strong> : Bronze
+        (1), Argent (3), Or (6), Platine (10). Les administrateurs vous
+        attribuent le rang.
+      </p>
+      <p class="identity" id="identity-line" hidden>
+        Connecté en tant que <strong id="id-user"></strong
+        ><span id="rank-badge" class="rank-badge" hidden>
+          — Rang : <strong id="id-rank-label"></strong> (<span
+            id="id-rank-quota"
+          ></span>
+          invitations / mois)</span
+        >
+      </p>
+
+      <div class="quota-card">
+        <h2>Votre quota ce mois-ci</h2>
+        <div class="quota-top">
+          <span>Invitations créées / maximum</span>
+          <strong id="quota-fraction">— / —</strong>
+        </div>
+        <div
+          class="quota-bar"
+          id="quota-bar"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="0"
+          aria-label="Quota mensuel d’invitations"
+        >
+          <div class="quota-fill" id="quota-fill"></div>
+        </div>
+        <p class="quota-hint" id="quota-hint"></p>
+        <p class="quota-meta">
+          Codes générés au total (historique affiché ci-dessous) :
+          <strong id="total-codes">0</strong>
+        </p>
+      </div>
+
+      <section>
+        <h2>Nouveau code</h2>
+        <p class="hint" id="invite-hint"></p>
+        <button type="button" class="btn" id="btn-invite" hidden>
+          Générer un code d’invitation
         </button>
-        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
-          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
-          <a href="/watch/support.html" role="menuitem">Support</a>
-          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
-          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
+        <div id="invite-result" hidden>
+          <p class="hint">
+            Transmettez ce code à la personne invitée. Elle pourra l’utiliser
+            sur la page d’inscription.
+          </p>
+          <div class="code-box" id="invite-code-display"></div>
+          <div class="row-actions">
+            <button type="button" class="btn btn-secondary" id="btn-copy">
+              Copier le code
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
-  </nav>
-  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
-  <main>
-    <h1>Invitations</h1>
-    <p class="lead">Invitez des personnes à créer un compte viewer. Le nombre d’invitations <strong>par mois</strong> dépend de votre <strong>rang</strong> : Bronze (1), Argent (3), Or (6), Platine (10). Les administrateurs vous attribuent le rang.</p>
-    <p class="identity" id="identity-line" hidden>Connecté en tant que <strong id="id-user"></strong><span id="rank-badge" class="rank-badge" hidden> — Rang : <strong id="id-rank-label"></strong> (<span id="id-rank-quota"></span> invitations / mois)</span></p>
+        <p class="msg err" id="msg-invite"></p>
+      </section>
 
-    <div class="quota-card">
-      <h2>Votre quota ce mois-ci</h2>
-      <div class="quota-top">
-        <span>Invitations créées / maximum</span>
-        <strong id="quota-fraction">— / —</strong>
-      </div>
-      <div class="quota-bar" id="quota-bar" role="progressbar" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="Quota mensuel d’invitations">
-        <div class="quota-fill" id="quota-fill"></div>
-      </div>
-      <p class="quota-hint" id="quota-hint"></p>
-      <p class="quota-meta">Codes générés au total (historique affiché ci-dessous) : <strong id="total-codes">0</strong></p>
-    </div>
-
-    <section>
-      <h2>Nouveau code</h2>
-      <p class="hint" id="invite-hint"></p>
-      <button type="button" class="btn" id="btn-invite" hidden>Générer un code d’invitation</button>
-      <div id="invite-result" hidden>
-        <p class="hint">Transmettez ce code à la personne invitée. Elle pourra l’utiliser sur la page d’inscription.</p>
-        <div class="code-box" id="invite-code-display"></div>
-        <div class="row-actions">
-          <button type="button" class="btn btn-secondary" id="btn-copy">Copier le code</button>
+      <section>
+        <h2>Historique de vos codes</h2>
+        <p class="hint" id="invite-history-empty">
+          Aucun code généré pour l’instant.
+        </p>
+        <div class="invite-table-wrap" id="invite-history-wrap" hidden>
+          <table
+            class="invite-table"
+            aria-label="Historique des codes d’invitation"
+          >
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Créé le</th>
+                <th>Utilisations</th>
+                <th>Statut</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="invite-history-body"></tbody>
+          </table>
         </div>
-      </div>
-      <p class="msg err" id="msg-invite"></p>
-    </section>
-
-    <section>
-      <h2>Historique de vos codes</h2>
-      <p class="hint" id="invite-history-empty">Aucun code généré pour l’instant.</p>
-      <div class="invite-table-wrap" id="invite-history-wrap" hidden>
-        <table class="invite-table" aria-label="Historique des codes d’invitation">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Créé le</th>
-              <th>Utilisations</th>
-              <th>Statut</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="invite-history-body"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
-  <script src="/watch/app.js"></script>
-  <script>
-    function formatNextInvite(iso) {
-      if (!iso) return '';
-      try {
-        const d = new Date(iso);
-        return d.toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'UTC' });
-      } catch (_) {
-        return iso;
+      </section>
+    </main>
+    <footer>
+      © Redwood Plus — This product uses the TMDB API but is not endorsed or
+      certified by TMDB.
+    </footer>
+    <script src="/watch/app.js"></script>
+    <script>
+      function formatNextInvite(iso) {
+        if (!iso) return "";
+        try {
+          const d = new Date(iso);
+          return d.toLocaleString("fr-FR", {
+            dateStyle: "long",
+            timeStyle: "short",
+            timeZone: "UTC",
+          });
+        } catch (_) {
+          return iso;
+        }
       }
-    }
 
-    const RANK_LABELS = { bronze: 'Bronze', silver: 'Argent', gold: 'Or', platinum: 'Platine' };
+      const RANK_LABELS = {
+        bronze: "Bronze",
+        silver: "Argent",
+        gold: "Or",
+        platinum: "Platine",
+      };
 
-    function monthUsedAndQuota(inv) {
-      const quota = typeof inv.invite_quota_per_month === 'number' ? inv.invite_quota_per_month : 1;
-      let used = inv.invites_created_this_month;
-      if (typeof used !== 'number') {
-        used = inv.can_invite_this_month ? 0 : quota;
+      function monthUsedAndQuota(inv) {
+        const quota =
+          typeof inv.invite_quota_per_month === "number"
+            ? inv.invite_quota_per_month
+            : 1;
+        let used = inv.invites_created_this_month;
+        if (typeof used !== "number") {
+          used = inv.can_invite_this_month ? 0 : quota;
+        }
+        used = Math.max(0, Math.min(used, quota));
+        return { used, quota };
       }
-      used = Math.max(0, Math.min(used, quota));
-      return { used, quota };
-    }
 
-    function updateQuotaBar(inv, totalHistory) {
-      const { used, quota } = monthUsedAndQuota(inv || {});
-      const frac = document.getElementById('quota-fraction');
-      const fill = document.getElementById('quota-fill');
-      const bar = document.getElementById('quota-bar');
-      const hint = document.getElementById('quota-hint');
-      const totalEl = document.getElementById('total-codes');
-      if (totalEl) totalEl.textContent = String(totalHistory);
-      if (!inv || typeof inv.can_invite_this_month === 'undefined') {
-        if (frac) frac.textContent = '— / —';
-        if (fill) fill.style.width = '0%';
-        if (bar) { bar.setAttribute('aria-valuemax', '1'); bar.setAttribute('aria-valuenow', '0'); }
-        if (hint) hint.textContent = '';
-        return;
+      function updateQuotaBar(inv, totalHistory) {
+        const { used, quota } = monthUsedAndQuota(inv || {});
+        const frac = document.getElementById("quota-fraction");
+        const fill = document.getElementById("quota-fill");
+        const bar = document.getElementById("quota-bar");
+        const hint = document.getElementById("quota-hint");
+        const totalEl = document.getElementById("total-codes");
+        if (totalEl) totalEl.textContent = String(totalHistory);
+        if (!inv || typeof inv.can_invite_this_month === "undefined") {
+          if (frac) frac.textContent = "— / —";
+          if (fill) fill.style.width = "0%";
+          if (bar) {
+            bar.setAttribute("aria-valuemax", "1");
+            bar.setAttribute("aria-valuenow", "0");
+          }
+          if (hint) hint.textContent = "";
+          return;
+        }
+        if (frac) frac.textContent = used + " / " + quota;
+        const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+        if (fill) fill.style.width = pct + "%";
+        if (bar) {
+          bar.setAttribute("aria-valuemax", String(quota));
+          bar.setAttribute("aria-valuenow", String(used));
+        }
+        if (hint) {
+          if (inv.can_invite_this_month) {
+            const left = quota - used;
+            hint.textContent =
+              left <= 0
+                ? ""
+                : "Vous pouvez encore créer " +
+                  left +
+                  " invitation(s) ce mois-ci.";
+          } else {
+            const when = formatNextInvite(inv.next_invite_at);
+            hint.textContent = when
+              ? "Quota mensuel atteint. Prochain créneau à partir du : " + when
+              : "Quota mensuel atteint.";
+          }
+        }
       }
-      if (frac) frac.textContent = used + ' / ' + quota;
-      const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
-      if (fill) fill.style.width = pct + '%';
-      if (bar) {
-        bar.setAttribute('aria-valuemax', String(quota));
-        bar.setAttribute('aria-valuenow', String(used));
-      }
-      if (hint) {
+
+      function applyInviteUi(inv) {
+        const hint = document.getElementById("invite-hint");
+        const btn = document.getElementById("btn-invite");
+        const res = document.getElementById("invite-result");
+        if (!inv || typeof inv.can_invite_this_month === "undefined") {
+          if (hint) hint.textContent = "";
+          if (btn) btn.hidden = true;
+          return;
+        }
         if (inv.can_invite_this_month) {
-          const left = quota - used;
-          hint.textContent =
-            left <= 0
-              ? ''
-              : 'Vous pouvez encore créer ' + left + ' invitation(s) ce mois-ci.';
+          if (hint)
+            hint.textContent =
+              "Vous pouvez générer une nouvelle invitation pour ce mois-ci.";
+          if (btn) btn.hidden = false;
         } else {
           const when = formatNextInvite(inv.next_invite_at);
-          hint.textContent = when
-            ? 'Quota mensuel atteint. Prochain créneau à partir du : ' + when
-            : 'Quota mensuel atteint.';
+          if (hint) {
+            hint.textContent = when
+              ? "Limite atteinte pour ce mois. Prochain créneau à partir du : " +
+                when
+              : "Limite atteinte pour ce mois.";
+          }
+          if (btn) btn.hidden = true;
         }
+        if (!inv.can_invite_this_month && res) res.hidden = true;
       }
-    }
 
-    function applyInviteUi(inv) {
-      const hint = document.getElementById('invite-hint');
-      const btn = document.getElementById('btn-invite');
-      const res = document.getElementById('invite-result');
-      if (!inv || typeof inv.can_invite_this_month === 'undefined') {
-        if (hint) hint.textContent = '';
-        if (btn) btn.hidden = true;
-        return;
-      }
-      if (inv.can_invite_this_month) {
-        if (hint) hint.textContent = 'Vous pouvez générer une nouvelle invitation pour ce mois-ci.';
-        if (btn) btn.hidden = false;
-      } else {
-        const when = formatNextInvite(inv.next_invite_at);
-        if (hint) {
-          hint.textContent = when
-            ? 'Limite atteinte pour ce mois. Prochain créneau à partir du : ' + when
-            : 'Limite atteinte pour ce mois.';
-        }
-        if (btn) btn.hidden = true;
-      }
-      if (!inv.can_invite_this_month && res) res.hidden = true;
-    }
+      let lastCode = "";
 
-    let lastCode = '';
-
-    function formatInviteDate(iso) {
-      if (!iso) return '—';
-      try {
-        return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-      } catch (_) {
-        return iso;
-      }
-    }
-
-    function inviteStatusLabel(row) {
-      if (row.usable) return { text: 'Utilisable', cls: 'badge-ok' };
-      if (row.expires_at) {
+      function formatInviteDate(iso) {
+        if (!iso) return "—";
         try {
-          if (new Date(row.expires_at) <= new Date()) return { text: 'Expiré', cls: 'badge-off' };
-        } catch (_) {}
+          return new Date(iso).toLocaleString("fr-FR", {
+            dateStyle: "short",
+            timeStyle: "short",
+          });
+        } catch (_) {
+          return iso;
+        }
       }
-      if (row.uses >= row.max_uses) return { text: 'Utilisé', cls: 'badge-warn' };
-      return { text: 'Inutilisable', cls: 'badge-off' };
-    }
 
-    async function copyCode(code) {
-      try {
-        await navigator.clipboard.writeText(code);
-      } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = code;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
+      function inviteStatusLabel(row) {
+        if (row.usable) return { text: "Utilisable", cls: "badge-ok" };
+        if (row.expires_at) {
+          try {
+            if (new Date(row.expires_at) <= new Date())
+              return { text: "Expiré", cls: "badge-off" };
+          } catch (_) {}
+        }
+        if (row.uses >= row.max_uses)
+          return { text: "Utilisé", cls: "badge-warn" };
+        return { text: "Inutilisable", cls: "badge-off" };
       }
-    }
 
-    function renderInviteHistory(me) {
-      const list = Array.isArray(me.my_invites) ? me.my_invites : [];
-      const emptyEl = document.getElementById('invite-history-empty');
-      const wrap = document.getElementById('invite-history-wrap');
-      const body = document.getElementById('invite-history-body');
-      body.innerHTML = '';
-      updateQuotaBar(me.invite, list.length);
-      if (!list.length) {
-        emptyEl.hidden = false;
-        wrap.hidden = true;
-        return;
+      async function copyCode(code) {
+        try {
+          await navigator.clipboard.writeText(code);
+        } catch (_) {
+          const ta = document.createElement("textarea");
+          ta.value = code;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+        }
       }
-      emptyEl.hidden = true;
-      wrap.hidden = false;
-      list.forEach((row) => {
-        const st = inviteStatusLabel(row);
-        const tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td class="mono">' +
-          watchEscapeHtml(row.code) +
-          '</td><td>' +
-          watchEscapeHtml(formatInviteDate(row.created_at)) +
-          '</td><td>' +
-          watchEscapeHtml(String(row.uses) + ' / ' + String(row.max_uses)) +
-          '</td><td><span class="badge ' +
-          st.cls +
-          '">' +
-          watchEscapeHtml(st.text) +
-          '</span></td><td></td>';
-        const tdBtn = tr.querySelector('td:last-child');
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn btn-secondary btn-tiny';
-        b.textContent = 'Copier';
-        b.addEventListener('click', () => copyCode(row.code));
-        tdBtn.appendChild(b);
-        body.appendChild(tr);
-      });
-    }
 
-    async function loadMe() {
-      const me = await apiJson('/api/auth/me');
-      document.getElementById('id-user').textContent = me.username;
-      document.getElementById('identity-line').hidden = false;
-      const rb = document.getElementById('rank-badge');
-      const rk = (me.viewer_rank || (me.invite && me.invite.viewer_rank) || '').toLowerCase();
-      const q = me.invite && typeof me.invite.invite_quota_per_month === 'number' ? me.invite.invite_quota_per_month : null;
-      if (me.role === 'viewer' && rk && q != null) {
-        rb.hidden = false;
-        const tier = ['bronze', 'silver', 'gold', 'platinum'].includes(rk) ? rk : 'bronze';
-        rb.className = 'rank-badge rank-badge--' + tier;
-        document.getElementById('id-rank-label').textContent = RANK_LABELS[rk] || rk;
-        document.getElementById('id-rank-quota').textContent = String(q);
-      } else {
-        rb.hidden = true;
-        rb.className = 'rank-badge';
+      function renderInviteHistory(me) {
+        const list = Array.isArray(me.my_invites) ? me.my_invites : [];
+        const emptyEl = document.getElementById("invite-history-empty");
+        const wrap = document.getElementById("invite-history-wrap");
+        const body = document.getElementById("invite-history-body");
+        body.innerHTML = "";
+        updateQuotaBar(me.invite, list.length);
+        if (!list.length) {
+          emptyEl.hidden = false;
+          wrap.hidden = true;
+          return;
+        }
+        emptyEl.hidden = true;
+        wrap.hidden = false;
+        list.forEach((row) => {
+          const st = inviteStatusLabel(row);
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            '<td class="mono">' +
+            watchEscapeHtml(row.code) +
+            "</td><td>" +
+            watchEscapeHtml(formatInviteDate(row.created_at)) +
+            "</td><td>" +
+            watchEscapeHtml(String(row.uses) + " / " + String(row.max_uses)) +
+            '</td><td><span class="badge ' +
+            st.cls +
+            '">' +
+            watchEscapeHtml(st.text) +
+            "</span></td><td></td>";
+          const tdBtn = tr.querySelector("td:last-child");
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "btn btn-secondary btn-tiny";
+          b.textContent = "Copier";
+          b.addEventListener("click", () => copyCode(row.code));
+          tdBtn.appendChild(b);
+          body.appendChild(tr);
+        });
       }
-      applyInviteUi(me.invite);
-      renderInviteHistory(me);
-      return me;
-    }
 
-    document.getElementById('btn-invite').addEventListener('click', async () => {
-      const errEl = document.getElementById('msg-invite');
-      errEl.style.display = 'none';
-      try {
-        const data = await apiJson('/api/auth/member-invite', { method: 'POST' });
-        lastCode = data.code || '';
-        document.getElementById('invite-code-display').textContent = lastCode;
-        document.getElementById('invite-result').hidden = false;
-        applyInviteUi(data.invite);
-        if (Array.isArray(data.my_invites)) renderInviteHistory({ my_invites: data.my_invites, invite: data.invite });
-        else await loadMe();
-      } catch (err) {
-        errEl.textContent = err.message || String(err);
-        errEl.style.display = 'block';
+      async function loadMe() {
+        const me = await apiJson("/api/auth/me");
+        document.getElementById("id-user").textContent = me.username;
+        document.getElementById("identity-line").hidden = false;
+        const rb = document.getElementById("rank-badge");
+        const rk = (
+          me.viewer_rank ||
+          (me.invite && me.invite.viewer_rank) ||
+          ""
+        ).toLowerCase();
+        const q =
+          me.invite && typeof me.invite.invite_quota_per_month === "number"
+            ? me.invite.invite_quota_per_month
+            : null;
+        if (me.role === "viewer" && rk && q != null) {
+          rb.hidden = false;
+          const tier = ["bronze", "silver", "gold", "platinum"].includes(rk)
+            ? rk
+            : "bronze";
+          rb.className = "rank-badge rank-badge--" + tier;
+          document.getElementById("id-rank-label").textContent =
+            RANK_LABELS[rk] || rk;
+          document.getElementById("id-rank-quota").textContent = String(q);
+        } else {
+          rb.hidden = true;
+          rb.className = "rank-badge";
+        }
+        applyInviteUi(me.invite);
+        renderInviteHistory(me);
+        return me;
       }
-    });
 
-    document.getElementById('btn-copy').addEventListener('click', async () => {
-      if (!lastCode) return;
-      try {
-        await navigator.clipboard.writeText(lastCode);
-      } catch (_) {
-        const ta = document.createElement('textarea');
-        ta.value = lastCode;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
-      }
-      const b = document.getElementById('btn-copy');
-      const prev = b.textContent;
-      b.textContent = 'Copié !';
-      setTimeout(() => { b.textContent = prev; }, 1600);
-    });
+      document
+        .getElementById("btn-invite")
+        .addEventListener("click", async () => {
+          const errEl = document.getElementById("msg-invite");
+          errEl.style.display = "none";
+          try {
+            const data = await apiJson("/api/auth/member-invite", {
+              method: "POST",
+            });
+            lastCode = data.code || "";
+            document.getElementById("invite-code-display").textContent =
+              lastCode;
+            document.getElementById("invite-result").hidden = false;
+            applyInviteUi(data.invite);
+            if (Array.isArray(data.my_invites))
+              renderInviteHistory({
+                my_invites: data.my_invites,
+                invite: data.invite,
+              });
+            else await loadMe();
+          } catch (err) {
+            errEl.textContent = err.message || String(err);
+            errEl.style.display = "block";
+          }
+        });
 
-    (async function () {
-      const main = document.querySelector('main');
-      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
-      try {
-        await loadMe();
-      } catch (e) {
-        if (e && e.message === '401') { window.location.href = '/login.html'; return; }
-        console.error(e);
-        alert('Impossible de charger le profil : ' + (e.message || e));
-        window.location.href = '/watch/';
-      } finally {
-        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
-      }
-    })();
-  </script>
-</body>
+      document
+        .getElementById("btn-copy")
+        .addEventListener("click", async () => {
+          if (!lastCode) return;
+          try {
+            await navigator.clipboard.writeText(lastCode);
+          } catch (_) {
+            const ta = document.createElement("textarea");
+            ta.value = lastCode;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            ta.remove();
+          }
+          const b = document.getElementById("btn-copy");
+          const prev = b.textContent;
+          b.textContent = "Copié !";
+          setTimeout(() => {
+            b.textContent = prev;
+          }, 1600);
+        });
+
+      (async function () {
+        const main = document.querySelector("main");
+        if (typeof watchScopedLoadingShow === "function")
+          watchScopedLoadingShow(main);
+        try {
+          await loadMe();
+        } catch (e) {
+          if (e && e.message === "401") {
+            window.location.href = "/login.html";
+            return;
+          }
+          console.error(e);
+          alert("Impossible de charger le profil : " + (e.message || e));
+          window.location.href = "/watch/";
+        } finally {
+          if (typeof watchScopedLoadingHide === "function")
+            watchScopedLoadingHide(main);
+        }
+      })();
+    </script>
+  </body>
 </html>

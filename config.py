@@ -117,6 +117,9 @@ class Settings(BaseSettings):
     VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC: int = 90
     # If an instance never exposes /dev/nvidia0, destroy it and try another offer (auto-pick only), up to this many rounds.
     VAST_TRANSCODE_NO_GPU_MAX_RETRIES: int = 6
+    # PUT /asks/{id}/ can fail with no_such_ask when the bundle was rented elsewhere; retry with a fresh pick.
+    VAST_CREATE_INSTANCE_MAX_RETRIES: int = 10
+    VAST_CREATE_INSTANCE_RETRY_DELAY_SEC: float = 0.5
     # If True, bundle search for auto-picked transcode uses num_gpus eq 1 only (reduces CDI gpu=N failures on some hosts).
     VAST_TRANSCODE_SINGLE_GPU_ONLY: bool = True
     # If True, POST /bundles/ requests verified eq true and auto-pick skips offers with verified=false.

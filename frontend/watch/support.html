@@ -1,323 +1,378 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
-  <title>Support — Redwood Plus</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
+    <title>Support — Redwood Plus</title>
     <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-support.css" />
-</head>
-<body>
-  <nav>
-    <a class="brand" href="/watch/">Redwood Plus</a>
-    <div class="nav-end">
-      <a href="/watch/">Accueil</a>
-      <a href="/watch/films.html">Films</a>
-      <a href="/watch/serie.html">Séries</a>
-      <a href="/watch/categories.html">Catégories</a>
-      <a href="/watch/pick.html">Choisir pour moi</a>
-      <a href="/watch/invitations.html" class="nav-invite-link" aria-label="Invitations" title="Invitations"></a>
-      <div class="nav-user-wrap" id="nav-user-wrap">
-        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
-          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
-          <span class="nav-user-name" id="nav-user-name">…</span>
-        </button>
-        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
-          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
-          <a href="/watch/support.html" role="menuitem">Support</a>
-          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
-          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
+    <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+    <link rel="stylesheet" href="/css/redwood-watch-support.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/watch/">Redwood Plus</a>
+      <div class="nav-end">
+        <a href="/watch/">Accueil</a>
+        <a href="/watch/films.html">Films</a>
+        <a href="/watch/serie.html">Séries</a>
+        <a href="/watch/categories.html">Catégories</a>
+        <a href="/watch/pick.html">Choisir pour moi</a>
+        <a
+          href="/watch/invitations.html"
+          class="nav-invite-link"
+          aria-label="Invitations"
+          title="Invitations"
+        ></a>
+        <div class="nav-user-wrap" id="nav-user-wrap">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-user-menu"
+          >
+            <span class="nav-user-avatar" aria-hidden="true"
+              ><span id="nav-user-initials">…</span></span
+            >
+            <span class="nav-user-name" id="nav-user-name">…</span>
+          </button>
+          <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+            <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+            <a href="/watch/support.html" role="menuitem">Support</a>
+            <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+            <button
+              type="button"
+              class="nav-logout-btn"
+              role="menuitem"
+              id="nav-logout"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </nav>
-  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
-  <main>
-    <h1>Support</h1>
-    <p class="lead">Ouvrez un ticket pour demander un film ou une série, signaler un bug, proposer une amélioration ou un souci de compte. L’équipe lit les messages sur l’interface d’administration.</p>
+    </nav>
+    <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+    <main>
+      <h1>Support</h1>
+      <p class="lead">
+        Ouvrez un ticket pour demander un film ou une série, signaler un bug,
+        proposer une amélioration ou un souci de compte. L’équipe lit les
+        messages sur l’interface d’administration.
+      </p>
 
-    <section>
-      <h2>Nouveau ticket</h2>
-      <label for="tk-cat">Catégorie</label>
-      <select id="tk-cat">
-        <option value="request_content">Demande de contenu (film / série)</option>
-        <option value="bug">Bug ou problème technique</option>
-        <option value="suggestion">Suggestion d’amélioration</option>
-        <option value="account">Problème de compte</option>
-        <option value="other">Autre</option>
-      </select>
-      <label for="tk-subject">Sujet</label>
-      <input id="tk-subject" type="text" maxlength="200" placeholder="Résumé court" required />
-      <label for="tk-body">Message</label>
-      <textarea id="tk-body" placeholder="Décrivez votre demande en quelques phrases." required></textarea>
-      <button type="button" class="btn" id="tk-send">Envoyer le ticket</button>
-      <p class="msg" id="tk-msg"></p>
-    </section>
+      <section>
+        <h2>Nouveau ticket</h2>
+        <label for="tk-cat">Catégorie</label>
+        <select id="tk-cat">
+          <option value="request_content">
+            Demande de contenu (film / série)
+          </option>
+          <option value="bug">Bug ou problème technique</option>
+          <option value="suggestion">Suggestion d’amélioration</option>
+          <option value="account">Problème de compte</option>
+          <option value="other">Autre</option>
+        </select>
+        <label for="tk-subject">Sujet</label>
+        <input
+          id="tk-subject"
+          type="text"
+          maxlength="200"
+          placeholder="Résumé court"
+          required
+        />
+        <label for="tk-body">Message</label>
+        <textarea
+          id="tk-body"
+          placeholder="Décrivez votre demande en quelques phrases."
+          required
+        ></textarea>
+        <button type="button" class="btn" id="tk-send">
+          Envoyer le ticket
+        </button>
+        <p class="msg" id="tk-msg"></p>
+      </section>
 
-    <section>
-      <h2>Mes tickets</h2>
-      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Cliquez sur un ticket pour voir la conversation et répondre.</p>
-      <div id="tk-list"></div>
-    </section>
-  </main>
-  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
-  <script src="/watch/app.js"></script>
-  <script>
-    const CAT_LABEL = {
-      request_content: 'Contenu',
-      bug: 'Bug',
-      suggestion: 'Suggestion',
-      account: 'Compte',
-      other: 'Autre',
-    };
-    const STATUS_LABEL = {
-      open: 'Ouvert',
-      in_progress: 'En cours',
-      resolved: 'Résolu',
-      closed: 'Fermé',
-    };
+      <section>
+        <h2>Mes tickets</h2>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 12px">
+          Cliquez sur un ticket pour voir la conversation et répondre.
+        </p>
+        <div id="tk-list"></div>
+      </section>
+    </main>
+    <footer>
+      © Redwood Plus — This product uses the TMDB API but is not endorsed or
+      certified by TMDB.
+    </footer>
+    <script src="/watch/app.js"></script>
+    <script>
+      const CAT_LABEL = {
+        request_content: "Contenu",
+        bug: "Bug",
+        suggestion: "Suggestion",
+        account: "Compte",
+        other: "Autre",
+      };
+      const STATUS_LABEL = {
+        open: "Ouvert",
+        in_progress: "En cours",
+        resolved: "Résolu",
+        closed: "Fermé",
+      };
 
-    function showMsg(el, text, ok) {
-      el.textContent = text;
-      el.classList.remove('err', 'ok');
-      el.classList.add(ok ? 'ok' : 'err');
-      el.style.display = 'block';
-    }
-
-    function renderThreadInto(host, data) {
-      const arr = data.messages || [];
-      const msgs = arr
-        .map((m) => {
-          const adm = m.author_role === "admin";
-          const who = escapeHtml(m.author_username || "—");
-          const role = adm ? ' <em>(équipe)</em>' : "";
-          const dt = escapeHtml(m.created_at || "");
-          return (
-            '<div class="tk-msg ' +
-            (adm ? "tk-adm" : "") +
-            '"><div class="who">' +
-            who +
-            role +
-            " · " +
-            dt +
-            '</div><div class="body-preview">' +
-            escapeHtml(m.body) +
-            "</div></div>"
-          );
-        })
-        .join("");
-      const msgBlock =
-        arr.length > 0
-          ? msgs
-          : '<p style="font-size:12px;color:var(--muted)">Pas encore de réponse.</p>';
-      const id = data.id;
-      const st = data.status || "";
-      const noReply = st === "closed" || st === "resolved";
-      const replyBlock = noReply
-        ? '<p class="tk-closed-notice">Ce ticket est <strong>résolu</strong> ou <strong>fermé</strong> — vous ne pouvez plus envoyer de message.</p>'
-        : '<div class="tk-reply-box"><label for="tk-reply-' +
-          id +
-          '">Votre réponse</label><textarea id="tk-reply-' +
-          id +
-          '" rows="4" placeholder="Écrivez ici…"></textarea><button type="button" class="btn tk-send-reply" data-tid="' +
-          id +
-          '">Envoyer</button><p class="msg" id="tk-reply-msg-' +
-          id +
-          '"></p></div>';
-      host.innerHTML =
-        '<p style="font-size:12px;color:var(--muted);margin-bottom:6px">Votre demande initiale</p><div class="body-preview">' +
-        escapeHtml(data.body) +
-        '</div><p style="font-size:12px;color:var(--muted);margin:14px 0 8px">Conversation</p>' +
-        msgBlock +
-        replyBlock;
-    }
-
-    function renderTickets(rows) {
-      const host = document.getElementById("tk-list");
-      if (!rows || !rows.length) {
-        host.innerHTML =
-          '<p style="font-size:13px;color:var(--muted)">Aucun ticket pour le moment.</p>';
-        return;
+      function showMsg(el, text, ok) {
+        el.textContent = text;
+        el.classList.remove("err", "ok");
+        el.classList.add(ok ? "ok" : "err");
+        el.style.display = "block";
       }
-      host.innerHTML = rows
-        .map((t) => {
-          const cat = CAT_LABEL[t.category] || t.category;
-          const st = STATUS_LABEL[t.status] || t.status;
-          const hint = t.last_reply_admin_username
-            ? '<p class="admin-hint">Dernière réponse équipe : <strong>' +
-              escapeHtml(t.last_reply_admin_username) +
-              "</strong></p>"
-            : "";
-          return (
-            '<div class="ticket" data-id="' +
-            t.id +
-            '" data-status="' +
-            escapeHtml(t.status || "") +
-            '">' +
-            "<h3>" +
-            escapeHtml(t.subject) +
-            "</h3>" +
-            '<div class="meta"><span class="badge">' +
-            escapeHtml(cat) +
-            '</span><span class="badge">' +
-            escapeHtml(st) +
-            "</span> · " +
-            escapeHtml(t.created_at || "") +
-            "</div>" +
-            '<div class="body-preview" style="margin-top:8px">' +
-            escapeHtml(t.body) +
-            "</div>" +
-            hint +
-            '<div class="tk-thread" data-thread-for="' +
-            t.id +
-            '"></div></div>'
-          );
-        })
-        .join("");
-    }
 
-    document.getElementById("tk-list").addEventListener("click", async (ev) => {
-      const sendBtn = ev.target.closest(".tk-send-reply");
-      if (sendBtn) {
-        ev.stopPropagation();
-        const tid = parseInt(sendBtn.getAttribute("data-tid"), 10);
-        const row = document.querySelector('.ticket[data-id="' + tid + '"]');
-        const rs = row && row.getAttribute("data-status");
-        if (rs === "closed" || rs === "resolved") {
-          const mEl = document.getElementById("tk-reply-msg-" + tid);
-          if (mEl) {
-            mEl.textContent =
-              rs === "resolved"
-                ? "Ce ticket est résolu."
-                : "Ce ticket est fermé.";
-            mEl.classList.add("err");
-            mEl.style.display = "block";
-          }
+      function renderThreadInto(host, data) {
+        const arr = data.messages || [];
+        const msgs = arr
+          .map((m) => {
+            const adm = m.author_role === "admin";
+            const who = escapeHtml(m.author_username || "—");
+            const role = adm ? " <em>(équipe)</em>" : "";
+            const dt = escapeHtml(m.created_at || "");
+            return (
+              '<div class="tk-msg ' +
+              (adm ? "tk-adm" : "") +
+              '"><div class="who">' +
+              who +
+              role +
+              " · " +
+              dt +
+              '</div><div class="body-preview">' +
+              escapeHtml(m.body) +
+              "</div></div>"
+            );
+          })
+          .join("");
+        const msgBlock =
+          arr.length > 0
+            ? msgs
+            : '<p style="font-size:12px;color:var(--muted)">Pas encore de réponse.</p>';
+        const id = data.id;
+        const st = data.status || "";
+        const noReply = st === "closed" || st === "resolved";
+        const replyBlock = noReply
+          ? '<p class="tk-closed-notice">Ce ticket est <strong>résolu</strong> ou <strong>fermé</strong> — vous ne pouvez plus envoyer de message.</p>'
+          : '<div class="tk-reply-box"><label for="tk-reply-' +
+            id +
+            '">Votre réponse</label><textarea id="tk-reply-' +
+            id +
+            '" rows="4" placeholder="Écrivez ici…"></textarea><button type="button" class="btn tk-send-reply" data-tid="' +
+            id +
+            '">Envoyer</button><p class="msg" id="tk-reply-msg-' +
+            id +
+            '"></p></div>';
+        host.innerHTML =
+          '<p style="font-size:12px;color:var(--muted);margin-bottom:6px">Votre demande initiale</p><div class="body-preview">' +
+          escapeHtml(data.body) +
+          '</div><p style="font-size:12px;color:var(--muted);margin:14px 0 8px">Conversation</p>' +
+          msgBlock +
+          replyBlock;
+      }
+
+      function renderTickets(rows) {
+        const host = document.getElementById("tk-list");
+        if (!rows || !rows.length) {
+          host.innerHTML =
+            '<p style="font-size:13px;color:var(--muted)">Aucun ticket pour le moment.</p>';
           return;
         }
-        const ta = document.getElementById("tk-reply-" + tid);
-        const mEl = document.getElementById("tk-reply-msg-" + tid);
-        const text = (ta && ta.value.trim()) || "";
-        if (text.length < 1) {
-          if (mEl) {
-            mEl.textContent = "Saisissez un message.";
-            mEl.classList.add("err");
-            mEl.style.display = "block";
+        host.innerHTML = rows
+          .map((t) => {
+            const cat = CAT_LABEL[t.category] || t.category;
+            const st = STATUS_LABEL[t.status] || t.status;
+            const hint = t.last_reply_admin_username
+              ? '<p class="admin-hint">Dernière réponse équipe : <strong>' +
+                escapeHtml(t.last_reply_admin_username) +
+                "</strong></p>"
+              : "";
+            return (
+              '<div class="ticket" data-id="' +
+              t.id +
+              '" data-status="' +
+              escapeHtml(t.status || "") +
+              '">' +
+              "<h3>" +
+              escapeHtml(t.subject) +
+              "</h3>" +
+              '<div class="meta"><span class="badge">' +
+              escapeHtml(cat) +
+              '</span><span class="badge">' +
+              escapeHtml(st) +
+              "</span> · " +
+              escapeHtml(t.created_at || "") +
+              "</div>" +
+              '<div class="body-preview" style="margin-top:8px">' +
+              escapeHtml(t.body) +
+              "</div>" +
+              hint +
+              '<div class="tk-thread" data-thread-for="' +
+              t.id +
+              '"></div></div>'
+            );
+          })
+          .join("");
+      }
+
+      document
+        .getElementById("tk-list")
+        .addEventListener("click", async (ev) => {
+          const sendBtn = ev.target.closest(".tk-send-reply");
+          if (sendBtn) {
+            ev.stopPropagation();
+            const tid = parseInt(sendBtn.getAttribute("data-tid"), 10);
+            const row = document.querySelector(
+              '.ticket[data-id="' + tid + '"]',
+            );
+            const rs = row && row.getAttribute("data-status");
+            if (rs === "closed" || rs === "resolved") {
+              const mEl = document.getElementById("tk-reply-msg-" + tid);
+              if (mEl) {
+                mEl.textContent =
+                  rs === "resolved"
+                    ? "Ce ticket est résolu."
+                    : "Ce ticket est fermé.";
+                mEl.classList.add("err");
+                mEl.style.display = "block";
+              }
+              return;
+            }
+            const ta = document.getElementById("tk-reply-" + tid);
+            const mEl = document.getElementById("tk-reply-msg-" + tid);
+            const text = (ta && ta.value.trim()) || "";
+            if (text.length < 1) {
+              if (mEl) {
+                mEl.textContent = "Saisissez un message.";
+                mEl.classList.add("err");
+                mEl.style.display = "block";
+              }
+              return;
+            }
+            if (mEl) {
+              mEl.style.display = "none";
+              mEl.classList.remove("err", "ok");
+            }
+            try {
+              const data = await apiJson(
+                "/api/support-tickets/" + tid + "/replies",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ body: text }),
+                },
+              );
+              const wrap = document.querySelector(
+                '.tk-thread[data-thread-for="' + tid + '"]',
+              );
+              if (wrap) renderThreadInto(wrap, data);
+              if (ta) ta.value = "";
+              if (mEl) {
+                mEl.textContent = "Message envoyé.";
+                mEl.classList.add("ok");
+                mEl.style.display = "block";
+              }
+              await refreshList();
+            } catch (err) {
+              if (mEl) {
+                mEl.textContent = err.message || String(err);
+                mEl.classList.add("err");
+                mEl.style.display = "block";
+              }
+            }
+            return;
           }
+          if (ev.target.closest(".tk-thread")) return;
+          const row = ev.target.closest(".ticket");
+          if (!row) return;
+          const id = row.getAttribute("data-id");
+          if (!id) return;
+          const sub = row.querySelector(".tk-thread");
+          if (!sub) return;
+          const wasOpen = row.classList.contains("open");
+          document.querySelectorAll(".ticket.open").forEach((x) => {
+            if (x !== row) x.classList.remove("open");
+          });
+          row.classList.toggle("open", !wasOpen);
+          if (!row.classList.contains("open")) return;
+          try {
+            const data = await apiJson("/api/support-tickets/" + id);
+            renderThreadInto(sub, data);
+            row.setAttribute("data-status", data.status || "");
+          } catch (e) {
+            sub.innerHTML =
+              '<p class="msg err" style="display:block">Impossible de charger le ticket.</p>';
+          }
+        });
+
+      function escapeHtml(s) {
+        const d = document.createElement("div");
+        d.textContent = s == null ? "" : String(s);
+        return d.innerHTML;
+      }
+
+      async function refreshList() {
+        const host = document.getElementById("tk-list");
+        const main = document.querySelector("main");
+        if (typeof watchScopedLoadingShow === "function")
+          watchScopedLoadingShow(main);
+        try {
+          const data = await apiJson("/api/support-tickets");
+          renderTickets(data.tickets || []);
+        } catch (e) {
+          host.innerHTML =
+            '<p class="msg err" style="display:block">Impossible de charger les tickets : ' +
+            escapeHtml(e.message || e) +
+            "</p>";
+        } finally {
+          if (typeof watchScopedLoadingHide === "function")
+            watchScopedLoadingHide(main);
+        }
+      }
+
+      document.getElementById("tk-send").addEventListener("click", async () => {
+        const msg = document.getElementById("tk-msg");
+        msg.style.display = "none";
+        const category = document.getElementById("tk-cat").value;
+        const subject = document.getElementById("tk-subject").value.trim();
+        const body = document.getElementById("tk-body").value.trim();
+        if (subject.length < 3) {
+          showMsg(msg, "Le sujet doit faire au moins 3 caractères.", false);
           return;
         }
-        if (mEl) {
-          mEl.style.display = "none";
-          mEl.classList.remove("err", "ok");
+        if (body.length < 10) {
+          showMsg(msg, "Le message doit faire au moins 10 caractères.", false);
+          return;
         }
         try {
-          const data = await apiJson("/api/support-tickets/" + tid + "/replies", {
+          await apiJson("/api/support-tickets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ body: text }),
+            body: JSON.stringify({ category, subject, body }),
           });
-          const wrap = document.querySelector('.tk-thread[data-thread-for="' + tid + '"]');
-          if (wrap) renderThreadInto(wrap, data);
-          if (ta) ta.value = "";
-          if (mEl) {
-            mEl.textContent = "Message envoyé.";
-            mEl.classList.add("ok");
-            mEl.style.display = "block";
-          }
+          document.getElementById("tk-subject").value = "";
+          document.getElementById("tk-body").value = "";
+          showMsg(msg, "Ticket envoyé. Merci !", true);
           await refreshList();
-        } catch (err) {
-          if (mEl) {
-            mEl.textContent = err.message || String(err);
-            mEl.classList.add("err");
-            mEl.style.display = "block";
-          }
+        } catch (e) {
+          showMsg(msg, e.message || String(e), false);
         }
-        return;
-      }
-      if (ev.target.closest(".tk-thread")) return;
-      const row = ev.target.closest(".ticket");
-      if (!row) return;
-      const id = row.getAttribute("data-id");
-      if (!id) return;
-      const sub = row.querySelector(".tk-thread");
-      if (!sub) return;
-      const wasOpen = row.classList.contains("open");
-      document.querySelectorAll(".ticket.open").forEach((x) => {
-        if (x !== row) x.classList.remove("open");
       });
-      row.classList.toggle("open", !wasOpen);
-      if (!row.classList.contains("open")) return;
-      try {
-        const data = await apiJson("/api/support-tickets/" + id);
-        renderThreadInto(sub, data);
-        row.setAttribute("data-status", data.status || "");
-      } catch (e) {
-        sub.innerHTML =
-          '<p class="msg err" style="display:block">Impossible de charger le ticket.</p>';
-      }
-    });
 
-    function escapeHtml(s) {
-      const d = document.createElement('div');
-      d.textContent = s == null ? '' : String(s);
-      return d.innerHTML;
-    }
-
-    async function refreshList() {
-      const host = document.getElementById('tk-list');
-      const main = document.querySelector('main');
-      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(main);
-      try {
-        const data = await apiJson('/api/support-tickets');
-        renderTickets(data.tickets || []);
-      } catch (e) {
-        host.innerHTML =
-          '<p class="msg err" style="display:block">Impossible de charger les tickets : ' +
-          escapeHtml(e.message || e) +
-          '</p>';
-      } finally {
-        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(main);
-      }
-    }
-
-    document.getElementById('tk-send').addEventListener('click', async () => {
-      const msg = document.getElementById('tk-msg');
-      msg.style.display = 'none';
-      const category = document.getElementById('tk-cat').value;
-      const subject = document.getElementById('tk-subject').value.trim();
-      const body = document.getElementById('tk-body').value.trim();
-      if (subject.length < 3) {
-        showMsg(msg, 'Le sujet doit faire au moins 3 caractères.', false);
-        return;
-      }
-      if (body.length < 10) {
-        showMsg(msg, 'Le message doit faire au moins 10 caractères.', false);
-        return;
-      }
-      try {
-        await apiJson('/api/support-tickets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ category, subject, body }),
-        });
-        document.getElementById('tk-subject').value = '';
-        document.getElementById('tk-body').value = '';
-        showMsg(msg, 'Ticket envoyé. Merci !', true);
-        await refreshList();
-      } catch (e) {
-        showMsg(msg, e.message || String(e), false);
-      }
-    });
-
-    refreshList().catch((e) => {
-      if (e && e.message === '401') {
-        window.location.href = '/login.html';
-        return;
-      }
-      console.error(e);
-    });
-  </script>
-</body>
+      refreshList().catch((e) => {
+        if (e && e.message === "401") {
+          window.location.href = "/login.html";
+          return;
+        }
+        console.error(e);
+      });
+    </script>
+  </body>
 </html>

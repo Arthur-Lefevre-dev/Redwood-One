@@ -1,358 +1,483 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
-  <title>Séries — Redwood Plus</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
+    <title>Séries — Redwood Plus</title>
     <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
-  <link rel="stylesheet" href="/css/redwood-watch-serie.css" />
-</head>
-<body>
-  <nav>
-    <a class="brand" href="/watch/">Redwood Plus</a>
-    <input type="search" class="nav-search" id="nav-q" placeholder="Séries, acteurs, réalisateurs…" autocomplete="off" />
-    <div class="nav-end">
-      <a href="/watch/">Accueil</a>
-      <a href="/watch/films.html">Films</a>
-      <a href="/watch/serie.html">Séries</a>
-      <a href="/watch/categories.html">Catégories</a>
-      <a href="/watch/pick.html">Choisir pour moi</a>
-      <a href="/watch/invitations.html" class="nav-invite-link" aria-label="Invitations" title="Invitations"></a>
-      <div class="nav-user-wrap" id="nav-user-wrap">
-        <button type="button" class="nav-user-trigger" id="nav-user-trigger" aria-expanded="false" aria-haspopup="true" aria-controls="nav-user-menu">
-          <span class="nav-user-avatar" aria-hidden="true"><span id="nav-user-initials">…</span></span>
-          <span class="nav-user-name" id="nav-user-name">…</span>
-        </button>
-        <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
-          <a href="/watch/invitations.html" role="menuitem">Invitations</a>
-          <a href="/watch/support.html" role="menuitem">Support</a>
-          <a href="/watch/settings.html" role="menuitem">Paramètres</a>
-          <button type="button" class="nav-logout-btn" role="menuitem" id="nav-logout">Déconnexion</button>
-        </div>
-      </div>
-    </div>
-  </nav>
-  <div id="watch-announcement" class="watch-announcement-host" hidden></div>
-  <main id="main-list">
-    <h1>Séries</h1>
-    <div class="grid" id="series-grid"></div>
-    <div id="series-sentinel" class="series-list-sentinel" aria-hidden="true"></div>
-    <p class="empty" id="series-loading-more" style="display:none;margin-top:8px">Chargement…</p>
-    <p class="empty" id="empty-list" style="display:none">Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.</p>
-  </main>
-  <main id="main-detail" style="display:none">
-    <a class="back" href="/watch/serie.html">← Toutes les séries</a>
-    <div class="serie-hero">
-      <div class="poster-col">
-        <img class="hero-poster" id="d-poster" alt="" />
-      </div>
-      <div class="serie-hero-main">
-        <h1 id="d-title">…</h1>
-        <p class="hero-text" id="d-hero-text" hidden></p>
-        <p class="lead" id="d-syn"></p>
-      </div>
-      <div class="user-score-wrap" id="serie-score-wrap" hidden>
-        <div class="user-score" id="serie-score-widget">
-          <svg viewBox="0 0 36 36" class="user-score-svg" aria-hidden="true">
-            <circle class="user-score-disc" cx="18" cy="18" r="13.35" />
-            <circle class="user-score-track" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" />
-            <circle id="serie-score-arc" class="user-score-fill" cx="18" cy="18" r="15.915" pathLength="100" fill="none" stroke-width="3" stroke-linecap="round" transform="rotate(-90 18 18)" stroke-dasharray="0 100" />
-          </svg>
-          <div class="user-score-inner">
-            <span class="score-value"><span id="serie-score-num"></span><span class="user-score-pct">%</span></span>
+    <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+    <link rel="stylesheet" href="/css/redwood-watch-serie.css" />
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="/watch/">Redwood Plus</a>
+      <input
+        type="search"
+        class="nav-search"
+        id="nav-q"
+        placeholder="Séries, acteurs, réalisateurs…"
+        autocomplete="off"
+      />
+      <div class="nav-end">
+        <a href="/watch/">Accueil</a>
+        <a href="/watch/films.html">Films</a>
+        <a href="/watch/serie.html">Séries</a>
+        <a href="/watch/categories.html">Catégories</a>
+        <a href="/watch/pick.html">Choisir pour moi</a>
+        <a
+          href="/watch/invitations.html"
+          class="nav-invite-link"
+          aria-label="Invitations"
+          title="Invitations"
+        ></a>
+        <div class="nav-user-wrap" id="nav-user-wrap">
+          <button
+            type="button"
+            class="nav-user-trigger"
+            id="nav-user-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-user-menu"
+          >
+            <span class="nav-user-avatar" aria-hidden="true"
+              ><span id="nav-user-initials">…</span></span
+            >
+            <span class="nav-user-name" id="nav-user-name">…</span>
+          </button>
+          <div class="nav-user-menu" id="nav-user-menu" role="menu" hidden>
+            <a href="/watch/invitations.html" role="menuitem">Invitations</a>
+            <a href="/watch/support.html" role="menuitem">Support</a>
+            <a href="/watch/settings.html" role="menuitem">Paramètres</a>
+            <button
+              type="button"
+              class="nav-logout-btn"
+              role="menuitem"
+              id="nav-logout"
+            >
+              Déconnexion
+            </button>
           </div>
         </div>
-        <span class="user-score-label">Score TMDB</span>
       </div>
-    </div>
-    <div id="seasons"></div>
-  </main>
-  <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
-  <script src="/watch/app.js"></script>
-  <script>
-    const params = new URLSearchParams(location.search);
-    const key = params.get('key');
+    </nav>
+    <div id="watch-announcement" class="watch-announcement-host" hidden></div>
+    <main id="main-list">
+      <h1>Séries</h1>
+      <div class="grid" id="series-grid"></div>
+      <div
+        id="series-sentinel"
+        class="series-list-sentinel"
+        aria-hidden="true"
+      ></div>
+      <p
+        class="empty"
+        id="series-loading-more"
+        style="display: none; margin-top: 8px"
+      >
+        Chargement…
+      </p>
+      <p class="empty" id="empty-list" style="display: none">
+        Aucune série. Marquez des entrées comme « Épisode de série » dans
+        l’administration.
+      </p>
+    </main>
+    <main id="main-detail" style="display: none">
+      <a class="back" href="/watch/serie.html">← Toutes les séries</a>
+      <div class="serie-hero">
+        <div class="poster-col">
+          <img class="hero-poster" id="d-poster" alt="" />
+        </div>
+        <div class="serie-hero-main">
+          <h1 id="d-title">…</h1>
+          <p class="hero-text" id="d-hero-text" hidden></p>
+          <p class="lead" id="d-syn"></p>
+        </div>
+        <div class="user-score-wrap" id="serie-score-wrap" hidden>
+          <div class="user-score" id="serie-score-widget">
+            <svg viewBox="0 0 36 36" class="user-score-svg" aria-hidden="true">
+              <circle class="user-score-disc" cx="18" cy="18" r="13.35" />
+              <circle
+                class="user-score-track"
+                cx="18"
+                cy="18"
+                r="15.915"
+                pathLength="100"
+                fill="none"
+                stroke-width="3"
+              />
+              <circle
+                id="serie-score-arc"
+                class="user-score-fill"
+                cx="18"
+                cy="18"
+                r="15.915"
+                pathLength="100"
+                fill="none"
+                stroke-width="3"
+                stroke-linecap="round"
+                transform="rotate(-90 18 18)"
+                stroke-dasharray="0 100"
+              />
+            </svg>
+            <div class="user-score-inner">
+              <span class="score-value"
+                ><span id="serie-score-num"></span
+                ><span class="user-score-pct">%</span></span
+              >
+            </div>
+          </div>
+          <span class="user-score-label">Score TMDB</span>
+        </div>
+      </div>
+      <div id="seasons"></div>
+    </main>
+    <footer>
+      © Redwood Plus — This product uses the TMDB API but is not endorsed or
+      certified by TMDB.
+    </footer>
+    <script src="/watch/app.js"></script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const key = params.get("key");
 
-    function seriesListUrl(qTrim) {
-      return '/watch/serie.html' + (qTrim ? '?q=' + encodeURIComponent(qTrim) : '');
-    }
-
-    function showList() {
-      document.getElementById('main-list').style.display = 'block';
-      document.getElementById('main-detail').style.display = 'none';
-    }
-    function showDetail() {
-      disconnectSeriesListObserver();
-      document.getElementById('main-list').style.display = 'none';
-      document.getElementById('main-detail').style.display = 'block';
-    }
-
-    const SERIES_PAGE = 24;
-    let seriesListState = { offset: 0, needle: '', loading: false, done: false };
-    let seriesListIo = null;
-
-    function disconnectSeriesListObserver() {
-      if (seriesListIo) {
-        seriesListIo.disconnect();
-        seriesListIo = null;
-      }
-    }
-
-    function appendSeriesListCard(s) {
-      const g = document.getElementById('series-grid');
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.onclick = () => {
-        location.href = '/watch/serie.html?key=' + encodeURIComponent(s.series_key);
-      };
-      const img = s.poster_path ? posterUrl(s.poster_path) : '';
-      el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
-      const nEp = Number(s.episode_count) || 0;
-      const nSe = Number(s.season_count) || 0;
-      const epLabel = nEp === 1 ? '1 ép.' : nEp + ' ép.';
-      const seLabel = nSe === 1 ? '1 saison' : nSe + ' saisons';
-      el.querySelector('.t').textContent = s.title + ' · ' + epLabel + ' · ' + seLabel;
-      g.appendChild(el);
-    }
-
-    async function fetchSeriesListPage() {
-      let url = '/api/series?limit=' + SERIES_PAGE + '&offset=' + seriesListState.offset;
-      if (seriesListState.needle) url += '&q=' + encodeURIComponent(seriesListState.needle);
-      return apiJson(url);
-    }
-
-    async function loadSeriesListAppend() {
-      if (seriesListState.loading || seriesListState.done) return;
-      if (document.getElementById('main-list').style.display === 'none') return;
-      const loadMore = document.getElementById('series-loading-more');
-      seriesListState.loading = true;
-      loadMore.style.display = 'block';
-      try {
-        const rows = await fetchSeriesListPage();
-        rows.forEach(appendSeriesListCard);
-        seriesListState.offset += rows.length;
-        if (rows.length < SERIES_PAGE) seriesListState.done = true;
-      } finally {
-        seriesListState.loading = false;
-        loadMore.style.display = 'none';
-      }
-    }
-
-    function setupSeriesListObserver() {
-      disconnectSeriesListObserver();
-      const sentinel = document.getElementById('series-sentinel');
-      if (!sentinel) return;
-      seriesListIo = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((en) => {
-            if (!en.isIntersecting || seriesListState.loading || seriesListState.done) return;
-            loadSeriesListAppend().catch((e) => {
-              if (e && e.message === '401') { location.href = '/login.html'; return; }
-              console.error(e);
-              seriesListState.done = true;
-            });
-          });
-        },
-        { root: null, rootMargin: '280px', threshold: 0 },
-      );
-      seriesListIo.observe(sentinel);
-    }
-
-    async function bootList(q) {
-      disconnectSeriesListObserver();
-      const listRoot = document.getElementById('main-list');
-      if (typeof watchScopedLoadingShow === 'function') watchScopedLoadingShow(listRoot);
-      try {
-      const needle = (q || '').trim();
-      seriesListState = { offset: 0, needle, loading: false, done: false };
-      const g = document.getElementById('series-grid');
-      const empty = document.getElementById('empty-list');
-      const loadMore = document.getElementById('series-loading-more');
-      const h1 = document.querySelector('#main-list h1');
-      g.innerHTML = '';
-      loadMore.style.display = 'none';
-      seriesListState.loading = true;
-      let rows;
-      try {
-        rows = await fetchSeriesListPage();
-      } finally {
-        seriesListState.loading = false;
-      }
-      if (!rows.length) {
-        empty.style.display = 'block';
-        empty.textContent = needle
-          ? 'Aucune série ne correspond à votre recherche.'
-          : 'Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.';
-        if (h1) h1.textContent = needle ? ('Résultats : « ' + needle + ' »') : 'Séries';
-        return;
-      }
-      empty.style.display = 'none';
-      if (h1) h1.textContent = needle ? ('Résultats : « ' + needle + ' »') : 'Séries';
-      rows.forEach(appendSeriesListCard);
-      seriesListState.offset += rows.length;
-      if (rows.length < SERIES_PAGE) seriesListState.done = true;
-      setupSeriesListObserver();
-      } finally {
-        if (typeof watchScopedLoadingHide === 'function') watchScopedLoadingHide(listRoot);
-      }
-    }
-
-    function applySerieTmdbScore(note) {
-      const wrap = document.getElementById('serie-score-wrap');
-      if (note == null || note === '') {
-        wrap.hidden = true;
-        return;
-      }
-      const n = Number(note);
-      if (Number.isNaN(n)) {
-        wrap.hidden = true;
-        return;
-      }
-      const pct = Math.min(100, Math.max(0, Math.round(n * 10)));
-      wrap.hidden = false;
-      document.getElementById('serie-score-num').textContent = String(pct);
-      document.getElementById('serie-score-arc').setAttribute('stroke-dasharray', pct + ' ' + (100 - pct));
-      document.getElementById('serie-score-widget').setAttribute('aria-label', 'Score TMDB ' + pct + ' pour cent');
-    }
-
-    async function bootDetail(sk) {
-      const d = await apiJson('/api/series/' + encodeURIComponent(sk) + '/detail');
-      document.getElementById('d-title').textContent = d.title || sk;
-      const heroEl = document.getElementById('d-hero-text');
-      const heroRaw = (d.hero_text != null && String(d.hero_text).trim()) ? String(d.hero_text).trim() : '';
-      if (heroRaw) {
-        heroEl.hidden = false;
-        heroEl.textContent = heroRaw;
-      } else {
-        heroEl.hidden = true;
-        heroEl.textContent = '';
-      }
-      document.getElementById('d-syn').textContent = (d.synopsis || '').slice(0, 400) + (d.synopsis && d.synopsis.length > 400 ? '…' : '');
-      const pu = d.poster_path ? posterUrl(d.poster_path) : '';
-      document.getElementById('d-poster').src = pu;
-      applySerieTmdbScore(d.note_tmdb);
-      const wrap = document.getElementById('seasons');
-      wrap.innerHTML = '';
-      const seasonNums = Object.keys(d.seasons || {}).map((k) => parseInt(k, 10)).sort((a, b) => a - b);
-      seasonNums.forEach((sn) => {
-        const k = String(sn);
-        const eps = d.seasons[k] || [];
-        const sec = document.createElement('details');
-        sec.className = 'season';
-        const sum = document.createElement('summary');
-        sum.className = 'season-summary';
-        sum.setAttribute(
-          'aria-label',
-          'Saison ' + k + ', afficher ou masquer la liste des épisodes',
+      function seriesListUrl(qTrim) {
+        return (
+          "/watch/serie.html" + (qTrim ? "?q=" + encodeURIComponent(qTrim) : "")
         );
-        const art = (d.season_art && d.season_art[k]) || {};
-        const hasSeasonHead = !!(art.poster_path || art.note || art.synopsis);
-        function appendChevron(host) {
-          const chev = document.createElement('span');
-          chev.className = 'season-chevron';
-          chev.setAttribute('aria-hidden', 'true');
-          chev.textContent = '▼';
-          host.appendChild(chev);
-        }
-        if (hasSeasonHead) {
-          const head = document.createElement('div');
-          head.className = 'season-head';
-          if (art.poster_path) {
-            const img = document.createElement('img');
-            img.className = 'season-poster';
-            img.src = posterUrl(art.poster_path);
-            img.alt = '';
-            img.loading = 'lazy';
-            img.onerror = function () { this.style.opacity = '0.25'; };
-            head.appendChild(img);
-          }
-          const ht = document.createElement('div');
-          ht.className = 'season-head-text';
-          const h2 = document.createElement('h2');
-          h2.textContent = 'Saison ' + k;
-          ht.appendChild(h2);
-          if (art.note) {
-            const pn = document.createElement('p');
-            pn.className = 'season-note';
-            pn.textContent = art.note;
-            ht.appendChild(pn);
-          }
-          if (art.synopsis) {
-            const ps = document.createElement('p');
-            ps.className = 'season-synopsis';
-            ps.textContent = art.synopsis;
-            ht.appendChild(ps);
-          }
-          head.appendChild(ht);
-          appendChevron(head);
-          sum.appendChild(head);
-        } else {
-          const row = document.createElement('div');
-          row.className = 'season-summary-row';
-          const h2 = document.createElement('h2');
-          h2.textContent = 'Saison ' + k;
-          row.appendChild(h2);
-          appendChevron(row);
-          sum.appendChild(row);
-        }
-        sec.appendChild(sum);
-        const list = document.createElement('div');
-        list.className = 'ep-list';
-        sec.appendChild(list);
-        eps.forEach((ep) => {
-          const row = document.createElement('div');
-          row.className = 'ep';
-          row.onclick = () => { location.href = '/watch/film.html?id=' + ep.id; };
-          const en = ep.episode_number != null ? ep.episode_number : '—';
-          row.innerHTML = '<span class="ep-num">E' + String(en).padStart(2, '0') + '</span><span class="ep-title"></span>';
-          row.querySelector('.ep-title').textContent = ep.titre || ('Épisode ' + en);
-          list.appendChild(row);
-        });
-        wrap.appendChild(sec);
-      });
-    }
+      }
 
-    let searchTimer;
-    document.getElementById('nav-q').addEventListener('input', () => {
-      clearTimeout(searchTimer);
-      searchTimer = setTimeout(() => {
-        const q = document.getElementById('nav-q').value.trim();
-        if (key) {
-          location.href = seriesListUrl(q);
+      function showList() {
+        document.getElementById("main-list").style.display = "block";
+        document.getElementById("main-detail").style.display = "none";
+      }
+      function showDetail() {
+        disconnectSeriesListObserver();
+        document.getElementById("main-list").style.display = "none";
+        document.getElementById("main-detail").style.display = "block";
+      }
+
+      const SERIES_PAGE = 24;
+      let seriesListState = {
+        offset: 0,
+        needle: "",
+        loading: false,
+        done: false,
+      };
+      let seriesListIo = null;
+
+      function disconnectSeriesListObserver() {
+        if (seriesListIo) {
+          seriesListIo.disconnect();
+          seriesListIo = null;
+        }
+      }
+
+      function appendSeriesListCard(s) {
+        const g = document.getElementById("series-grid");
+        const el = document.createElement("div");
+        el.className = "card";
+        el.onclick = () => {
+          location.href =
+            "/watch/serie.html?key=" + encodeURIComponent(s.series_key);
+        };
+        const img = s.poster_path ? posterUrl(s.poster_path) : "";
+        el.innerHTML = `<img src="${img}" alt="" loading="lazy" onerror="this.style.opacity=.25" /><div class="t"></div>`;
+        const nEp = Number(s.episode_count) || 0;
+        const nSe = Number(s.season_count) || 0;
+        const epLabel = nEp === 1 ? "1 ép." : nEp + " ép.";
+        const seLabel = nSe === 1 ? "1 saison" : nSe + " saisons";
+        el.querySelector(".t").textContent =
+          s.title + " · " + epLabel + " · " + seLabel;
+        g.appendChild(el);
+      }
+
+      async function fetchSeriesListPage() {
+        let url =
+          "/api/series?limit=" +
+          SERIES_PAGE +
+          "&offset=" +
+          seriesListState.offset;
+        if (seriesListState.needle)
+          url += "&q=" + encodeURIComponent(seriesListState.needle);
+        return apiJson(url);
+      }
+
+      async function loadSeriesListAppend() {
+        if (seriesListState.loading || seriesListState.done) return;
+        if (document.getElementById("main-list").style.display === "none")
+          return;
+        const loadMore = document.getElementById("series-loading-more");
+        seriesListState.loading = true;
+        loadMore.style.display = "block";
+        try {
+          const rows = await fetchSeriesListPage();
+          rows.forEach(appendSeriesListCard);
+          seriesListState.offset += rows.length;
+          if (rows.length < SERIES_PAGE) seriesListState.done = true;
+        } finally {
+          seriesListState.loading = false;
+          loadMore.style.display = "none";
+        }
+      }
+
+      function setupSeriesListObserver() {
+        disconnectSeriesListObserver();
+        const sentinel = document.getElementById("series-sentinel");
+        if (!sentinel) return;
+        seriesListIo = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((en) => {
+              if (
+                !en.isIntersecting ||
+                seriesListState.loading ||
+                seriesListState.done
+              )
+                return;
+              loadSeriesListAppend().catch((e) => {
+                if (e && e.message === "401") {
+                  location.href = "/login.html";
+                  return;
+                }
+                console.error(e);
+                seriesListState.done = true;
+              });
+            });
+          },
+          { root: null, rootMargin: "280px", threshold: 0 },
+        );
+        seriesListIo.observe(sentinel);
+      }
+
+      async function bootList(q) {
+        disconnectSeriesListObserver();
+        const listRoot = document.getElementById("main-list");
+        if (typeof watchScopedLoadingShow === "function")
+          watchScopedLoadingShow(listRoot);
+        try {
+          const needle = (q || "").trim();
+          seriesListState = { offset: 0, needle, loading: false, done: false };
+          const g = document.getElementById("series-grid");
+          const empty = document.getElementById("empty-list");
+          const loadMore = document.getElementById("series-loading-more");
+          const h1 = document.querySelector("#main-list h1");
+          g.innerHTML = "";
+          loadMore.style.display = "none";
+          seriesListState.loading = true;
+          let rows;
+          try {
+            rows = await fetchSeriesListPage();
+          } finally {
+            seriesListState.loading = false;
+          }
+          if (!rows.length) {
+            empty.style.display = "block";
+            empty.textContent = needle
+              ? "Aucune série ne correspond à votre recherche."
+              : "Aucune série. Marquez des entrées comme « Épisode de série » dans l’administration.";
+            if (h1)
+              h1.textContent = needle
+                ? "Résultats : « " + needle + " »"
+                : "Séries";
+            return;
+          }
+          empty.style.display = "none";
+          if (h1)
+            h1.textContent = needle
+              ? "Résultats : « " + needle + " »"
+              : "Séries";
+          rows.forEach(appendSeriesListCard);
+          seriesListState.offset += rows.length;
+          if (rows.length < SERIES_PAGE) seriesListState.done = true;
+          setupSeriesListObserver();
+        } finally {
+          if (typeof watchScopedLoadingHide === "function")
+            watchScopedLoadingHide(listRoot);
+        }
+      }
+
+      function applySerieTmdbScore(note) {
+        const wrap = document.getElementById("serie-score-wrap");
+        if (note == null || note === "") {
+          wrap.hidden = true;
           return;
         }
-        history.replaceState(null, '', seriesListUrl(q));
-        bootList(q).catch((e) => {
-          if (e && e.message === '401') { location.href = '/login.html'; return; }
-          console.error(e);
-        });
-      }, 280);
-    });
+        const n = Number(note);
+        if (Number.isNaN(n)) {
+          wrap.hidden = true;
+          return;
+        }
+        const pct = Math.min(100, Math.max(0, Math.round(n * 10)));
+        wrap.hidden = false;
+        document.getElementById("serie-score-num").textContent = String(pct);
+        document
+          .getElementById("serie-score-arc")
+          .setAttribute("stroke-dasharray", pct + " " + (100 - pct));
+        document
+          .getElementById("serie-score-widget")
+          .setAttribute("aria-label", "Score TMDB " + pct + " pour cent");
+      }
 
-    async function boot() {
-      if (typeof watchPageLoadingShow === 'function') watchPageLoadingShow();
-      try {
-      await apiJson('/api/auth/me');
-      const listQ = (params.get('q') || '').trim();
-      document.getElementById('nav-q').value = listQ;
-      if (key) {
-        showDetail();
-        await bootDetail(key);
-      } else {
-        showList();
-        await bootList(listQ);
+      async function bootDetail(sk) {
+        const d = await apiJson(
+          "/api/series/" + encodeURIComponent(sk) + "/detail",
+        );
+        document.getElementById("d-title").textContent = d.title || sk;
+        const heroEl = document.getElementById("d-hero-text");
+        const heroRaw =
+          d.hero_text != null && String(d.hero_text).trim()
+            ? String(d.hero_text).trim()
+            : "";
+        if (heroRaw) {
+          heroEl.hidden = false;
+          heroEl.textContent = heroRaw;
+        } else {
+          heroEl.hidden = true;
+          heroEl.textContent = "";
+        }
+        document.getElementById("d-syn").textContent =
+          (d.synopsis || "").slice(0, 400) +
+          (d.synopsis && d.synopsis.length > 400 ? "…" : "");
+        const pu = d.poster_path ? posterUrl(d.poster_path) : "";
+        document.getElementById("d-poster").src = pu;
+        applySerieTmdbScore(d.note_tmdb);
+        const wrap = document.getElementById("seasons");
+        wrap.innerHTML = "";
+        const seasonNums = Object.keys(d.seasons || {})
+          .map((k) => parseInt(k, 10))
+          .sort((a, b) => a - b);
+        seasonNums.forEach((sn) => {
+          const k = String(sn);
+          const eps = d.seasons[k] || [];
+          const sec = document.createElement("details");
+          sec.className = "season";
+          const sum = document.createElement("summary");
+          sum.className = "season-summary";
+          sum.setAttribute(
+            "aria-label",
+            "Saison " + k + ", afficher ou masquer la liste des épisodes",
+          );
+          const art = (d.season_art && d.season_art[k]) || {};
+          const hasSeasonHead = !!(art.poster_path || art.note || art.synopsis);
+          function appendChevron(host) {
+            const chev = document.createElement("span");
+            chev.className = "season-chevron";
+            chev.setAttribute("aria-hidden", "true");
+            chev.textContent = "▼";
+            host.appendChild(chev);
+          }
+          if (hasSeasonHead) {
+            const head = document.createElement("div");
+            head.className = "season-head";
+            if (art.poster_path) {
+              const img = document.createElement("img");
+              img.className = "season-poster";
+              img.src = posterUrl(art.poster_path);
+              img.alt = "";
+              img.loading = "lazy";
+              img.onerror = function () {
+                this.style.opacity = "0.25";
+              };
+              head.appendChild(img);
+            }
+            const ht = document.createElement("div");
+            ht.className = "season-head-text";
+            const h2 = document.createElement("h2");
+            h2.textContent = "Saison " + k;
+            ht.appendChild(h2);
+            if (art.note) {
+              const pn = document.createElement("p");
+              pn.className = "season-note";
+              pn.textContent = art.note;
+              ht.appendChild(pn);
+            }
+            if (art.synopsis) {
+              const ps = document.createElement("p");
+              ps.className = "season-synopsis";
+              ps.textContent = art.synopsis;
+              ht.appendChild(ps);
+            }
+            head.appendChild(ht);
+            appendChevron(head);
+            sum.appendChild(head);
+          } else {
+            const row = document.createElement("div");
+            row.className = "season-summary-row";
+            const h2 = document.createElement("h2");
+            h2.textContent = "Saison " + k;
+            row.appendChild(h2);
+            appendChevron(row);
+            sum.appendChild(row);
+          }
+          sec.appendChild(sum);
+          const list = document.createElement("div");
+          list.className = "ep-list";
+          sec.appendChild(list);
+          eps.forEach((ep) => {
+            const row = document.createElement("div");
+            row.className = "ep";
+            row.onclick = () => {
+              location.href = "/watch/film.html?id=" + ep.id;
+            };
+            const en = ep.episode_number != null ? ep.episode_number : "—";
+            row.innerHTML =
+              '<span class="ep-num">E' +
+              String(en).padStart(2, "0") +
+              '</span><span class="ep-title"></span>';
+            row.querySelector(".ep-title").textContent =
+              ep.titre || "Épisode " + en;
+            list.appendChild(row);
+          });
+          wrap.appendChild(sec);
+        });
       }
-      } finally {
-        if (typeof watchPageLoadingHide === 'function') watchPageLoadingHide();
+
+      let searchTimer;
+      document.getElementById("nav-q").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const q = document.getElementById("nav-q").value.trim();
+          if (key) {
+            location.href = seriesListUrl(q);
+            return;
+          }
+          history.replaceState(null, "", seriesListUrl(q));
+          bootList(q).catch((e) => {
+            if (e && e.message === "401") {
+              location.href = "/login.html";
+              return;
+            }
+            console.error(e);
+          });
+        }, 280);
+      });
+
+      async function boot() {
+        if (typeof watchPageLoadingShow === "function") watchPageLoadingShow();
+        try {
+          await apiJson("/api/auth/me");
+          const listQ = (params.get("q") || "").trim();
+          document.getElementById("nav-q").value = listQ;
+          if (key) {
+            showDetail();
+            await bootDetail(key);
+          } else {
+            showList();
+            await bootList(listQ);
+          }
+        } finally {
+          if (typeof watchPageLoadingHide === "function")
+            watchPageLoadingHide();
+        }
       }
-    }
-    boot().catch((e) => {
-      if (e && e.message === '401') { location.href = '/login.html'; return; }
-      console.error(e);
-      alert('Chargement impossible : ' + (e && e.message ? e.message : e));
-    });
-  </script>
-</body>
+      boot().catch((e) => {
+        if (e && e.message === "401") {
+          location.href = "/login.html";
+          return;
+        }
+        console.error(e);
+        alert("Chargement impossible : " + (e && e.message ? e.message : e));
+      });
+    </script>
+  </body>
 </html>

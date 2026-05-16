@@ -9,7 +9,8 @@
   }
 
   function getApiBase() {
-    if (typeof window === "undefined" || window.__REDWOOD_API_BASE__ == null) return "";
+    if (typeof window === "undefined" || window.__REDWOOD_API_BASE__ == null)
+      return "";
     var b = String(window.__REDWOOD_API_BASE__).trim();
     return b ? b.replace(/\/$/, "") : "";
   }
@@ -26,7 +27,8 @@
     var uid = String(cfg.unit_id).replace(/\D/g, "");
     if (!uid) return;
 
-    var mobileRaw = cfg.mobile_unit_id != null ? String(cfg.mobile_unit_id) : "";
+    var mobileRaw =
+      cfg.mobile_unit_id != null ? String(cfg.mobile_unit_id) : "";
     var mobileUid = mobileRaw.replace(/\D/g, "");
     if (!mobileUid || mobileUid === uid) {
       mobileUid = "";
@@ -69,7 +71,10 @@
     function makeIframe(idNum) {
       var ifr = document.createElement("iframe");
       ifr.setAttribute("data-aa", idNum);
-      ifr.src = "https://acceptable.a-ads.com/" + encodeURIComponent(idNum) + "/?size=Adaptive";
+      ifr.src =
+        "https://acceptable.a-ads.com/" +
+        encodeURIComponent(idNum) +
+        "/?size=Adaptive";
       ifr.title = "Publicité";
       ifr.loading = "lazy";
       ifr.referrerPolicy = "strict-origin-when-cross-origin";

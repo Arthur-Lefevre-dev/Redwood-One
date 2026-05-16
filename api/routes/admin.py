@@ -1277,12 +1277,39 @@ def _iter_month_labels(from_month: str, to_month: str) -> List[str]:
     return out
 
 
+def _iter_day_labels(from_day: str, to_day: str) -> List[str]:
+    """from_day / to_day as YYYY-MM-DD inclusive."""
+    d = datetime.strptime(from_day[:10], "%Y-%m-%d").date()
+    end = datetime.strptime(to_day[:10], "%Y-%m-%d").date()
+    out: List[str] = []
+    while d <= end:
+        out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def _catalog_bytes_before(db: Session, before: datetime) -> int:
+    """Sum taille_octets for disponible titles added before ``before`` (or without date_ajout)."""
+    row = (
+        db.query(func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+            or_(Film.date_ajout.is_(None), Film.date_ajout < before),
+        )
+        .scalar()
+    )
+    return int(row or 0)
+
+
 @router.get("/billing/overview")
 def admin_billing_overview(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
     months: int = Query(18, ge=3, le=60, description="Months of monthly storage / Vast series."),
     vast_daily_days: int = Query(90, ge=7, le=120, description="Days for Vast est. daily chart."),
+    storage_daily_days: int = Query(90, ge=7, le=365, description="Days for storage daily charts."),
 ):
     """
     Billing-oriented estimates: storage (€/GiB/h HT), Vast transcode upper bound (USD→EUR),
@@ -1293,6 +1320,7 @@ def admin_billing_overview(
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     since = now - timedelta(days=32 * months)
     since_day = now - timedelta(days=int(vast_daily_days))
+    since_storage_day = now - timedelta(days=int(storage_daily_days))
 
     rate_gib_h = float(getattr(s, "BILLING_STORAGE_EUR_PER_GIB_HOUR_HT", 0.0) or 0.0)
     usd_to_eur = float(getattr(s, "BILLING_USD_TO_EUR", 0.92) or 0.92)
@@ -1314,6 +1342,7 @@ def admin_billing_overview(
     eur_per_month_storage_30 = eur_per_day_storage * 30.0
 
     bucket_m = _month_bucket_expr(Film.date_ajout, dialect)
+    bucket_d = _day_bucket_expr(Film.date_ajout, dialect)
     storage_rows = (
         db.query(bucket_m, func.coalesce(func.sum(Film.taille_octets), 0))
         .filter(
@@ -1335,9 +1364,9 @@ def admin_billing_overview(
     first_month = (now - timedelta(days=32 * months)).strftime("%Y-%m")[:7]
     current_month = now.strftime("%Y-%m")[:7]
     month_axis = _iter_month_labels(first_month[:7], current_month)
-    cumulative_bytes = 0
+    cumulative_bytes = _catalog_bytes_before(db, since)
     storage_monthly: List[Dict[str, Any]] = []
-    prev_gib_end = 0.0
+    prev_gib_end = cumulative_bytes / (1024.0**3)
     for lab in month_axis:
         cumulative_bytes += int(bytes_by_month.get(lab, 0))
         gib_end = cumulative_bytes / (1024.0**3)
@@ -1368,7 +1397,47 @@ def admin_billing_overview(
         {"year": y, "est_storage_eur_sum_months_ht": round(v, 4)} for y, v in sorted(by_year.items())
     ]
 
-    bucket_d = _day_bucket_expr(Film.date_ajout, dialect)
+    storage_day_rows = (
+        db.query(bucket_d, func.coalesce(func.sum(Film.taille_octets), 0))
+        .filter(
+            Film.statut == FilmStatut.disponible,
+            Film.taille_octets.isnot(None),
+            Film.taille_octets > 0,
+            Film.date_ajout.isnot(None),
+            Film.date_ajout >= since_storage_day,
+        )
+        .group_by(bucket_d)
+        .order_by(bucket_d)
+        .all()
+    )
+    bytes_by_day: Dict[str, int] = {}
+    for b, nbytes in storage_day_rows:
+        dlab = _billing_day_label(b, dialect)
+        if dlab:
+            bytes_by_day[dlab] = int(nbytes or 0)
+
+    first_day = since_storage_day.date().isoformat()
+    current_day = now.date().isoformat()
+    day_axis = _iter_day_labels(first_day, current_day)
+    cumulative_bytes_day = _catalog_bytes_before(db, since_storage_day)
+    storage_daily: List[Dict[str, Any]] = []
+    for dlab in day_axis:
+        cumulative_bytes_day += int(bytes_by_day.get(dlab, 0))
+        gib_end = cumulative_bytes_day / (1024.0**3)
+        if rate_gib_h > 0:
+            eur_day_burn = gib_end * rate_gib_h * 24.0
+        else:
+            eur_day_burn = 0.0
+        storage_daily.append(
+            {
+                "day": dlab,
+                "bytes_added_day": int(bytes_by_day.get(dlab, 0)),
+                "cumulative_bytes_catalog_proxy": cumulative_bytes_day,
+                "cumulative_gib": round(gib_end, 4),
+                "est_storage_eur_day_burn_ht": round(eur_day_burn, 6),
+            }
+        )
+
     vast_day_rows = (
         db.query(bucket_d, func.coalesce(func.sum(Film.duree_min), 0))
         .filter(
@@ -1502,7 +1571,9 @@ def admin_billing_overview(
         },
         "series": {
             "months_requested": months,
+            "storage_daily_days": storage_daily_days,
             "storage_monthly": storage_monthly,
+            "storage_daily": storage_daily,
             "storage_cost_by_year_eur_ht": storage_yearly,
             "vast_transcode_eur_by_month": vast_eur_by_month,
             "vast_transcode_eur_by_day": vast_eur_by_day,
@@ -1510,7 +1581,8 @@ def admin_billing_overview(
         "disclaimers": [
             "Les montants Vast sont une borne haute (durée catalogue × VAST_MAX_DPH_PER_HOUR), pas la facture Vast.ai.",
             "Le stockage utilise la somme des taille_octets des fiches « disponibles », pas un inventaire S3 temps réel.",
-            "Coût stockage mois par mois : moyenne trapézoïdale des Gio cumulés (proxy par date d’ajout) × €/(Gio·h) × heures du mois.",
+            "Graphiques stockage (jour) : Gio cumulés par date d’ajout + coût journalier = Gio cumulés × €/(Gio·h) × 24 h (catalogue déjà présent avant la fenêtre inclus en point de départ).",
+            "Synthèse annuelle : somme des coûts mensuels trapézoïdaux (€ HT).",
         ],
     }
 

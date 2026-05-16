@@ -1966,18 +1966,18 @@
               <div class="stats-dash-charts">
                 <div class="stats-chart-card">
                   <div class="stats-chart-title">
-                    Coût stockage estimé par mois (€ HT)
+                    Coût stockage estimé par jour (€ HT)
                   </div>
                   <div class="stats-chart-wrap">
                     <canvas
                       id="chart-bill-storage-eur"
-                      aria-label="Stockage euros par mois"
+                      aria-label="Stockage euros par jour"
                     ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
                   <div class="stats-chart-title">
-                    Volume catalogue cumulé (Gio, proxy)
+                    Volume catalogue cumulé par jour (Gio, proxy)
                   </div>
                   <div class="stats-chart-wrap">
                     <canvas
@@ -4134,6 +4134,16 @@
         _billingCharts = [];
       }
 
+      function _resizeBillingCharts() {
+        requestAnimationFrame(() => {
+          _billingCharts.forEach((c) => {
+            try {
+              c.resize();
+            } catch (_) {}
+          });
+        });
+      }
+
       function _fmtEurNum(n, maxD = 6) {
         if (n == null || !Number.isFinite(Number(n))) return "—";
         return Number(n).toLocaleString("fr-FR", {
@@ -4162,7 +4172,7 @@
         genEl.textContent = "Chargement…";
         try {
           const r = await api(
-            "/api/admin/billing/overview?months=20&vast_daily_days=90",
+            "/api/admin/billing/overview?months=20&vast_daily_days=90&storage_daily_days=90",
           );
           if (!r.ok) {
             let t = "Échec du chargement.";
@@ -4280,12 +4290,28 @@
 
           _destroyBillingCharts();
 
-          const sm = ser.storage_monthly || [];
-          const labelsM = sm.map((x) => x.month);
-          const eurStM = sm.map(
-            (x) => Number(x.est_storage_eur_month_trapezoid_ht) || 0,
+          const sd = ser.storage_daily || [];
+          const labelsD = sd.map((x) => x.day);
+          const eurStD = sd.map(
+            (x) => Number(x.est_storage_eur_day_burn_ht) || 0,
           );
-          const gibCum = sm.map((x) => Number(x.cumulative_gib) || 0);
+          const gibCumD = sd.map((x) => Number(x.cumulative_gib) || 0);
+          const dayTickOpts = {
+            maxRotation: 60,
+            autoSkip: true,
+            maxTicksLimit: 14,
+          };
+          const _suggestedYMin = (vals) => {
+            const finite = vals.filter((n) => Number.isFinite(n));
+            if (!finite.length) return undefined;
+            const lo = Math.min(...finite);
+            const hi = Math.max(...finite);
+            if (hi <= lo) return undefined;
+            const pad = (hi - lo) * 0.08;
+            return Math.max(0, lo - pad);
+          };
+          const eurYMin = _suggestedYMin(eurStD);
+          const gibYMin = _suggestedYMin(gibCumD);
 
           const ctx1 = document.getElementById("chart-bill-storage-eur");
           if (ctx1) {
@@ -4293,12 +4319,12 @@
               new Chart(ctx1, {
                 type: "line",
                 data: {
-                  labels: labelsM,
+                  labels: labelsD,
                   datasets: [
                     {
-                      label: "€ HT stockage (trapèze)",
-                      data: eurStM,
-                      tension: 0.2,
+                      label: "€ HT / jour (catalogue cumulé)",
+                      data: eurStD,
+                      tension: 0.15,
                       fill: true,
                       borderColor: "#22c55e",
                       backgroundColor: "rgba(34, 197, 94, 0.12)",
@@ -4309,8 +4335,11 @@
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
-                    x: { ticks: { maxRotation: 45 } },
-                    y: { beginAtZero: true },
+                    x: { ticks: dayTickOpts },
+                    y: {
+                      beginAtZero: eurYMin == null,
+                      suggestedMin: eurYMin,
+                    },
                   },
                 },
               }),
@@ -4323,12 +4352,12 @@
               new Chart(ctx2, {
                 type: "line",
                 data: {
-                  labels: labelsM,
+                  labels: labelsD,
                   datasets: [
                     {
                       label: "Gio cumulés (proxy)",
-                      data: gibCum,
-                      tension: 0.2,
+                      data: gibCumD,
+                      tension: 0.15,
                       borderColor: "#38bdf8",
                       backgroundColor: "rgba(56, 189, 248, 0.12)",
                       fill: true,
@@ -4339,8 +4368,11 @@
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
-                    x: { ticks: { maxRotation: 45 } },
-                    y: { beginAtZero: true },
+                    x: { ticks: dayTickOpts },
+                    y: {
+                      beginAtZero: gibYMin == null,
+                      suggestedMin: gibYMin,
+                    },
                   },
                 },
               }),
@@ -4453,6 +4485,7 @@
           _billVastFilmRowsCache = tv.per_film_top || [];
           _billVastFilmPage = 1;
           renderBillingVastFilmTable();
+          _resizeBillingCharts();
         } catch (e) {
           if (e && e.message === "403-admin") return;
           const hint =

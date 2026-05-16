@@ -12,6 +12,24 @@ logger = logging.getLogger(__name__)
 
 REDWOOD_VAST_NO_GPU_SENTINEL = "REDWOOD_VAST_NO_GPU=1"
 
+
+def _repick_vast_bundle_offer(
+    skipped_offer_ids: list[int],
+    *,
+    search_limit: int = 64,
+) -> tuple[int, Optional[str]]:
+    """Pick the next rentable bundle offer, skipping ids that already failed."""
+    from core import vast_ai
+
+    first = vast_ai.pick_first_verified_bundle_offer(
+        vast_ai.default_gpu_name_list(),
+        search_limit=search_limit,
+        skip_offer_ids=skipped_offer_ids,
+    )
+    oid = int(first["id"])
+    gpu = first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
+    return oid, gpu
+
 # Env: RW_IN, RW_OUT, RW_EXT, RW_BR/MR/BF, RW_BA (AAC kbit/s), RW_GPU_WAIT, RW_FFMPEG_URL (optional BtbN tarball URL).
 # Prefers a recent static FFmpeg with NVENC; sets NVIDIA_DRIVER_CAPABILITIES + LD_LIBRARY_PATH for Vast.
 # Vast contracts are GPU-backed: NVENC is the intended path. Order: NVENC (decode on CPU or CUDA),
@@ -381,7 +399,21 @@ def run_vast_transcode_test(
                 raise RuntimeError("Cancelled by user")
             raw: Optional[Dict[str, Any]] = None
             last_create_err: Optional[RuntimeError] = None
-            for attempt in range(3):
+            max_create_attempts = max(
+                3,
+                min(
+                    20,
+                    int(getattr(s, "VAST_CREATE_INSTANCE_MAX_RETRIES", 10) or 10),
+                ),
+            )
+            create_retry_delay = max(
+                0.0,
+                min(
+                    5.0,
+                    float(getattr(s, "VAST_CREATE_INSTANCE_RETRY_DELAY_SEC", 0.5) or 0.5),
+                ),
+            )
+            for attempt in range(max_create_attempts):
                 try:
                     raw = vast_ai.create_instance(
                         oid,
@@ -396,22 +428,30 @@ def run_vast_transcode_test(
                     break
                 except RuntimeError as e:
                     last_create_err = e
-                    if not vast_ai.is_no_such_ask_error(e) or attempt >= 2:
+                    if not vast_ai.is_no_such_ask_error(e):
                         raise
-                    first = vast_ai.pick_first_verified_bundle_offer(
-                        vast_ai.default_gpu_name_list(),
-                        search_limit=64,
-                        skip_offer_ids=skipped_offer_ids,
+                    if attempt >= max_create_attempts - 1:
+                        raise RuntimeError(
+                            f"Vast create_instance failed after {max_create_attempts} attempts "
+                            f"(offers expire quickly; skipped offer ids: {skipped_offer_ids}). "
+                            f"Last error: {e}"
+                        ) from e
+                    skipped_offer_ids.append(oid)
+                    search_lim = min(128, 48 + (attempt + 1) * 16)
+                    oid, picked_gpu_name = _repick_vast_bundle_offer(
+                        skipped_offer_ids,
+                        search_limit=search_lim,
                     )
-                    oid = int(first["id"])
-                    picked_gpu_name = (
-                        first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
-                    )
+                    if explicit_offer:
+                        explicit_offer = False
                     logger.warning(
-                        "vast create_instance stale offer (attempt %s); repicked offer_id=%s gpu=%s",
+                        "vast create_instance stale offer (attempt %s/%s); "
+                        "repicked offer_id=%s gpu=%s skipped=%s",
                         attempt + 1,
+                        max_create_attempts,
                         oid,
                         picked_gpu_name or "?",
+                        skipped_offer_ids,
                     )
                     meta_kw["offer_id"] = oid
                     if picked_gpu_name:
@@ -419,6 +459,8 @@ def run_vast_transcode_test(
                     meta(**meta_kw)
                     if is_cancel_requested(rid):
                         raise RuntimeError("Cancelled by user")
+                    if create_retry_delay > 0:
+                        time.sleep(create_retry_delay)
             if raw is None:
                 raise last_create_err or RuntimeError("Vast create_instance failed without response")
             raw_nid = raw.get("new_contract") if isinstance(raw, dict) else None
@@ -559,14 +601,9 @@ def run_vast_transcode_test(
                         "VAST_TRANSCODE_GPU_DEVICE_WAIT_SEC."
                     )
                 skipped_offer_ids.append(oid)
-                first = vast_ai.pick_first_verified_bundle_offer(
-                    vast_ai.default_gpu_name_list(),
-                    search_limit=64,
-                    skip_offer_ids=list(skipped_offer_ids),
-                )
-                oid = int(first["id"])
-                picked_gpu_name = (
-                    first.get("gpu_name") if isinstance(first.get("gpu_name"), str) else None
+                oid, picked_gpu_name = _repick_vast_bundle_offer(
+                    skipped_offer_ids,
+                    search_limit=96,
                 )
                 logger.warning(
                     "vast_remote_transcode: repicking after no GPU; skipped_offer_ids=%s new_offer_id=%s",
