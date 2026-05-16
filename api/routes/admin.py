@@ -32,7 +32,7 @@ from core.donation_campaign import RECURRENCE_NONE, normalize_recurrence
 from core.donation_service import compute_donation_snapshot
 from core.member_invites import reset_member_invite_quota_current_month
 from core.upload import save_upload_stream
-from core.s3 import delete_object_key, object_size_or_none, upload_file
+from core.s3 import delete_film_prefix, delete_object_key, object_size_or_none, upload_file
 from core.vast_transcode_cancel import cancel_vast_transcode_test, store_job_envelope
 from db.models import (
     AuthPageAnnouncement,
@@ -395,6 +395,38 @@ def admin_film_processing_state(
             "réel tourne sur votre worker local."
         ),
     }
+
+
+class AdminBulkDeleteFilmsBody(BaseModel):
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+@router.post("/films/bulk-delete")
+def admin_bulk_delete_films(
+    body: AdminBulkDeleteFilmsBody,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Delete multiple catalog entries (films or episodes) in one request."""
+    unique_ids = list(dict.fromkeys(body.ids))
+    deleted: List[int] = []
+    errors: List[Dict[str, Any]] = []
+    for film_id in unique_ids:
+        f = db.get(Film, film_id)
+        if not f:
+            errors.append({"id": film_id, "error": "not_found"})
+            continue
+        try:
+            delete_film_prefix(film_id, known_s3_key=f.s3_key)
+        except Exception as e:
+            logger.exception("s3 delete failed for film_id=%s", film_id)
+            errors.append({"id": film_id, "error": str(e)})
+            continue
+        db.delete(f)
+        deleted.append(film_id)
+    if deleted:
+        db.commit()
+    return {"deleted": deleted, "errors": errors}
 
 
 @router.get("/films/{film_id}")
