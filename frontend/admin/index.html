@@ -760,6 +760,44 @@
       details.lib-series-season:last-of-type .film-table tr:last-child td {
         border-bottom: none;
       }
+      .lib-bulk-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        padding: 10px 14px;
+        border-radius: var(--border-radius-md);
+        border: 0.5px solid var(--color-border-secondary);
+        background: var(--color-background-secondary);
+        font-size: 12px;
+      }
+      .lib-bulk-bar[hidden] {
+        display: none !important;
+      }
+      .lib-sel-cell {
+        width: 36px;
+        padding: 8px 8px 8px 16px !important;
+        vertical-align: middle;
+      }
+      .lib-sel-cell input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        accent-color: var(--accent);
+      }
+      .lib-show-sel-wrap {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 10px;
+        flex-shrink: 0;
+      }
+      .lib-show-sel-wrap input[type="checkbox"] {
+        width: 15px;
+        height: 15px;
+        cursor: pointer;
+        accent-color: var(--accent);
+      }
       .lib-series-empty {
         padding: 20px 16px;
         font-size: 12px;
@@ -1021,7 +1059,8 @@
         padding: 4px 10px;
         line-height: 1;
       }
-      .floating-upload-dock.floating-upload-dock-collapsed .floating-upload-dock-body {
+      .floating-upload-dock.floating-upload-dock-collapsed
+        .floating-upload-dock-body {
         display: none;
       }
       .floating-upload-dock-body {
@@ -1201,7 +1240,9 @@
         pointer-events: none;
         opacity: 0;
         transform: translateX(-50%) translateY(16px);
-        transition: transform 0.28s ease, opacity 0.28s ease;
+        transition:
+          transform 0.28s ease,
+          opacity 0.28s ease;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -1608,7 +1649,11 @@
           <div class="nav-item" data-page="support-tickets">
             <span class="nav-icon">✉</span>
             Tickets support
-            <span class="nav-badge red" id="badge-support-tickets" hidden></span>
+            <span
+              class="nav-badge red"
+              id="badge-support-tickets"
+              hidden
+            ></span>
           </div>
           <div class="nav-section">Système</div>
           <div class="nav-item" data-page="users">
@@ -1662,7 +1707,9 @@
             <header class="topbar">
               <div>
                 <div class="page-title">Pipeline · Local</div>
-                <div class="page-sub">Ajout et traitement des films (worker sur cette machine)</div>
+                <div class="page-sub">
+                  Ajout et traitement des films (worker sur cette machine)
+                </div>
               </div>
               <div class="topbar-right">
                 <div class="gpu-pill" id="gpu-pill-pipeline">
@@ -1815,8 +1862,10 @@
                       Pour une série, indiquez la clé, le titre, la saison et
                       l’épisode dans <strong>Modifier</strong> une fois le
                       traitement terminé. Les magnet / .torrent ajoutés
-                      <strong>ici</strong> sont encodés sur <strong>cette machine</strong>
-                      après téléchargement (onglet Vast pour encoder sur GPU Vast).
+                      <strong>ici</strong> sont encodés sur
+                      <strong>cette machine</strong>
+                      après téléchargement (onglet Vast pour encoder sur GPU
+                      Vast).
                     </p>
                   </div>
                   <div
@@ -1860,7 +1909,8 @@
                         hidden
                       ></div>
                       <p class="upload-inline-hint" id="upload-inline-hint">
-                        Progression des envois vers le serveur : panneau flottant
+                        Progression des envois vers le serveur : panneau
+                        flottant
                         <strong>Uploads locaux</strong> en bas à droite.
                       </p>
                       <button
@@ -1942,7 +1992,8 @@
               <div>
                 <div class="page-title">Pipeline · Vast</div>
                 <div class="page-sub">
-                  Ajout et traitement des films (transcodage GPU Vast.ai, worker Celery)
+                  Ajout et traitement des films (transcodage GPU Vast.ai, worker
+                  Celery)
                 </div>
               </div>
               <div class="topbar-right">
@@ -2093,12 +2144,14 @@
                         line-height: 1.45;
                       "
                     >
-                      <strong>Upload vidéo</strong> : transcodage sur Vast (un job
-                      par fichier). <strong>Magnet / .torrent sur cet onglet</strong>
-                      : téléchargement sur ce worker puis <strong>transcodage Vast</strong>
+                      <strong>Upload vidéo</strong> : transcodage sur Vast (un
+                      job par fichier).
+                      <strong>Magnet / .torrent sur cet onglet</strong> :
+                      téléchargement sur ce worker puis
+                      <strong>transcodage Vast</strong>
                       (offre ci-dessus si renseignée). Sur l’onglet
-                      <strong>Pipeline · Local</strong>, le même torrent est encodé
-                      <strong>localement</strong> après téléchargement.
+                      <strong>Pipeline · Local</strong>, le même torrent est
+                      encodé <strong>localement</strong> après téléchargement.
                     </p>
                   </div>
                   <div
@@ -2251,7 +2304,8 @@
                               margin-bottom: 4px;
                             "
                           >
-                            Journal distant (ffmpeg · mis à jour depuis l’instance Vast)
+                            Journal distant (ffmpeg · mis à jour depuis
+                            l’instance Vast)
                           </div>
                           <pre
                             id="vast-remote-log"
@@ -2283,7 +2337,11 @@
                             white-space: pre-wrap;
                           "
                         ></div>
-                        <div id="vast-video-wrap" class="hidden" style="margin-top: 14px">
+                        <div
+                          id="vast-video-wrap"
+                          class="hidden"
+                          style="margin-top: 14px"
+                        >
                           <div
                             style="
                               font-size: 12px;
@@ -2694,10 +2752,7 @@
               </div>
             </header>
             <div class="content">
-              <div
-                class="card"
-                style="margin-bottom: 16px"
-              >
+              <div class="card" style="margin-bottom: 16px">
                 <div class="card-head">
                   <div class="card-title">Filtres</div>
                 </div>
@@ -2764,14 +2819,20 @@
                       "
                     >
                       <option value="">Toutes</option>
-                      <option value="request_content">Contenu (film / série)</option>
+                      <option value="request_content">
+                        Contenu (film / série)
+                      </option>
                       <option value="bug">Bug</option>
                       <option value="suggestion">Suggestion</option>
                       <option value="account">Compte</option>
                       <option value="other">Autre</option>
                     </select>
                   </div>
-                  <button type="button" class="btn btn-primary" id="st-apply-filters">
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    id="st-apply-filters"
+                  >
                     Appliquer
                   </button>
                 </div>
@@ -2800,7 +2861,10 @@
                     </thead>
                     <tbody id="st-tbody">
                       <tr>
-                        <td colspan="6" style="color: var(--color-text-tertiary)">
+                        <td
+                          colspan="6"
+                          style="color: var(--color-text-tertiary)"
+                        >
                           Chargement…
                         </td>
                       </tr>
@@ -2846,12 +2910,26 @@
                     ×
                   </button>
                 </div>
-                <div class="card-body" style="font-size: 13px; line-height: 1.55">
-                  <p style="margin-bottom: 8px; color: var(--color-text-secondary)">
+                <div
+                  class="card-body"
+                  style="font-size: 13px; line-height: 1.55"
+                >
+                  <p
+                    style="
+                      margin-bottom: 8px;
+                      color: var(--color-text-secondary);
+                    "
+                  >
                     <strong id="st-detail-user">—</strong>
-                    <span id="st-detail-email" style="color: var(--color-text-tertiary)"></span>
+                    <span
+                      id="st-detail-email"
+                      style="color: var(--color-text-tertiary)"
+                    ></span>
                   </p>
-                  <div class="st-detail-badges" aria-label="Catégorie et statut">
+                  <div
+                    class="st-detail-badges"
+                    aria-label="Catégorie et statut"
+                  >
                     <span class="gpu-pill" id="st-detail-cat-pill">—</span>
                     <span class="gpu-pill" id="st-detail-st-pill">—</span>
                   </div>
@@ -2861,8 +2939,9 @@
                       margin-bottom: 6px;
                       color: var(--color-text-primary);
                     "
-                    >Message initial (spectateur)</p
                   >
+                    Message initial (spectateur)
+                  </p>
                   <pre
                     id="st-detail-body"
                     style="
@@ -2883,8 +2962,9 @@
                       margin-bottom: 8px;
                       color: var(--color-text-primary);
                     "
-                    >Fil de discussion</p
                   >
+                    Fil de discussion
+                  </p>
                   <div id="st-thread" style="margin-bottom: 16px"></div>
                   <label for="st-detail-reply"
                     >Nouveau message public (ajouté au fil, signé avec votre nom
@@ -2927,7 +3007,11 @@
                     <option value="resolved">Résolu</option>
                     <option value="closed">Fermé</option>
                   </select>
-                  <button type="button" class="btn btn-primary" id="st-detail-save">
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    id="st-detail-save"
+                  >
                     Enregistrer
                   </button>
                   <button
@@ -2961,8 +3045,8 @@
               <div>
                 <div class="page-title">Dons crypto</div>
                 <div class="page-sub">
-                  Adresses de dépôt, objectif en euros, projection via soldes on-chain
-                  et taux CoinGecko
+                  Adresses de dépôt, objectif en euros, projection via soldes
+                  on-chain et taux CoinGecko
                 </div>
               </div>
             </header>
@@ -2981,8 +3065,9 @@
                   "
                 >
                   <p style="margin-bottom: 12px">
-                    Renseignez les adresses de réception (réseau indiqué). Polygon =
-                    solde natif POL/MATIC sur l’adresse EVM. Cliquez sur
+                    Renseignez les adresses de réception (réseau indiqué).
+                    Polygon = solde natif POL/MATIC sur l’adresse EVM. Cliquez
+                    sur
                     <strong>Actualiser les soldes</strong> pour interroger les
                     explorateurs / RPC et convertir en EUR (API
                     <a
@@ -2992,8 +3077,9 @@
                       style="color: var(--color-accent)"
                       >CoinGecko</a
                     >, usage raisonnable). Enregistrez les adresses avant
-                    d’actualiser les soldes. Les spectateurs voient l’objectif et la
-                    progression sur l’accueil après la dernière actualisation.
+                    d’actualiser les soldes. Les spectateurs voient l’objectif
+                    et la progression sur l’accueil après la dernière
+                    actualisation.
                   </p>
                   <label for="don-goal">Objectif de dons (EUR)</label>
                   <input
@@ -3033,7 +3119,9 @@
                       font-size: 12px;
                     "
                   />
-                  <label for="don-polygon">Polygon (EVM, natif POL/MATIC)</label>
+                  <label for="don-polygon"
+                    >Polygon (EVM, natif POL/MATIC)</label
+                  >
                   <input
                     type="text"
                     id="don-polygon"
@@ -3113,14 +3201,21 @@
                       font-size: 12px;
                     "
                   />
-                  <p style="margin: 16px 0 8px; font-weight: 600; color: var(--color-text-primary)">
+                  <p
+                    style="
+                      margin: 16px 0 8px;
+                      font-weight: 600;
+                      color: var(--color-text-primary);
+                    "
+                  >
                     Fenêtre d’affichage (accueil spectateurs)
                   </p>
                   <p style="margin-bottom: 10px">
-                    Dates interprétées en <strong>heure locale du navigateur</strong>, stockées en UTC côté
-                    serveur. Laissez vide pour afficher tant que l’objectif &gt; 0. Avec une
-                    <strong>récurrence</strong>, renseignez début et fin de la
-                    <em>première</em> période.
+                    Dates interprétées en
+                    <strong>heure locale du navigateur</strong>, stockées en UTC
+                    côté serveur. Laissez vide pour afficher tant que l’objectif
+                    &gt; 0. Avec une <strong>récurrence</strong>, renseignez
+                    début et fin de la <em>première</em> période.
                   </p>
                   <label for="don-campaign-start">Début de campagne</label>
                   <input
@@ -3173,9 +3268,15 @@
                     <option value="repeat_span">
                       Répéter la même durée (enchaîne les créneaux [début→fin])
                     </option>
-                    <option value="weekly">Après la 1re fin : chaque semaine (7 j.)</option>
-                    <option value="monthly">Après la 1re fin : chaque ~30 jours</option>
-                    <option value="yearly">Après la 1re fin : chaque ~365 jours</option>
+                    <option value="weekly">
+                      Après la 1re fin : chaque semaine (7 j.)
+                    </option>
+                    <option value="monthly">
+                      Après la 1re fin : chaque ~30 jours
+                    </option>
+                    <option value="yearly">
+                      Après la 1re fin : chaque ~365 jours
+                    </option>
                   </select>
                   <p
                     id="don-status"
@@ -3226,7 +3327,11 @@
                 </div>
               </div>
               <div class="topbar-right">
-                <button type="button" class="btn btn-refresh" id="btn-stats-refresh">
+                <button
+                  type="button"
+                  class="btn btn-refresh"
+                  id="btn-stats-refresh"
+                >
                   <span class="btn-refresh-glyph" aria-hidden="true">↻</span
                   >Actualiser
                 </button>
@@ -3277,25 +3382,39 @@
                 <div class="stats-chart-card">
                   <div class="stats-chart-title">Films par statut</div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-films-status" aria-label="Graphique statuts"></canvas>
+                    <canvas
+                      id="chart-films-status"
+                      aria-label="Graphique statuts"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
                   <div class="stats-chart-title">Contenus par source</div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-films-source" aria-label="Graphique sources"></canvas>
+                    <canvas
+                      id="chart-films-source"
+                      aria-label="Graphique sources"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Ajouts catalogue (par mois)</div>
+                  <div class="stats-chart-title">
+                    Ajouts catalogue (par mois)
+                  </div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-films-month" aria-label="Graphique ajouts films"></canvas>
+                    <canvas
+                      id="chart-films-month"
+                      aria-label="Graphique ajouts films"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
                   <div class="stats-chart-title">Inscriptions (par mois)</div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-users-month" aria-label="Graphique inscriptions"></canvas>
+                    <canvas
+                      id="chart-users-month"
+                      aria-label="Graphique inscriptions"
+                    ></canvas>
                   </div>
                 </div>
               </div>
@@ -3324,11 +3443,16 @@
               <div>
                 <div class="page-title">Coûts &amp; estimations</div>
                 <div class="page-sub">
-                  Stockage (€/Gio/h HT), transcodage Vast (borne haute), synthèses et graphiques
+                  Stockage (€/Gio/h HT), transcodage Vast (borne haute),
+                  synthèses et graphiques
                 </div>
               </div>
               <div class="topbar-right">
-                <button type="button" class="btn btn-refresh" id="btn-billing-refresh">
+                <button
+                  type="button"
+                  class="btn btn-refresh"
+                  id="btn-billing-refresh"
+                >
                   <span class="btn-refresh-glyph" aria-hidden="true">↻</span
                   >Actualiser
                 </button>
@@ -3375,7 +3499,13 @@
                 </div>
                 <div class="stat">
                   <div class="stat-label">Prix réf. stockage</div>
-                  <div class="stat-val" id="bill-kpi-rate" style="font-size: 15px">—</div>
+                  <div
+                    class="stat-val"
+                    id="bill-kpi-rate"
+                    style="font-size: 15px"
+                  >
+                    —
+                  </div>
                   <div class="stat-sub">€ HT / Gio / h</div>
                 </div>
               </div>
@@ -3397,7 +3527,9 @@
               </div>
               <div class="card" style="margin-bottom: 14px">
                 <div class="card-head">
-                  <div class="card-title">Récapitulatif annuel (stockage HT, somme des mois du graphe)</div>
+                  <div class="card-title">
+                    Récapitulatif annuel (stockage HT, somme des mois du graphe)
+                  </div>
                 </div>
                 <div
                   class="card-body"
@@ -3414,39 +3546,66 @@
               </div>
               <div class="stats-dash-charts">
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Coût stockage estimé par mois (€ HT)</div>
+                  <div class="stats-chart-title">
+                    Coût stockage estimé par mois (€ HT)
+                  </div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-bill-storage-eur" aria-label="Stockage euros par mois"></canvas>
+                    <canvas
+                      id="chart-bill-storage-eur"
+                      aria-label="Stockage euros par mois"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Volume catalogue cumulé (Gio, proxy)</div>
+                  <div class="stats-chart-title">
+                    Volume catalogue cumulé (Gio, proxy)
+                  </div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-bill-storage-gib" aria-label="Gio cumulés"></canvas>
+                    <canvas
+                      id="chart-bill-storage-gib"
+                      aria-label="Gio cumulés"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Transcodage Vast · € estimés par mois</div>
+                  <div class="stats-chart-title">
+                    Transcodage Vast · € estimés par mois
+                  </div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-bill-vast-month" aria-label="Vast par mois"></canvas>
+                    <canvas
+                      id="chart-bill-vast-month"
+                      aria-label="Vast par mois"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Transcodage Vast · € estimés par jour</div>
+                  <div class="stats-chart-title">
+                    Transcodage Vast · € estimés par jour
+                  </div>
                   <div class="stats-chart-wrap">
-                    <canvas id="chart-bill-vast-day" aria-label="Vast par jour"></canvas>
+                    <canvas
+                      id="chart-bill-vast-day"
+                      aria-label="Vast par jour"
+                    ></canvas>
                   </div>
                 </div>
                 <div class="stats-chart-card">
-                  <div class="stats-chart-title">Titres Vast · coût estimé par film (top 18)</div>
+                  <div class="stats-chart-title">
+                    Titres Vast · coût estimé par film (top 18)
+                  </div>
                   <div class="stats-chart-wrap" style="height: 320px">
-                    <canvas id="chart-bill-films-bar" aria-label="Coût par film"></canvas>
+                    <canvas
+                      id="chart-bill-films-bar"
+                      aria-label="Coût par film"
+                    ></canvas>
                   </div>
                 </div>
               </div>
               <div class="card" style="margin-top: 16px">
                 <div class="card-head">
-                  <div class="card-title">Détail par film (Vast, disponibles)</div>
+                  <div class="card-title">
+                    Détail par film (Vast, disponibles)
+                  </div>
                 </div>
                 <div class="card-body" style="overflow-x: auto">
                   <table class="film-table">
@@ -3512,12 +3671,30 @@
               </div>
             </header>
             <div class="content" id="lib-refresh-root">
+
+              <div id="lib-bulk-bar" class="lib-bulk-bar" hidden>
+                <span id="lib-bulk-count">0 sélectionné(s)</span>
+                <button type="button" class="btn danger" id="lib-bulk-delete">
+                  Supprimer la sélection
+                </button>
+                <button type="button" class="btn" id="lib-bulk-clear">
+                  Tout désélectionner
+                </button>
+              </div>
               <div class="card">
                 <div class="card-head"><div class="card-title">Films</div></div>
                 <div class="card-body library-card-body">
                   <table class="film-table">
                     <thead>
                       <tr>
+                        <th class="lib-sel-cell">
+                          <input
+                            type="checkbox"
+                            id="lib-films-select-all"
+                            title="Tout sélectionner sur cette page"
+                            aria-label="Tout sélectionner les films de la page"
+                          />
+                        </th>
                         <th style="padding-left: 16px">Film</th>
                         <th>Année</th>
                         <th>Taille</th>
@@ -3533,8 +3710,12 @@
                 </div>
               </div>
               <div class="card" style="margin-top: 16px">
-                <div class="card-head">
+                <div class="card-head" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
                   <div class="card-title">Séries</div>
+                  <label class="lib-series-select-all-wrap" style="margin-left:auto;font-size:11px;font-weight:400;display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="checkbox" id="lib-series-select-all" title="Tout sélectionner sur cette page (épisodes)" />
+                    Tout sélectionner (page)
+                  </label>
                 </div>
                 <div class="card-body library-card-body">
                   <div id="lib-series-root" class="lib-series-root"></div>
@@ -3847,12 +4028,15 @@
             color: var(--color-text-secondary, #a3a3a3);
           "
         >
-          Règles identiques à l’inscription viewer : e-mail valide (domaine joignable,
-          pas d’adresse jetable), mot de passe sans espace, 12 caractères minimum avec
-          <strong>minuscule</strong>, <strong>majuscule</strong>, <strong>chiffre</strong> et
-          <strong>symbole</strong>.
+          Règles identiques à l’inscription viewer : e-mail valide (domaine
+          joignable, pas d’adresse jetable), mot de passe sans espace, 12
+          caractères minimum avec
+          <strong>minuscule</strong>, <strong>majuscule</strong>,
+          <strong>chiffre</strong> et <strong>symbole</strong>.
         </p>
-        <label for="nu-user" style="display: block; font-size: 12px; margin-bottom: 4px"
+        <label
+          for="nu-user"
+          style="display: block; font-size: 12px; margin-bottom: 4px"
           >Identifiant</label
         >
         <input
@@ -3863,11 +4047,21 @@
           minlength="2"
           maxlength="80"
         />
-        <label for="nu-email" style="display: block; font-size: 12px; margin: 10px 0 4px"
+        <label
+          for="nu-email"
+          style="display: block; font-size: 12px; margin: 10px 0 4px"
           >E-mail</label
         >
-        <input id="nu-email" placeholder="email" type="email" required autocomplete="email" />
-        <label for="nu-pass" style="display: block; font-size: 12px; margin: 10px 0 4px"
+        <input
+          id="nu-email"
+          placeholder="email"
+          type="email"
+          required
+          autocomplete="email"
+        />
+        <label
+          for="nu-pass"
+          style="display: block; font-size: 12px; margin: 10px 0 4px"
           >Mot de passe</label
         >
         <input
@@ -3880,7 +4074,9 @@
           title="12+ caractères, sans espace : min., maj., chiffre, symbole"
           autocomplete="new-password"
         />
-        <label for="nu-pass2" style="display: block; font-size: 12px; margin: 10px 0 4px"
+        <label
+          for="nu-pass2"
+          style="display: block; font-size: 12px; margin: 10px 0 4px"
           >Confirmer le mot de passe</label
         >
         <input
@@ -3910,7 +4106,17 @@
           <option value="viewer">viewer</option>
           <option value="admin">admin</option>
         </select>
-        <label for="nu-rank" id="nu-rank-label" style="display:block;font-size:12px;margin-bottom:4px;opacity:.85">Rang viewer</label>
+        <label
+          for="nu-rank"
+          id="nu-rank-label"
+          style="
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+            opacity: 0.85;
+          "
+          >Rang viewer</label
+        >
         <select
           id="nu-rank"
           style="
@@ -3987,10 +4193,10 @@
           ci‑dessous doivent être <strong>strictement identiques</strong> sur
           <em>chaque</em> épisode de cette série dans le catalogue.<br /><br />
           <strong>Titre affiché de la série</strong> — le nom de la série telle
-          qu’elle apparaît pour les spectateurs (ex. le titre de la série entière),
-          <em>pas</em> le titre de cet épisode seul.<br /><br />
-          <strong>Clé série</strong> — un identifiant technique unique pour toute
-          la série, le même sur tous les épisodes (ex.
+          qu’elle apparaît pour les spectateurs (ex. le titre de la série
+          entière), <em>pas</em> le titre de cet épisode seul.<br /><br />
+          <strong>Clé série</strong> — un identifiant technique unique pour
+          toute la série, le même sur tous les épisodes (ex.
           <code>tv-57243</code>, <code>doctor-who</code>).<br /><br />
           <strong>Saison</strong> et <strong>épisode</strong> changent à chaque
           épisode ; une fois renseignés, cliquez <strong>Enregistrer</strong>.
@@ -4077,7 +4283,8 @@
           spellcheck="false"
         />
         <p class="hint" style="margin-top: -6px">
-          Format <code>tt</code> + chiffres. Utile pour l’enrichissement IMDb API et les épisodes.
+          Format <code>tt</code> + chiffres. Utile pour l’enrichissement IMDb
+          API et les épisodes.
         </p>
         <label for="fm-trailers">Bande-annonce YouTube (manuel)</label>
         <textarea
@@ -4132,121 +4339,127 @@
           </button>
         </div>
         <div class="modal-season-meta-body">
-        <p class="err-msg" id="sm-err" style="display: none"></p>
-        <p class="hint" id="sm-intro">
-          Même <strong>clé série</strong> que sur les épisodes. En haut : affiche
-          <strong>globale</strong> de la page série et texte sous le titre ; plus
-          bas : une <strong>affiche par saison</strong> (indépendante) et note
-          optionnelle.
-        </p>
-        <label for="sm-key-select">Clé série</label>
-        <select id="sm-key-select"></select>
-        <label for="sm-key-input" class="hidden" id="sm-key-input-label"
-          >Clé série (saisie manuelle)</label
-        >
-        <input
-          type="text"
-          id="sm-key-input"
-          class="hidden"
-          placeholder="ex. tv-57243"
-          autocomplete="off"
-        />
-        <p id="sm-key-warn" class="hint hidden">
-          Aucune <strong>clé série</strong> n’est encore enregistrée sur les
-          épisodes de ce bloc. Vous pouvez quand même définir une affiche :
-          saisissez la clé (la même que vous mettrez dans
-          <strong>Modifier</strong> sur chaque épisode), puis enregistrez. Ce
-          bandeau disparaît dès que le champ ci‑dessus est rempli.
-        </p>
-        <p style="font-size: 12px; font-weight: 600; margin: 12px 0 8px">
-          Page série (grand poster + texte sous le titre)
-        </p>
-        <label for="sm-global-poster">Affiche globale (TMDB / URL)</label>
-        <input
-          type="text"
-          id="sm-global-poster"
-          placeholder="/affiche-serie.jpg"
-          autocomplete="off"
-        />
-        <label for="sm-global-text">Texte sous le titre (entre titre et résumé)</label>
-        <textarea
-          id="sm-global-text"
-          rows="4"
-          placeholder="Résumé court, accroche, ou précision pour les spectateurs…"
-        ></textarea>
-        <button
-          class="btn btn-primary"
-          type="button"
-          id="sm-save-global"
-          style="margin-top: 8px; font-size: 12px"
-        >
-          Enregistrer la fiche globale
-        </button>
-        <p class="hint" style="margin-top: 8px">
-          Utilisez bien <strong>Enregistrer la fiche globale</strong> pour cette
-          section — le bouton du bas ne concerne que les saisons. Laissez les
-          deux champs vides et enregistrez pour supprimer la fiche globale.
-        </p>
-        <hr
-          style="
-            border: 0;
-            border-top: 1px solid var(--color-border-tertiary);
-            margin: 16px 0;
-          "
-        />
-        <p style="font-size: 12px; font-weight: 600; margin: 0 0 8px">
-          Affiches par saison
-        </p>
-        <div
-          id="sm-list"
-          style="
-            margin: 14px 0;
-            max-height: 220px;
-            overflow: auto;
-            font-size: 12px;
-          "
-        ></div>
-        <hr
-          style="
-            border: 0;
-            border-top: 1px solid var(--color-border-tertiary);
-            margin: 14px 0;
-          "
-        />
-        <label for="sm-season-num">Numéro de saison</label>
-        <input
-          type="number"
-          id="sm-season-num"
-          min="0"
-          step="1"
-          placeholder="1"
-        />
-        <label for="sm-poster">Chemin affiche (poster_path TMDB ou URL)</label>
-        <input
-          type="text"
-          id="sm-poster"
-          placeholder="/abc.jpg"
-          autocomplete="off"
-        />
-        <label for="sm-note">Note (sous le titre de saison, optionnel)</label>
-        <input
-          type="text"
-          id="sm-note"
-          placeholder="ex. 8.2"
-          autocomplete="off"
-        />
-        <label for="sm-synopsis">Résumé de la saison (optionnel)</label>
-        <textarea
-          id="sm-synopsis"
-          rows="5"
-          placeholder="Texte affiché sur la fiche série, sous le titre de saison…"
-        ></textarea>
-        <div class="row" style="margin-top: 12px">
-          <button class="btn" type="button" id="sm-close">Fermer</button>
-          <button class="btn btn-primary" type="button" id="sm-save">
-            Enregistrer / mettre à jour
+          <p class="err-msg" id="sm-err" style="display: none"></p>
+          <p class="hint" id="sm-intro">
+            Même <strong>clé série</strong> que sur les épisodes. En haut :
+            affiche <strong>globale</strong> de la page série et texte sous le
+            titre ; plus bas : une
+            <strong>affiche par saison</strong> (indépendante) et note
+            optionnelle.
+          </p>
+          <label for="sm-key-select">Clé série</label>
+          <select id="sm-key-select"></select>
+          <label for="sm-key-input" class="hidden" id="sm-key-input-label"
+            >Clé série (saisie manuelle)</label
+          >
+          <input
+            type="text"
+            id="sm-key-input"
+            class="hidden"
+            placeholder="ex. tv-57243"
+            autocomplete="off"
+          />
+          <p id="sm-key-warn" class="hint hidden">
+            Aucune <strong>clé série</strong> n’est encore enregistrée sur les
+            épisodes de ce bloc. Vous pouvez quand même définir une affiche :
+            saisissez la clé (la même que vous mettrez dans
+            <strong>Modifier</strong> sur chaque épisode), puis enregistrez. Ce
+            bandeau disparaît dès que le champ ci‑dessus est rempli.
+          </p>
+          <p style="font-size: 12px; font-weight: 600; margin: 12px 0 8px">
+            Page série (grand poster + texte sous le titre)
+          </p>
+          <label for="sm-global-poster">Affiche globale (TMDB / URL)</label>
+          <input
+            type="text"
+            id="sm-global-poster"
+            placeholder="/affiche-serie.jpg"
+            autocomplete="off"
+          />
+          <label for="sm-global-text"
+            >Texte sous le titre (entre titre et résumé)</label
+          >
+          <textarea
+            id="sm-global-text"
+            rows="4"
+            placeholder="Résumé court, accroche, ou précision pour les spectateurs…"
+          ></textarea>
+          <button
+            class="btn btn-primary"
+            type="button"
+            id="sm-save-global"
+            style="margin-top: 8px; font-size: 12px"
+          >
+            Enregistrer la fiche globale
           </button>
-        </div>
+          <p class="hint" style="margin-top: 8px">
+            Utilisez bien <strong>Enregistrer la fiche globale</strong> pour
+            cette section — le bouton du bas ne concerne que les saisons.
+            Laissez les deux champs vides et enregistrez pour supprimer la fiche
+            globale.
+          </p>
+          <hr
+            style="
+              border: 0;
+              border-top: 1px solid var(--color-border-tertiary);
+              margin: 16px 0;
+            "
+          />
+          <p style="font-size: 12px; font-weight: 600; margin: 0 0 8px">
+            Affiches par saison
+          </p>
+          <div
+            id="sm-list"
+            style="
+              margin: 14px 0;
+              max-height: 220px;
+              overflow: auto;
+              font-size: 12px;
+            "
+          ></div>
+          <hr
+            style="
+              border: 0;
+              border-top: 1px solid var(--color-border-tertiary);
+              margin: 14px 0;
+            "
+          />
+          <label for="sm-season-num">Numéro de saison</label>
+          <input
+            type="number"
+            id="sm-season-num"
+            min="0"
+            step="1"
+            placeholder="1"
+          />
+          <label for="sm-poster"
+            >Chemin affiche (poster_path TMDB ou URL)</label
+          >
+          <input
+            type="text"
+            id="sm-poster"
+            placeholder="/abc.jpg"
+            autocomplete="off"
+          />
+          <label for="sm-note">Note (sous le titre de saison, optionnel)</label>
+          <input
+            type="text"
+            id="sm-note"
+            placeholder="ex. 8.2"
+            autocomplete="off"
+          />
+          <label for="sm-synopsis">Résumé de la saison (optionnel)</label>
+          <textarea
+            id="sm-synopsis"
+            rows="5"
+            placeholder="Texte affiché sur la fiche série, sous le titre de saison…"
+          ></textarea>
+          <div class="row" style="margin-top: 12px">
+            <button class="btn" type="button" id="sm-close">Fermer</button>
+            <button class="btn btn-primary" type="button" id="sm-save">
+              Enregistrer / mettre à jour
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -4377,7 +4590,9 @@
       <div class="floating-upload-dock-header">
         <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
           <span class="floating-upload-dock-title">Uploads locaux</span>
-          <span class="floating-upload-dock-count" id="floating-upload-dock-count"
+          <span
+            class="floating-upload-dock-count"
+            id="floating-upload-dock-count"
             >0</span
           >
         </div>
@@ -4767,7 +4982,8 @@
         let r;
         try {
           r = await api(
-            "/api/admin/transcode/vast/status/" + encodeURIComponent(vastTestTaskId),
+            "/api/admin/transcode/vast/status/" +
+              encodeURIComponent(vastTestTaskId),
           );
         } catch (e) {
           if (e && e.message === "403-admin") return;
@@ -4789,7 +5005,10 @@
             _vastPollLastCeleryState = null;
           }
           if (_vastPollLastCeleryState !== null) {
-            if (_vastPollLastCeleryState !== "SUCCESS" && celerySt === "SUCCESS") {
+            if (
+              _vastPollLastCeleryState !== "SUCCESS" &&
+              celerySt === "SUCCESS"
+            ) {
               if (j.ready && j.error) {
                 showAdminToast(
                   "Transcodage Vast terminé en erreur : " +
@@ -4804,7 +5023,8 @@
               celerySt === "FAILURE"
             ) {
               showAdminToast(
-                "Transcodage Vast en échec. " + String(j.error || "").slice(0, 120),
+                "Transcodage Vast en échec. " +
+                  String(j.error || "").slice(0, 120),
                 "error",
               );
             }
@@ -4840,11 +5060,13 @@
         $("#vast-progress-fill").style.width = pct + "%";
         const metaStr = JSON.stringify(j, null, 2);
         const metaEl = $("#vast-meta");
-        if (metaEl && metaEl.textContent !== metaStr) metaEl.textContent = metaStr;
+        if (metaEl && metaEl.textContent !== metaStr)
+          metaEl.textContent = metaStr;
         const rlWrap = $("#vast-remote-log-wrap");
         const rl = $("#vast-remote-log");
         if (rlWrap && rl) {
-          const remote = j.meta && j.meta.remote_log ? String(j.meta.remote_log) : "";
+          const remote =
+            j.meta && j.meta.remote_log ? String(j.meta.remote_log) : "";
           if (remote.trim()) {
             rlWrap.classList.remove("hidden");
             if (rl.textContent !== remote) rl.textContent = remote;
@@ -5028,7 +5250,9 @@
       const ADMIN_MOBILE_BREAKPOINT = 768;
 
       function adminIsMobileLayout() {
-        return window.matchMedia("(max-width: " + ADMIN_MOBILE_BREAKPOINT + "px)").matches;
+        return window.matchMedia(
+          "(max-width: " + ADMIN_MOBILE_BREAKPOINT + "px)",
+        ).matches;
       }
 
       function adminCloseMobileNav() {
@@ -5123,7 +5347,9 @@
       }
 
       function _seriesByMonth(sparse, labels) {
-        const m = Object.fromEntries((sparse || []).map((x) => [x.month, x.count]));
+        const m = Object.fromEntries(
+          (sparse || []).map((x) => [x.month, x.count]),
+        );
         return labels.map((k) => (m[k] != null ? m[k] : 0));
       }
 
@@ -5168,10 +5394,13 @@
 
           genEl.textContent =
             "Données au " +
-            new Date(data.generated_at_utc || Date.now()).toLocaleString("fr-FR", {
-              dateStyle: "medium",
-              timeStyle: "short",
-            }) +
+            new Date(data.generated_at_utc || Date.now()).toLocaleString(
+              "fr-FR",
+              {
+                dateStyle: "medium",
+                timeStyle: "short",
+              },
+            ) +
             " (UTC)";
 
           const elUsersT = $("#st-kpi-users-total");
@@ -5179,7 +5408,10 @@
           const elUsersS = $("#st-kpi-users-sub");
           if (elUsersS)
             elUsersS.textContent =
-              (u.active ?? "—") + " actifs · " + (u.inactive ?? "—") + " inactifs";
+              (u.active ?? "—") +
+              " actifs · " +
+              (u.inactive ?? "—") +
+              " inactifs";
 
           const elFilmsT = $("#st-kpi-films-total");
           if (elFilmsT) elFilmsT.textContent = String(f.total ?? "—");
@@ -5197,7 +5429,8 @@
           const elSto = $("#st-kpi-storage-gb");
           if (elSto)
             elSto.textContent = Number.isFinite(gbio)
-              ? gbio.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio"
+              ? gbio.toLocaleString("fr-FR", { maximumFractionDigits: 2 }) +
+                " Gio"
               : "—";
           const elStoS = $("#st-kpi-storage-sub");
           if (elStoS)
@@ -5231,14 +5464,16 @@
               " cible Vast";
 
           const elR = $("#st-kpi-roles");
-          if (elR) elR.textContent = (u.admins ?? "—") + " / " + (u.viewers ?? "—");
+          if (elR)
+            elR.textContent = (u.admins ?? "—") + " / " + (u.viewers ?? "—");
           const elRS = $("#st-kpi-roles-sub");
           if (elRS) elRS.textContent = "admins · viewers";
 
           const elI = $("#st-kpi-invites");
           if (elI) elI.textContent = String(inv.codes_total ?? "—");
           const elIS = $("#st-kpi-invites-sub");
-          if (elIS) elIS.textContent = (inv.uses_total ?? "—") + " utilisations";
+          if (elIS)
+            elIS.textContent = (inv.uses_total ?? "—") + " utilisations";
 
           if (discEl) discEl.textContent = v.disclaimer || "";
 
@@ -5254,9 +5489,20 @@
 
           _destroyAdminStatsCharts();
 
-          const pal = ["#8b2500", "#185fa5", "#3b6d11", "#633806", "#8b5cf6", "#ca8a04"];
+          const pal = [
+            "#8b2500",
+            "#185fa5",
+            "#3b6d11",
+            "#633806",
+            "#8b5cf6",
+            "#ca8a04",
+          ];
           const labelsStatus = ["Disponible", "En cours", "Erreur"];
-          const valuesStatus = [f.disponible || 0, f.en_cours || 0, f.erreur || 0];
+          const valuesStatus = [
+            f.disponible || 0,
+            f.en_cours || 0,
+            f.erreur || 0,
+          ];
 
           const ctxS = document.getElementById("chart-films-status");
           if (ctxS) {
@@ -5301,7 +5547,12 @@
                   type: "pie",
                   data: {
                     labels: srcKeys,
-                    datasets: [{ data: srcKeys.map((k) => src[k]), backgroundColor: pal }],
+                    datasets: [
+                      {
+                        data: srcKeys.map((k) => src[k]),
+                        backgroundColor: pal,
+                      },
+                    ],
                   },
                   options: {
                     responsive: true,
@@ -5475,7 +5726,8 @@
       function _fmtGib(n) {
         if (n == null || !Number.isFinite(Number(n))) return "—";
         return (
-          Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Gio"
+          Number(n).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) +
+          " Gio"
         );
       }
 
@@ -5490,7 +5742,9 @@
         Chart.defaults.borderColor = "rgba(63, 63, 70, 0.55)";
         genEl.textContent = "Chargement…";
         try {
-          const r = await api("/api/admin/billing/overview?months=20&vast_daily_days=90");
+          const r = await api(
+            "/api/admin/billing/overview?months=20&vast_daily_days=90",
+          );
           if (!r.ok) {
             let t = "Échec du chargement.";
             try {
@@ -5503,10 +5757,13 @@
           const data = await r.json();
           genEl.textContent =
             "Données au " +
-            new Date(data.generated_at_utc || Date.now()).toLocaleString("fr-FR", {
-              dateStyle: "medium",
-              timeStyle: "short",
-            }) +
+            new Date(data.generated_at_utc || Date.now()).toLocaleString(
+              "fr-FR",
+              {
+                dateStyle: "medium",
+                timeStyle: "short",
+              },
+            ) +
             " (UTC)";
 
           const ul = $("#bill-disclaimers");
@@ -5555,19 +5812,27 @@
           if (kGibS) kGibS.textContent = "Somme taille_octets (catalogue)";
 
           const kd = $("#bill-kpi-st-eur-day");
-          if (kd) kd.textContent = _fmtEurNum(stNow.est_eur_per_day_storage_ht, 5) + " €";
+          if (kd)
+            kd.textContent =
+              _fmtEurNum(stNow.est_eur_per_day_storage_ht, 5) + " €";
           const km = $("#bill-kpi-st-eur-mo");
-          if (km) km.textContent = _fmtEurNum(stNow.est_eur_per_month_storage_30d_ht, 4) + " €";
+          if (km)
+            km.textContent =
+              _fmtEurNum(stNow.est_eur_per_month_storage_30d_ht, 4) + " €";
 
           const kv = $("#bill-kpi-vast-eur");
-          if (kv) kv.textContent = _fmtEurNum(tv.est_total_rental_eur_upper, 2) + " €";
+          if (kv)
+            kv.textContent =
+              _fmtEurNum(tv.est_total_rental_eur_upper, 2) + " €";
           const kvs = $("#bill-kpi-vast-sub");
           if (kvs)
             kvs.textContent =
-              (tv.films_disponible_count ?? "0") + " titres · borne haute durée × $/h";
+              (tv.films_disponible_count ?? "0") +
+              " titres · borne haute durée × $/h";
 
           const kr = $("#bill-kpi-rate");
-          if (kr) kr.textContent = _fmtEurNum(pr.storage_eur_per_gib_hour_ht, 8);
+          if (kr)
+            kr.textContent = _fmtEurNum(pr.storage_eur_per_gib_hour_ht, 8);
 
           const locWrap = $("#bill-kpi-local-wrap");
           const locE = $("#bill-kpi-local-eur");
@@ -5598,7 +5863,9 @@
 
           const sm = ser.storage_monthly || [];
           const labelsM = sm.map((x) => x.month);
-          const eurStM = sm.map((x) => Number(x.est_storage_eur_month_trapezoid_ht) || 0);
+          const eurStM = sm.map(
+            (x) => Number(x.est_storage_eur_month_trapezoid_ht) || 0,
+          );
           const gibCum = sm.map((x) => Number(x.cumulative_gib) || 0);
 
           const ctx1 = document.getElementById("chart-bill-storage-eur");
@@ -5714,7 +5981,13 @@
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
-                    x: { ticks: { maxRotation: 60, autoSkip: true, maxTicksLimit: 14 } },
+                    x: {
+                      ticks: {
+                        maxRotation: 60,
+                        autoSkip: true,
+                        maxTicksLimit: 14,
+                      },
+                    },
                     y: { beginAtZero: true },
                   },
                 },
@@ -5737,7 +6010,9 @@
                   datasets: [
                     {
                       label: "€ estimé",
-                      data: films.map((f) => Number(f.est_vast_rental_eur) || 0),
+                      data: films.map(
+                        (f) => Number(f.est_vast_rental_eur) || 0,
+                      ),
                       backgroundColor: "rgba(168, 85, 247, 0.65)",
                       borderColor: "#a855f7",
                       borderWidth: 1,
@@ -5762,7 +6037,9 @@
         } catch (e) {
           if (e && e.message === "403-admin") return;
           const hint =
-            e && e.message ? String(e.message).slice(0, 220) : "erreur inconnue";
+            e && e.message
+              ? String(e.message).slice(0, 220)
+              : "erreur inconnue";
           genEl.textContent =
             "Impossible d’afficher la facturation : " +
             hint +
@@ -5881,7 +6158,8 @@
       }
 
       function _stQs() {
-        const st = ($("#st-filter-status") && $("#st-filter-status").value) || "";
+        const st =
+          ($("#st-filter-status") && $("#st-filter-status").value) || "";
         const cat = ($("#st-filter-cat") && $("#st-filter-cat").value) || "";
         const q = new URLSearchParams();
         if (st) q.set("status", st);
@@ -5949,10 +6227,7 @@
           _stUpdatePaginationUi(data);
           if (meta) {
             meta.textContent =
-              rows.length +
-              " sur cette page · " +
-              total +
-              " au total";
+              rows.length + " sur cette page · " + total + " au total";
           }
           if (!rows.length) {
             tb.innerHTML =
@@ -5967,13 +6242,13 @@
               const sub = (t.subject || "").replace(/</g, "&lt;");
               const escU = u.replace(/</g, "&lt;");
               return (
-                "<tr data-st-id=\"" +
+                '<tr data-st-id="' +
                 t.id +
-                "\" style=\"cursor:pointer\">" +
+                '" style="cursor:pointer">' +
                 "<td>" +
                 t.id +
                 "</td>" +
-                "<td style=\"white-space:nowrap;font-size:12px\">" +
+                '<td style="white-space:nowrap;font-size:12px">' +
                 (t.created_at || "").replace(/</g, "&lt;") +
                 "</td>" +
                 "<td>" +
@@ -5982,7 +6257,7 @@
                 "<td>" +
                 String(cat).replace(/</g, "&lt;") +
                 "</td>" +
-                "<td style=\"max-width:220px;overflow:hidden;text-overflow:ellipsis\">" +
+                '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">' +
                 sub +
                 "</td>" +
                 "<td>" +
@@ -6041,26 +6316,26 @@
                       const who =
                         stEsc(m.author_username || "—") +
                         (adm
-                          ? " <span style=\"color:#86efac;font-size:11px\">(équipe)</span>"
+                          ? ' <span style="color:#86efac;font-size:11px">(équipe)</span>'
                           : "");
                       const dt = stEsc(m.created_at || "");
                       const body = stEsc(m.body || "");
                       return (
-                        "<div style=\"margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--color-border-secondary);background:" +
+                        '<div style="margin-bottom:12px;padding:10px;border-radius:8px;border:1px solid var(--color-border-secondary);background:' +
                         (adm ? "rgba(139,37,0,0.18)" : "#0f0f0f") +
-                        "\">" +
-                        "<div style=\"font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px\">" +
+                        '">' +
+                        '<div style="font-size:11px;color:var(--color-text-tertiary);margin-bottom:6px">' +
                         who +
                         " · " +
                         dt +
                         "</div>" +
-                        "<div style=\"font-size:13px;white-space:pre-wrap;word-break:break-word\">" +
+                        '<div style="font-size:13px;white-space:pre-wrap;word-break:break-word">' +
                         body +
                         "</div></div>"
                       );
                     })
                     .join("")
-                : "<p style=\"color:var(--color-text-tertiary);font-size:12px;margin:0\">Aucun message après l’ouverture du ticket.</p>";
+                : '<p style="color:var(--color-text-tertiary);font-size:12px;margin:0">Aucun message après l’ouverture du ticket.</p>';
           }
           $("#st-detail-reply").value = "";
           $("#st-detail-status").value = t.status || "open";
@@ -6082,7 +6357,10 @@
 
       const _btnStRefresh = document.getElementById("btn-st-refresh");
       if (_btnStRefresh) {
-        _btnStRefresh.addEventListener("click", () => void loadSupportTicketsAdmin());
+        _btnStRefresh.addEventListener(
+          "click",
+          () => void loadSupportTicketsAdmin(),
+        );
       }
       const _btnStPrev = document.getElementById("st-page-prev");
       if (_btnStPrev) {
@@ -6106,7 +6384,9 @@
           closeSupportTicketDetailPanel(),
         );
       }
-      const _btnStCloseTicket = document.getElementById("st-detail-close-ticket");
+      const _btnStCloseTicket = document.getElementById(
+        "st-detail-close-ticket",
+      );
       if (_btnStCloseTicket) {
         _btnStCloseTicket.addEventListener("click", async () => {
           const msg = $("#st-detail-msg");
@@ -6426,12 +6706,15 @@
       if (apaSaveBtn) {
         apaSaveBtn.addEventListener("click", async () => {
           const st = $("#apa-status");
-          const id = ($("#apa-edit-id") && $("#apa-edit-id").value || "").trim();
+          const id = (
+            ($("#apa-edit-id") && $("#apa-edit-id").value) ||
+            ""
+          ).trim();
           const placement = $("#apa-placement")
             ? $("#apa-placement").value
             : "login";
           const title = ($("#apa-title") && $("#apa-title").value) || "";
-          const body = ($("#apa-body") && $("#apa-body").value || "").trim();
+          const body = (($("#apa-body") && $("#apa-body").value) || "").trim();
           const sort = parseInt(
             ($("#apa-sort") && $("#apa-sort").value) || "0",
             10,
@@ -6531,7 +6814,8 @@
         return m[assetKey] || assetKey;
       }
       function formatDonProjection(snap, goalEur) {
-        if (!snap || typeof snap !== "object") return "Aucune lecture. Utilisez « Actualiser les soldes ».";
+        if (!snap || typeof snap !== "object")
+          return "Aucune lecture. Utilisez « Actualiser les soldes ».";
         const lines = [];
         lines.push("Horodatage (UTC) : " + (snap.fetched_at || "—"));
         const bal = snap.balances || {};
@@ -6566,18 +6850,18 @@
           lines.push("Erreur " + k + " : " + err[k]);
         });
         lines.push("—");
-        lines.push("Total estimé : ~" + (snap.raised_eur != null ? snap.raised_eur : "?") + " EUR");
+        lines.push(
+          "Total estimé : ~" +
+            (snap.raised_eur != null ? snap.raised_eur : "?") +
+            " EUR",
+        );
         if (goalEur != null && Number(goalEur) > 0) {
           const pct = Math.min(
             100,
             ((Number(snap.raised_eur) || 0) / Number(goalEur)) * 100,
           );
           lines.push(
-            "Objectif : " +
-              goalEur +
-              " EUR → " +
-              pct.toFixed(1) +
-              " %",
+            "Objectif : " + goalEur + " EUR → " + pct.toFixed(1) + " %",
           );
         }
         return lines.join("\n");
@@ -6628,7 +6912,10 @@
       $("#don-save") &&
         $("#don-save").addEventListener("click", async () => {
           const st = $("#don-status");
-          const goal = parseFloat(($("#don-goal").value || "0").replace(",", "."), 10);
+          const goal = parseFloat(
+            ($("#don-goal").value || "0").replace(",", "."),
+            10,
+          );
           if (!Number.isFinite(goal) || goal < 0) {
             st.textContent = "Objectif EUR invalide.";
             return;
@@ -6646,13 +6933,17 @@
                 address_xrp: ($("#don-xrp").value || "").trim(),
                 address_tron: ($("#don-tron").value || "").trim(),
                 campaign_start_utc: datetimeLocalToIsoUtc(
-                  ($("#don-campaign-start") && $("#don-campaign-start").value) || "",
+                  ($("#don-campaign-start") &&
+                    $("#don-campaign-start").value) ||
+                    "",
                 ),
                 campaign_end_utc: datetimeLocalToIsoUtc(
-                  ($("#don-campaign-end") && $("#don-campaign-end").value) || "",
+                  ($("#don-campaign-end") && $("#don-campaign-end").value) ||
+                    "",
                 ),
                 recurrence:
-                  ($("#don-recurrence") && $("#don-recurrence").value) || "none",
+                  ($("#don-recurrence") && $("#don-recurrence").value) ||
+                  "none",
               }),
             });
             if (!r.ok) {
@@ -6675,7 +6966,8 @@
         $("#don-refresh").addEventListener("click", async () => {
           const st = $("#don-status");
           const proj = $("#don-projection");
-          st.textContent = "Lecture des soldes et des taux… (peut prendre 20–40 s)";
+          st.textContent =
+            "Lecture des soldes et des taux… (peut prendre 20–40 s)";
           if (proj) proj.textContent = "…";
           try {
             const r = await api("/api/admin/donations/refresh-balances", {
@@ -6691,9 +6983,20 @@
               return;
             }
             const j = await r.json();
-            st.textContent = "Soldes mis à jour : " + (j.snapshot && j.snapshot.fetched_at ? j.snapshot.fetched_at : "OK");
-            const g = parseFloat(($("#don-goal").value || "0").replace(",", "."), 10);
-            if (proj) proj.textContent = formatDonProjection(j.snapshot, Number.isFinite(g) ? g : null);
+            st.textContent =
+              "Soldes mis à jour : " +
+              (j.snapshot && j.snapshot.fetched_at
+                ? j.snapshot.fetched_at
+                : "OK");
+            const g = parseFloat(
+              ($("#don-goal").value || "0").replace(",", "."),
+              10,
+            );
+            if (proj)
+              proj.textContent = formatDonProjection(
+                j.snapshot,
+                Number.isFinite(g) ? g : null,
+              );
           } catch (e) {
             if (e && e.message === "403-admin") return;
             st.textContent = "Erreur réseau.";
@@ -6731,7 +7034,9 @@
           if (!msg) return;
           msg.textContent = "Synchronisation…";
           try {
-            const r = await api("/api/admin/catalog/sync-s3", { method: "POST" });
+            const r = await api("/api/admin/catalog/sync-s3", {
+              method: "POST",
+            });
             if (!r.ok) {
               let t = `Erreur ${r.status}`;
               try {
@@ -6809,7 +7114,11 @@
           await loadInvites(false);
           return;
         }
-        if (totalFiltered > 0 && (data.items || []).length === 0 && invitesPage > 1) {
+        if (
+          totalFiltered > 0 &&
+          (data.items || []).length === 0 &&
+          invitesPage > 1
+        ) {
           invitesPage -= 1;
           await loadInvites(false);
           return;
@@ -6978,8 +7287,7 @@
           if (!Number.isFinite(id) || id <= 0) continue;
           next.set(id, {
             statut: String(i.statut || ""),
-            filename:
-              (i.filename || "").trim() || "Film #" + id,
+            filename: (i.filename || "").trim() || "Film #" + id,
           });
         }
         if (_prevPipelineQueueById instanceof Map) {
@@ -7076,8 +7384,7 @@
           const cancelBtn = canCancelPipeline
             ? ` <button type="button" class="btn" data-cancel-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Annuler</button>`
             : "";
-          const canRetryVast =
-            i.vast_retryable === true && st === "erreur";
+          const canRetryVast = i.vast_retryable === true && st === "erreur";
           const retryVastBtn = canRetryVast
             ? ` <button type="button" class="btn" data-retry-vast-film="${i.id}" style="font-size:11px;padding:3px 8px;margin-left:6px">Relancer Vast</button>`
             : "";
@@ -7138,7 +7445,8 @@
           const subParts = [base];
           if (tx) subParts.push(tx);
           if (tline) subParts.push(tline);
-          row.querySelector(".qi-task-details-body").textContent = subParts.join("\n");
+          row.querySelector(".qi-task-details-body").textContent =
+            subParts.join("\n");
           const detEl = row.querySelector("details.queue-task-collapse");
           if (detEl && restoreOpen.has("p:" + String(i.id))) detEl.open = true;
           listEl.appendChild(row);
@@ -7192,10 +7500,9 @@
           const empty = document.createElement("div");
           empty.style.cssText =
             "font-size:12px;color:var(--color-text-tertiary);padding:10px;";
-          empty.textContent =
-            q.error
-              ? "Inspect Celery indisponible : " + q.error
-              : "Aucune tâche vast_transcode active ou réservée sur les workers.";
+          empty.textContent = q.error
+            ? "Inspect Celery indisponible : " + q.error
+            : "Aucune tâche vast_transcode active ou réservée sur les workers.";
           list.appendChild(empty);
           return;
         }
@@ -7238,7 +7545,10 @@
             subBits.push("Origine : torrent (file Pipeline ci-dessus)");
           else if (i.job_source === "admin_upload")
             subBits.push("Origine : test admin (upload onglet Vast)");
-          if (tid) subBits.push("Celery " + tid.slice(0, 14) + (tid.length > 14 ? "…" : ""));
+          if (tid)
+            subBits.push(
+              "Celery " + tid.slice(0, 14) + (tid.length > 14 ? "…" : ""),
+            );
           if (
             i.vast_instance_id != null &&
             i.vast_instance_id !== undefined &&
@@ -7254,7 +7564,8 @@
             .filter(Boolean)
             .join("\n");
           const detVast = row.querySelector("details.queue-task-collapse");
-          if (detVast && tid && restoreOpenVast.has("v:" + tid)) detVast.open = true;
+          if (detVast && tid && restoreOpenVast.has("v:" + tid))
+            detVast.open = true;
           list.appendChild(row);
         });
       }
@@ -7334,8 +7645,10 @@
       }
 
       function compareLibrarySeasonKeys(a, b) {
-        if (a === LIB_SEASON_UNASSIGNED && b !== LIB_SEASON_UNASSIGNED) return 1;
-        if (a !== LIB_SEASON_UNASSIGNED && b === LIB_SEASON_UNASSIGNED) return -1;
+        if (a === LIB_SEASON_UNASSIGNED && b !== LIB_SEASON_UNASSIGNED)
+          return 1;
+        if (a !== LIB_SEASON_UNASSIGNED && b === LIB_SEASON_UNASSIGNED)
+          return -1;
         return a - b;
       }
 
@@ -7344,9 +7657,7 @@
        */
       function extractShowFromColonTitre(titre) {
         if (!titre || typeof titre !== "string") return "";
-        const m = titre
-          .trim()
-          .match(/^([^:\n]{2,80}):\s+(.{1,400})$/);
+        const m = titre.trim().match(/^([^:\n]{2,80}):\s+(.{1,400})$/);
         if (!m) return "";
         const show = m[1].trim();
         const epPart = m[2].trim();
@@ -7376,8 +7687,11 @@
 
       function appendLibraryRow(tb, f, primaryLine, subLine) {
         const tr = document.createElement("tr");
+        tr.dataset.filmId = String(f.id);
         const thumb = f.poster_path ? "🎬" : "🎞";
+        const selChecked = libSelectedIds.has(f.id) ? " checked" : "";
         tr.innerHTML = `
+      <td class="lib-sel-cell"><input type="checkbox" class="lib-row-sel" data-film-id="${f.id}"${selChecked} aria-label="Sélectionner" /></td>
       <td style="padding-left:16px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="film-thumb">${thumb}</div>
@@ -7393,14 +7707,14 @@
         tr.querySelector('div[style*="font-size:10px"]').textContent =
           subLine || "";
         const tds = tr.querySelectorAll("td");
-        tds[1].textContent = f.annee ?? "—";
-        tds[2].textContent = fmtBytes(f.taille_octets);
-        tds[3].innerHTML = f.codec_video
+        tds[2].textContent = f.annee ?? "—";
+        tds[3].textContent = fmtBytes(f.taille_octets);
+        tds[4].innerHTML = f.codec_video
           ? `<span style="font-size:10px;font-family:var(--font-mono);background:var(--color-background-secondary);padding:2px 5px;border-radius:3px">${f.codec_video}</span>`
           : "—";
         const tp = f.traitement || "—";
-        tds[4].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
-        tds[5].innerHTML = `<span class="status-pill ${f.statut === "disponible" ? "s-done" : f.statut === "erreur" ? "s-error" : "s-transcoding"}">${f.statut}</span>`;
+        tds[5].innerHTML = `<span class="status-pill ${traitClass(f.traitement)}">${tp}</span>`;
+        tds[6].innerHTML = `<span class="status-pill ${f.statut === "disponible" ? "s-done" : f.statut === "erreur" ? "s-error" : "s-transcoding"}">${f.statut}</span>`;
         const actions = document.createElement("div");
         actions.className = "film-actions";
         const b0 = document.createElement("button");
@@ -7435,8 +7749,7 @@
             let msg = "Échec du rafraîchissement IMDb API";
             try {
               const j = await r.json();
-              if (j.detail)
-                msg = typeof j.detail === "string" ? j.detail : msg;
+              if (j.detail) msg = typeof j.detail === "string" ? j.detail : msg;
             } catch (_) {}
             await showAlertModal("IMDb API", msg);
             return;
@@ -7447,29 +7760,159 @@
         b2.className = "action-btn danger";
         b2.textContent = "Suppr.";
         b2.onclick = async () => {
-          const isEp = libraryRowIsSeriesEpisode(f);
-          const ok = await showConfirmModal(
-            isEp ? "Supprimer cet épisode ?" : "Supprimer ce film ?",
-            isEp
-              ? "L’épisode sera retiré du catalogue. Cette action est définitive."
-              : "Le film sera retiré du catalogue. Cette action est définitive.",
-            { confirmText: "Supprimer", cancelText: "Annuler" },
-          );
-          if (!ok) return;
-          await api(`/api/films/${f.id}`, { method: "DELETE" });
-          loadLibrary();
+          await deleteLibraryItems([f.id]);
         };
         actions.appendChild(b0);
         actions.appendChild(b1);
         actions.appendChild(b1b);
         actions.appendChild(b2);
-        tds[6].appendChild(actions);
+        tds[7].appendChild(actions);
         tb.appendChild(tr);
       }
 
       const LIB_PAGE_SIZE = 10;
       let libFilmsPage = 1;
       let libEpsPage = 1;
+      const libSelectedIds = new Set();
+
+      function closeLibraryCollapses() {
+        const root = document.getElementById("lib-series-root");
+        if (!root) return;
+        root
+          .querySelectorAll(
+            "details.lib-series-show[open], details.lib-series-season[open]",
+          )
+          .forEach((el) => {
+            el.removeAttribute("open");
+          });
+      }
+
+      function syncLibBulkBar() {
+        const bar = document.getElementById("lib-bulk-bar");
+        const countEl = document.getElementById("lib-bulk-count");
+        const n = libSelectedIds.size;
+        if (bar) bar.hidden = n === 0;
+        if (countEl)
+          countEl.textContent =
+            n + " sélectionné" + (n > 1 ? "s" : "");
+      }
+
+      function clearLibSelection() {
+        libSelectedIds.clear();
+        const root = document.getElementById("lib-refresh-root");
+        if (root) {
+          root
+            .querySelectorAll(
+              ".lib-row-sel, .lib-show-sel, #lib-films-select-all, #lib-series-select-all",
+            )
+            .forEach((cb) => {
+              cb.checked = false;
+              cb.indeterminate = false;
+            });
+        }
+        syncLibBulkBar();
+      }
+
+      function syncLibFilmsSelectAllHeader() {
+        const master = document.getElementById("lib-films-select-all");
+        const boxes = document.querySelectorAll("#lib-body-films .lib-row-sel");
+        if (!master || !boxes.length) {
+          if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+          }
+          return;
+        }
+        let checked = 0;
+        boxes.forEach((cb) => {
+          if (cb.checked) checked += 1;
+        });
+        master.checked = checked === boxes.length;
+        master.indeterminate = checked > 0 && checked < boxes.length;
+      }
+
+      function syncLibShowSelectCheckbox(showBlock) {
+        if (!showBlock) return;
+        const master = showBlock.querySelector(".lib-show-sel");
+        const boxes = showBlock.querySelectorAll(".lib-row-sel");
+        if (!master || !boxes.length) return;
+        let checked = 0;
+        boxes.forEach((cb) => {
+          if (cb.checked) checked += 1;
+        });
+        master.checked = checked === boxes.length;
+        master.indeterminate = checked > 0 && checked < boxes.length;
+      }
+
+      function syncLibSeriesSelectAllHeader() {
+        const master = document.getElementById("lib-series-select-all");
+        const boxes = document.querySelectorAll("#lib-series-root .lib-row-sel");
+        if (!master) return;
+        if (!boxes.length) {
+          master.checked = false;
+          master.indeterminate = false;
+          return;
+        }
+        let checked = 0;
+        boxes.forEach((cb) => {
+          if (cb.checked) checked += 1;
+        });
+        master.checked = checked === boxes.length;
+        master.indeterminate = checked > 0 && checked < boxes.length;
+      }
+
+      async function deleteLibraryItems(ids) {
+        const unique = [
+          ...new Set(
+            ids.map((x) => parseInt(String(x), 10)).filter((n) => Number.isFinite(n)),
+          ),
+        ];
+        if (!unique.length) return;
+        const ok = await showConfirmModal(
+          unique.length === 1
+            ? "Supprimer cet élément ?"
+            : "Supprimer " + unique.length + " éléments ?",
+          "Cette action est définitive (catalogue et fichiers associés).",
+          { confirmText: "Supprimer", cancelText: "Annuler" },
+        );
+        if (!ok) return;
+        closeLibraryCollapses();
+        closeFilmModal();
+        const r = await api("/api/admin/films/bulk-delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: unique }),
+        });
+        if (!r.ok) {
+          await showAlertModal(
+            "Suppression",
+            "Échec : " + (await fastApiErrorDetail(r)),
+          );
+          return;
+        }
+        const j = await r.json();
+        const deleted = (j && j.deleted) || [];
+        const errors = (j && j.errors) || [];
+        clearLibSelection();
+        await loadLibrary(false);
+        closeLibraryCollapses();
+        if (errors.length) {
+          await showAlertModal(
+            "Suppression partielle",
+            deleted.length + " supprimé(s), " + errors.length + " en échec.",
+          );
+        } else {
+          showAdminToast(
+            deleted.length +
+              " élément" +
+              (deleted.length > 1 ? "s" : "") +
+              " supprimé" +
+              (deleted.length > 1 ? "s" : "") +
+              ".",
+          );
+        }
+      }
+
 
       function renderAdminLibPager(
         host,
@@ -7571,7 +8014,8 @@
 
         const [filmR, epR] = await Promise.all([api(filmUrl), api(epUrl)]);
         if (!filmR.ok || !epR.ok) {
-          $("#lib-body-films").innerHTML = `<tr><td colspan="7" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Erreur de chargement de la bibliothèque.</td></tr>`;
+          $("#lib-body-films").innerHTML =
+            `<tr><td colspan="8" style="padding:20px 16px;font-size:12px;color:var(--color-text-tertiary)">Erreur de chargement de la bibliothèque.</td></tr>`;
           $("#lib-series-root").innerHTML = "";
           $("#lib-films-pager").innerHTML = "";
           $("#lib-series-pager").innerHTML = "";
@@ -7623,8 +8067,7 @@
             if (!byShow.has(label)) byShow.set(label, new Map());
             const seasonMap = byShow.get(label);
             const { sN: bucketS } = dbSeasonEpisode(ep);
-            const sn =
-              bucketS != null ? bucketS : LIB_SEASON_UNASSIGNED;
+            const sn = bucketS != null ? bucketS : LIB_SEASON_UNASSIGNED;
             if (!seasonMap.has(sn)) seasonMap.set(sn, []);
             seasonMap.get(sn).push(ep);
           }
@@ -7637,6 +8080,16 @@
             block.className = "lib-series-show";
             const showSum = document.createElement("summary");
             showSum.className = "lib-series-show-summary";
+            const showSelWrap = document.createElement("span");
+            showSelWrap.className = "lib-show-sel-wrap";
+            showSelWrap.addEventListener("click", (ev) => ev.stopPropagation());
+            const showSel = document.createElement("input");
+            showSel.type = "checkbox";
+            showSel.className = "lib-show-sel";
+            showSel.title = "Sélectionner tous les épisodes de cette série";
+            showSel.setAttribute("aria-label", "Sélectionner la série " + showName);
+            showSelWrap.appendChild(showSel);
+            showSum.appendChild(showSelWrap);
             const h = document.createElement("span");
             h.className = "lib-series-show-title";
             h.textContent = showName;
@@ -7657,8 +8110,7 @@
                 numericSeasons.join(", ") +
                 " · et épisodes sans saison en base (voir bloc ci-dessous).";
             } else if (numericSeasons.length) {
-              meta.textContent =
-                "Saisons : " + numericSeasons.join(", ");
+              meta.textContent = "Saisons : " + numericSeasons.join(", ");
             } else if (hasUnassigned) {
               meta.textContent =
                 "Aucune saison en base pour ces épisodes — ouvrez Modifier, type « Épisode de série », puis renseignez Saison et Épisode (sinon tout reste regroupé ici).";
@@ -7713,6 +8165,7 @@
               const table = document.createElement("table");
               table.className = "film-table";
               table.innerHTML = `<thead><tr>
+        <th class="lib-sel-cell" style="width:36px"></th>
         <th style="padding-left:16px">Épisode</th>
         <th>Année</th>
         <th>Taille</th>
@@ -7743,6 +8196,12 @@
               showBody.appendChild(seasonDetails);
             }
             block.appendChild(showBody);
+            const showSelCb = block.querySelector(".lib-show-sel");
+            if (showSelCb) {
+              showSelCb.addEventListener("change", () => {
+                syncLibShowSelectCheckbox(block);
+              });
+            }
             root.appendChild(block);
           }
         }
@@ -7759,6 +8218,11 @@
           LIB_PAGE_SIZE,
           "série(s)",
         );
+        syncLibFilmsSelectAllHeader();
+        syncLibSeriesSelectAllHeader();
+        document.querySelectorAll("details.lib-series-show").forEach((block) => {
+          syncLibShowSelectCheckbox(block);
+        });
       }
 
       function smGetSeriesKey() {
@@ -7828,8 +8292,8 @@
           if (sy) sy.value = "";
           return;
         }
-        if (sn) sn.value =
-          row.season_number != null ? String(row.season_number) : "";
+        if (sn)
+          sn.value = row.season_number != null ? String(row.season_number) : "";
         if (pp) pp.value = row.poster_path || "";
         if (nt) nt.value = row.note || "";
         if (sy) sy.value = row.synopsis || "";
@@ -7943,10 +8407,7 @@
           list.appendChild(div);
         }
         let pick = null;
-        if (
-          preferredSeasonNumber != null &&
-          preferredSeasonNumber !== ""
-        ) {
+        if (preferredSeasonNumber != null && preferredSeasonNumber !== "") {
           const pn = parseInt(String(preferredSeasonNumber), 10);
           if (!Number.isNaN(pn)) {
             pick = rows.find((x) => x.season_number === pn) || null;
@@ -7954,8 +8415,7 @@
         }
         if (!pick) {
           const curRaw = ($("#sm-season-num").value || "").trim();
-          const curN =
-            curRaw === "" ? NaN : parseInt(curRaw, 10);
+          const curN = curRaw === "" ? NaN : parseInt(curRaw, 10);
           if (!Number.isNaN(curN)) {
             pick = rows.find((x) => x.season_number === curN) || null;
           }
@@ -7968,8 +8428,7 @@
         smHideErr();
         const h = $("#sm-heading");
         if (h)
-          h.textContent =
-            "Fiche série et saisons — " + (showName || "Série");
+          h.textContent = "Fiche série et saisons — " + (showName || "Série");
         const sel = $("#sm-key-select");
         const inp = $("#sm-key-input");
         const lbl = $("#sm-key-input-label");
@@ -8050,7 +8509,77 @@
         btn.hidden = !inp.value.trim();
       }
       $("#lib-search").addEventListener("input", () => {
-        syncLibSearchClearBtn();
+  
+      const libRefreshRoot = document.getElementById("lib-refresh-root");
+      if (libRefreshRoot && !libRefreshRoot.dataset.libSelBound) {
+        libRefreshRoot.dataset.libSelBound = "1";
+        libRefreshRoot.addEventListener("change", (ev) => {
+          const t = ev.target;
+          if (t.id === "lib-films-select-all") {
+            document.querySelectorAll("#lib-body-films .lib-row-sel").forEach((cb) => {
+              const id = parseInt(cb.dataset.filmId, 10);
+              cb.checked = t.checked;
+              if (t.checked) libSelectedIds.add(id);
+              else libSelectedIds.delete(id);
+            });
+            syncLibBulkBar();
+            syncLibFilmsSelectAllHeader();
+            return;
+          }
+          if (t.id === "lib-series-select-all") {
+            document.querySelectorAll("#lib-series-root .lib-row-sel").forEach((cb) => {
+              const id = parseInt(cb.dataset.filmId, 10);
+              cb.checked = t.checked;
+              if (t.checked) libSelectedIds.add(id);
+              else libSelectedIds.delete(id);
+            });
+            syncLibBulkBar();
+            syncLibSeriesSelectAllHeader();
+            document.querySelectorAll("details.lib-series-show").forEach((block) => {
+              syncLibShowSelectCheckbox(block);
+            });
+            return;
+          }
+          if (t.classList.contains("lib-show-sel")) {
+            const block = t.closest("details.lib-series-show");
+            if (!block) return;
+            block.querySelectorAll(".lib-row-sel").forEach((cb) => {
+              const id = parseInt(cb.dataset.filmId, 10);
+              cb.checked = t.checked;
+              if (t.checked) libSelectedIds.add(id);
+              else libSelectedIds.delete(id);
+            });
+            syncLibBulkBar();
+            syncLibShowSelectCheckbox(block);
+            syncLibSeriesSelectAllHeader();
+            return;
+          }
+          if (t.classList.contains("lib-row-sel")) {
+            const id = parseInt(t.dataset.filmId, 10);
+            if (!Number.isFinite(id)) return;
+            if (t.checked) libSelectedIds.add(id);
+            else libSelectedIds.delete(id);
+            syncLibBulkBar();
+            syncLibFilmsSelectAllHeader();
+            syncLibSeriesSelectAllHeader();
+            syncLibShowSelectCheckbox(t.closest("details.lib-series-show"));
+          }
+        });
+      }
+      const libBulkDel = document.getElementById("lib-bulk-delete");
+      if (libBulkDel && !libBulkDel.dataset.bound) {
+        libBulkDel.dataset.bound = "1";
+        libBulkDel.addEventListener("click", () => {
+          deleteLibraryItems([...libSelectedIds]);
+        });
+      }
+      const libBulkClear = document.getElementById("lib-bulk-clear");
+      if (libBulkClear && !libBulkClear.dataset.bound) {
+        libBulkClear.dataset.bound = "1";
+        libBulkClear.addEventListener("click", clearLibSelection);
+      }
+
+      syncLibSearchClearBtn();
         clearTimeout(window._ls);
         window._ls = setTimeout(loadLibrary, 300);
       });
@@ -8207,9 +8736,7 @@
           }),
         });
         if (!r.ok) {
-          smShowErr(
-            "Fiche globale : échec. " + (await fastApiErrorDetail(r)),
-          );
+          smShowErr("Fiche globale : échec. " + (await fastApiErrorDetail(r)));
           return;
         }
         await refreshSeriesShowGlobal();
@@ -8341,10 +8868,8 @@
             kind === "series_episode"
               ? $("#fm-series-title").value.trim() || null
               : null,
-          season_number:
-            kind === "series_episode" ? seriesSeasonSaved : null,
-          episode_number:
-            kind === "series_episode" ? seriesEpisodeSaved : null,
+          season_number: kind === "series_episode" ? seriesSeasonSaved : null,
+          episode_number: kind === "series_episode" ? seriesEpisodeSaved : null,
         };
         try {
           const r = await api("/api/admin/films/" + id, {
@@ -8464,7 +8989,8 @@
             sel.addEventListener("focus", () => {
               prevRank = sel.value;
             });
-            sel.title = "Rang viewer : quota d’invitations mensuel (modifiable par l’admin).";
+            sel.title =
+              "Rang viewer : quota d’invitations mensuel (modifiable par l’admin).";
             sel.addEventListener("change", async () => {
               const r = await api(`/api/admin/users/${u.id}/viewer-rank`, {
                 method: "PATCH",
@@ -8624,7 +9150,11 @@
           await loadUsers(false);
           return;
         }
-        if (totalFiltered > 0 && (data.items || []).length === 0 && usersPage > 1) {
+        if (
+          totalFiltered > 0 &&
+          (data.items || []).length === 0 &&
+          usersPage > 1
+        ) {
           usersPage -= 1;
           await loadUsers(false);
           return;
@@ -8861,7 +9391,9 @@
         floatingUploadDockMinBtn.addEventListener("click", () => {
           const dock = floatingUploadDockEl();
           if (!dock) return;
-          const collapsed = dock.classList.toggle("floating-upload-dock-collapsed");
+          const collapsed = dock.classList.toggle(
+            "floating-upload-dock-collapsed",
+          );
           floatingUploadDockMinBtn.setAttribute(
             "aria-expanded",
             collapsed ? "false" : "true",
@@ -8922,7 +9454,9 @@
             refreshQueue();
             refreshStats();
             showAdminToast(
-              "« " + file.name + " » uploadé — le film entre en file d’attente.",
+              "« " +
+                file.name +
+                " » uploadé — le film entre en file d’attente.",
             );
           } else {
             row.classList.add("upload-job-err");
@@ -9171,15 +9705,15 @@
               } catch (_) {
                 msg = ((await r.text()) || msg).slice(0, 500);
               }
-              await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+              await showAlertModal("Annulation impossible", msg, {
+                okText: "OK",
+              });
               return;
             }
           } catch (_) {
-            await showAlertModal(
-              "Erreur",
-              "Réseau ou session expirée.",
-              { okText: "OK" },
-            );
+            await showAlertModal("Erreur", "Réseau ou session expirée.", {
+              okText: "OK",
+            });
             return;
           }
           void refreshQueueVast();
@@ -9200,7 +9734,9 @@
           if (!okL) return;
           try {
             const r = await api(
-              "/api/admin/queue/jobs/" + encodeURIComponent(lfid) + "/retry-local",
+              "/api/admin/queue/jobs/" +
+                encodeURIComponent(lfid) +
+                "/retry-local",
               { method: "POST" },
             );
             if (!r.ok) {
@@ -9215,11 +9751,9 @@
               return;
             }
           } catch (_) {
-            await showAlertModal(
-              "Erreur",
-              "Réseau ou session expirée.",
-              { okText: "OK" },
-            );
+            await showAlertModal("Erreur", "Réseau ou session expirée.", {
+              okText: "OK",
+            });
             return;
           }
           refreshQueue();
@@ -9255,11 +9789,9 @@
               return;
             }
           } catch (_) {
-            await showAlertModal(
-              "Erreur",
-              "Réseau ou session expirée.",
-              { okText: "OK" },
-            );
+            await showAlertModal("Erreur", "Réseau ou session expirée.", {
+              okText: "OK",
+            });
             return;
           }
           refreshQueue();
@@ -9289,7 +9821,9 @@
             } catch (_) {
               msg = ((await r.text()) || msg).slice(0, 500);
             }
-            await showAlertModal("Annulation impossible", msg, { okText: "OK" });
+            await showAlertModal("Annulation impossible", msg, {
+              okText: "OK",
+            });
             return;
           }
           let revokedTid = null;
@@ -9309,11 +9843,9 @@
             } catch (_) {}
           }
         } catch (_) {
-          await showAlertModal(
-            "Erreur",
-            "Réseau ou session expirée.",
-            { okText: "OK" },
-          );
+          await showAlertModal("Erreur", "Réseau ou session expirée.", {
+            okText: "OK",
+          });
           return;
         }
         refreshQueue();
