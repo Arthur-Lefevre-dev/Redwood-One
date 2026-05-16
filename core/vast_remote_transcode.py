@@ -73,8 +73,65 @@ INP="/tmp/in${RW_EXT}"
 RW_MAP_ARGS=""
 RW_SUB_CODEC=""
 RW_HAS_AUD="0"
+RW_AUD_IDX=""
 if ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$INP" 2>/dev/null | grep -q .; then
   RW_HAS_AUD="1"
+  RW_AUD_IDX=$(python3 - "$INP" <<'PY' 2>/dev/null || true
+import json, subprocess, sys
+inp = sys.argv[1]
+FRENCH = {"fr", "fra", "fre", "french", "français", "francais"}
+HINTS = ("french", "français", "francais", " vf", "vf ", "vff", "truefrench", "version française", "version francaise", " dub", "dubbed")
+def norm_lang(s):
+    tags = s.get("tags") or {}
+    raw = (tags.get("language") or "").strip().lower()
+    return raw.replace("_", "-").split("-")[0] if raw else ""
+def is_fr(s):
+    lang = norm_lang(s)
+    if lang in FRENCH or (lang and lang.startswith("fr")):
+        return True
+    t = ((s.get("tags") or {}).get("title") or "").lower()
+    tc = t.strip()
+    if tc in ("vf", "vff", "vfi", "truefrench"):
+        return True
+    return any(h in t for h in HINTS)
+def rank(s):
+    title = ((s.get("tags") or {}).get("title") or "").lower()
+    p = 0
+    if "commentary" in title or "comment" in title:
+        p += 10
+    if "descriptive" in title or "audio description" in title:
+        p += 20
+    disp = s.get("disposition") or {}
+    if disp.get("default") in (1, "1", True):
+        p -= 5
+    idx = s.get("index")
+    tie = int(idx) if isinstance(idx, int) else 9999
+    return (p, tie)
+try:
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a",
+         "-show_entries", "stream=index:stream_tags=language:stream_tags=title",
+         "-of", "json", inp],
+        capture_output=True, text=True, timeout=120, check=False,
+    )
+    if r.returncode != 0:
+        raise SystemExit(0)
+    streams = (json.loads(r.stdout or "{}").get("streams") or [])
+except Exception:
+    raise SystemExit(0)
+if not streams:
+    raise SystemExit(0)
+fr = [s for s in streams if is_fr(s)]
+pick = sorted(fr, key=rank)[0] if fr else streams[0]
+idx = pick.get("index")
+if isinstance(idx, int) and idx >= 0:
+    print(idx)
+PY
+)
+  RW_AUD_IDX=$(printf '%s' "$RW_AUD_IDX" | tr -d '\r\n')
+  if [ -z "$RW_AUD_IDX" ]; then
+    RW_AUD_IDX=$(ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 "$INP" 2>/dev/null | head -n1 | tr -d '\r\n' || true)
+  fi
 fi
 SUB_MAPS=""
 FFCSV=$(ffprobe -v error -select_streams s -show_entries stream=index,codec_name -of csv=p=0 "$INP" 2>/dev/null || true)
@@ -91,11 +148,11 @@ while IFS= read -r line; do
 done <<EOF
 $(printf '%s\n' "$FFCSV")
 EOF
+RW_MAP_ARGS="-map 0:v:0"
+if [ "$RW_HAS_AUD" = "1" ] && [ -n "$RW_AUD_IDX" ]; then
+  RW_MAP_ARGS="${RW_MAP_ARGS} -map 0:${RW_AUD_IDX}"
+fi
 if [ -n "$SUB_MAPS" ]; then
-  RW_MAP_ARGS="-map 0:v:0"
-  if [ "$RW_HAS_AUD" = "1" ]; then
-    RW_MAP_ARGS="${RW_MAP_ARGS} -map 0:a:0"
-  fi
   RW_MAP_ARGS="${RW_MAP_ARGS}${SUB_MAPS}"
   RW_SUB_CODEC="-c:s mov_text"
 fi

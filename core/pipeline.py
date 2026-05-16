@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from config import get_settings
 from core.ffprobe import (
     FFprobeError,
+    preferred_audio_stream_index_from_probe,
     probe,
     probe_has_audio_stream,
     summarize,
@@ -47,6 +48,7 @@ def _build_ffmpeg_cmd(
     *,
     subtitle_stream_indices: Optional[list[int]] = None,
     has_audio: bool = True,
+    audio_stream_index: Optional[int] = None,
 ) -> list[str]:
     enc = get_encoder()
     cmd: list[str] = ["ffmpeg", "-y"]
@@ -58,10 +60,14 @@ def _build_ffmpeg_cmd(
         cmd += ["-hwaccel", "vaapi", "-hwaccel_device", str(enc["hwaccel_device"])]
     cmd += ["-i", input_path]
     subs = [int(x) for x in (subtitle_stream_indices or [])]
-    if subs:
+    if subs or has_audio:
         cmd += ["-map", "0:v:0"]
         if has_audio:
-            cmd += ["-map", "0:a:0"]
+            if audio_stream_index is not None:
+                cmd += ["-map", f"0:{int(audio_stream_index)}"]
+            else:
+                cmd += ["-map", "0:a:0"]
+    if subs:
         for idx in subs:
             cmd += ["-map", f"0:{idx}"]
         cmd += ["-c:s", "mov_text"]
@@ -116,6 +122,9 @@ def transcode_to_mp4(
     probe_in = input_probe if input_probe is not None else probe(input_path)
     sub_idx = text_subtitle_stream_indices_from_probe(probe_in)
     has_audio = probe_has_audio_stream(probe_in)
+    audio_idx = (
+        preferred_audio_stream_index_from_probe(probe_in) if has_audio else None
+    )
 
     def run_ffmpeg(cmd: list[str]) -> None:
         log_event(logger, "ffmpeg_start", cmd=" ".join(cmd))
@@ -186,6 +195,7 @@ def transcode_to_mp4(
         use_h265,
         subtitle_stream_indices=sub_idx if sub_idx else None,
         has_audio=has_audio,
+        audio_stream_index=audio_idx,
     )
     try:
         run_ffmpeg(cmd_with_subs)
@@ -205,6 +215,7 @@ def transcode_to_mp4(
             use_h265,
             subtitle_stream_indices=None,
             has_audio=has_audio,
+            audio_stream_index=audio_idx,
         )
         run_ffmpeg(cmd_plain)
 
