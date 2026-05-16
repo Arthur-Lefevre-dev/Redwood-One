@@ -997,7 +997,13 @@ def admin_cancel_pipeline_job(
                 )
             cancel_vast_transcode_test(celery_app, tid)
         else:
-            celery_app.control.revoke(tid, terminate=True, signal="SIGTERM")
+            from worker.tasks import _revoke_celery_task_or_group
+
+            _revoke_celery_task_or_group(
+                celery_app,
+                tid,
+                is_group=(kind == "process_series_pack"),
+            )
     except HTTPException:
         raise
     except Exception as e:

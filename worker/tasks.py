@@ -46,6 +46,32 @@ VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v"}
 TORRENT_DIR = Path("/tmp/redwood/torrents")
 
 
+def _apply_celery_signatures(sigs: list):
+    """
+    Run one signature immediately, or a group when several (parallel transcode).
+    Returns AsyncResult (single task) or GroupResult (episode pack).
+    """
+    if not sigs:
+        raise ValueError("empty Celery signature list")
+    if len(sigs) == 1:
+        return sigs[0].apply_async()
+    from celery import group
+
+    return group(sigs).apply_async()
+
+
+def _revoke_celery_task_or_group(celery_app, task_id: str, *, is_group: bool) -> None:
+    """Revoke a single task or every subtask in a Celery group."""
+    if is_group:
+        from celery.result import GroupResult
+
+        restored = GroupResult.restore(task_id, app=celery_app)
+        if restored is not None:
+            restored.revoke(terminate=True)
+            return
+    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+
+
 def _set_film_pipeline_task(film_id: int, task_id: Optional[str], kind: Optional[str]) -> None:
     """Persist active Celery task id for admin cancel (English comments in worker)."""
     from db.models import Film
@@ -244,8 +270,6 @@ def download_torrent_task(
         _fail_film(film_id, "no video file found after torrent download")
         return
 
-    from celery import chain
-
     from db.models import ContentKind, Film, FilmTraitement
     from db.session import SessionLocal
 
@@ -326,7 +350,14 @@ def download_torrent_task(
             for fid, jt, ext, title in uploads
         ]
         try:
-            async_res = chain(*sigs).delay()
+            async_res = _apply_celery_signatures(sigs)
+            logger.info(
+                "torrent->vast enqueue parent_film_id=%s episodes=%s parallel=%s celery_id=%s",
+                film_id,
+                len(sigs),
+                len(sigs) > 1,
+                async_res.id,
+            )
         except Exception as e:
             logger.exception("torrent->vast Celery enqueue film_id=%s", film_id)
             _fail_film(film_id, str(e)[:8000])
@@ -355,7 +386,14 @@ def download_torrent_task(
 
     sigs = [process_film_task.si(int(fid), str(p)) for fid, p in pack]
     try:
-        async_res = chain(*sigs).delay()
+        async_res = _apply_celery_signatures(sigs)
+        logger.info(
+            "torrent->local enqueue parent_film_id=%s episodes=%s parallel=%s celery_id=%s",
+            film_id,
+            len(sigs),
+            len(sigs) > 1,
+            async_res.id,
+        )
     except Exception as e:
         logger.exception("torrent->local Celery enqueue film_id=%s", film_id)
         _fail_film(film_id, str(e)[:8000])
