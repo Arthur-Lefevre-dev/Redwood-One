@@ -5,52 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
   <title>Catégories — Redwood Plus</title>
-  <style>
-    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
-    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem);transition:color .2s ease}
-    @keyframes brand-neon-flicker{
-      0%,100%{color:#fecaca;text-shadow:0 0 6px rgba(252,165,165,.9),0 0 14px rgba(139,37,0,.75),0 0 26px rgba(139,37,0,.38)}
-      6%{color:#fca5a5;text-shadow:0 0 2px rgba(252,165,165,.35),0 0 6px rgba(139,37,0,.22)}
-      8%{color:#fff7ed;text-shadow:0 0 10px rgba(254,243,199,.55),0 0 22px rgba(252,165,165,.88),0 0 34px rgba(139,37,0,.5)}
-      11%{color:#fecaca;text-shadow:0 0 5px rgba(252,165,165,.55),0 0 12px rgba(139,37,0,.4)}
-      51%{color:#fecaca;text-shadow:0 0 8px rgba(252,165,165,.85),0 0 18px rgba(139,37,0,.62)}
-      53%{color:var(--accent);text-shadow:none}
-      55%{color:#fecaca;text-shadow:0 0 12px rgba(252,165,165,.92),0 0 24px rgba(139,37,0,.58)}
-    }
-    a.brand:hover{color:#fecaca;animation:brand-neon-flicker 2.4s ease-in-out infinite}
-    .nav-search{flex:1;max-width:360px;padding:9px 14px;border-radius:999px;border:1px solid #333;background:#111;color:#fff;font-size:14px}
-    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
-    main{padding:24px 28px 48px;max-width:1200px;margin:0 auto}
-    h1{font-size:1.35rem;margin-bottom:6px}
-    .lead{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.5}
-    .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:32px}
-    .cat-card{
-      position:relative;border-radius:14px;overflow:hidden;cursor:pointer;min-height:168px;
-      background:linear-gradient(145deg,#1f1410,#121212);border:1px solid #2a2220;
-      display:flex;flex-direction:column;justify-content:flex-end;padding:14px;
-      transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
-    }
-    .cat-card-bg{
-      position:absolute;inset:0;background-size:cover;background-position:center top;
-      filter:brightness(.42)saturate(1.05);transform:scale(1.02);
-      transition:transform .35s ease,filter .35s ease;
-    }
-    .cat-card:hover .cat-card-bg{transform:scale(1.08);filter:brightness(.52)saturate(1.1)}
-    .cat-card-shade{
-      position:absolute;inset:0;
-      background:linear-gradient(180deg,rgba(10,10,10,.2) 0%,rgba(10,10,10,.82) 100%);
-      pointer-events:none;
-    }
-    .cat-card:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 12px 28px rgba(0,0,0,.45)}
-    .cat-card-inner{position:relative;z-index:1}
-    .cat-card .name{font-weight:600;font-size:15px;text-shadow:0 1px 8px rgba(0,0,0,.9)}
-    .cat-card .count{font-size:12px;color:#c4c4c4;margin-top:4px;text-shadow:0 1px 6px #000}
-    .cat-card .accent-bar{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#c94a1a);opacity:.9;z-index:2}
-    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:40px}
-  </style>
+    <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-categories.css" />
 </head>
 <body>
   <nav>

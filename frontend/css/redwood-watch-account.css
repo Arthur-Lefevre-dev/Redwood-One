@@ -1,0 +1,21 @@
+main{max-width:720px;margin:0 auto;padding:28px 24px 48px}
+    h1{font-size:1.35rem;margin-bottom:8px}
+    .lead{color:var(--muted);font-size:14px;margin-bottom:28px;line-height:1.5}
+    section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px}
+    section h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:var(--text);font-size:14px;margin-bottom:12px}
+    input:focus{outline:2px solid rgba(139,37,0,.45);outline-offset:1px}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:8px;
+      border:1px solid var(--accent);background:rgba(139,37,0,.25);color:#fecaca;font-size:14px;font-weight:600;
+      cursor:pointer;font-family:inherit;margin-top:4px;
+    }
+    .btn:hover{background:rgba(139,37,0,.4);color:#fff}
+    .msg{font-size:13px;margin-top:10px;line-height:1.45;display:none}
+    .msg.err{color:#f87171}
+    .msg.ok{color:#86efac}
+    .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
+    .identity{font-size:14px;color:#ccc;margin-bottom:6px}
+    .identity strong{color:#fff}
+    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
