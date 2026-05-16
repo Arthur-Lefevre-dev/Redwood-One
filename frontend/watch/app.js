@@ -26,10 +26,28 @@ function looksLikeHtmlBody(text) {
 }
 
 async function api(path, opts = {}) {
-  const r = await fetch(apiUrl(path), { credentials: 'include', cache: 'no-store', ...opts });
-  if (r.status === 401) {
-    window.location.href = '/login.html';
-    throw new Error('401');
+  const method = String(opts.method || 'GET').toUpperCase();
+  const idempotent = method === 'GET' || method === 'HEAD';
+  const maxAttempts = idempotent ? 3 : 1;
+  let r;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    r = await fetch(apiUrl(path), {
+      credentials: 'include',
+      cache: 'no-store',
+      ...opts,
+    });
+    if (r.status === 401) {
+      window.location.href = '/login.html';
+      throw new Error('401');
+    }
+    if (
+      !idempotent ||
+      (r.status !== 502 && r.status !== 503 && r.status !== 504) ||
+      attempt >= maxAttempts - 1
+    ) {
+      return r;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
   }
   return r;
 }

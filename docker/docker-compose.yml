@@ -40,6 +40,9 @@ services:
     container_name: redwood_api
     restart: unless-stopped
     env_file: .env
+    # Optional local dev (Live Server + window.__REDWOOD_API_BASE__ = 'http://127.0.0.1:8000').
+    ports:
+      - "127.0.0.1:8000:8000"
     volumes:
       - tmp_data:/tmp/redwood
     depends_on:
@@ -138,9 +141,10 @@ services:
       - ../frontend:/usr/share/nginx/html:ro
       - ../nginx/certs:/etc/nginx/certs:ro
       - ../nginx/acme-webroot:/var/www/certbot:ro
-    # Start nginx as soon as the API container exists so port 80 answers (maintenance page on upstream errors).
+    # Wait until FastAPI healthcheck passes so /api/* is not 502/503 right after compose up.
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - redwood_net
 
