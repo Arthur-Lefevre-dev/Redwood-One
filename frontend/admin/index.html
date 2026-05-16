@@ -6194,19 +6194,81 @@
       let libEpsPage = 1;
       const libSelectedIds = new Set();
 
-      function closeLibraryCollapses() {
-        const root = document.getElementById("lib-series-root");
-        if (!root) return;
-        root
-          .querySelectorAll(
-            "details.lib-series-show[open], details.lib-series-season[open]",
-          )
+      function libFilmIdFromCheckbox(cb) {
+        if (!cb) return NaN;
+        const raw = cb.getAttribute("data-film-id") ?? cb.dataset.filmId ?? "";
+        return parseInt(String(raw), 10);
+      }
+
+      /** Source of truth: checked row boxes in the library table(s). */
+      function collectSelectedLibraryIds() {
+        const ids = new Set();
+        const root = document.getElementById("lib-refresh-root");
+        if (!root) return [];
+        root.querySelectorAll(".lib-row-sel:checked").forEach((cb) => {
+          const id = libFilmIdFromCheckbox(cb);
+          if (Number.isFinite(id) && id > 0) ids.add(id);
+        });
+        return [...ids];
+      }
+
+      function syncLibSelectedIdsFromDom() {
+        libSelectedIds.clear();
+        collectSelectedLibraryIds().forEach((id) => libSelectedIds.add(id));
+      }
+
+      function captureLibraryCollapseState() {
+        const openShows = [];
+        const openSeasons = [];
+        document
+          .querySelectorAll("details.lib-series-show[open]")
           .forEach((el) => {
-            el.removeAttribute("open");
+            const key =
+              el.dataset.seriesShow ||
+              el.querySelector(".lib-series-show-title")?.textContent?.trim();
+            if (key) openShows.push(key);
           });
+        document
+          .querySelectorAll("details.lib-series-season[open]")
+          .forEach((el) => {
+            const showEl = el.closest("details.lib-series-show");
+            const showKey =
+              showEl?.dataset.seriesShow ||
+              showEl
+                ?.querySelector(".lib-series-show-title")
+                ?.textContent?.trim() ||
+              "";
+            const seasonKey =
+              el.dataset.seasonKey ||
+              el.querySelector(".lib-series-season-summary")?.textContent?.trim() ||
+              "";
+            openSeasons.push(showKey + "\u0001" + seasonKey);
+          });
+        return { openShows, openSeasons };
+      }
+
+      function restoreLibraryCollapseState(state) {
+        if (!state) return;
+        document.querySelectorAll("details.lib-series-show").forEach((el) => {
+          const key =
+            el.dataset.seriesShow ||
+            el.querySelector(".lib-series-show-title")?.textContent?.trim();
+          if (key && state.openShows.includes(key)) el.setAttribute("open", "");
+        });
+        document.querySelectorAll("details.lib-series-season").forEach((el) => {
+          const showEl = el.closest("details.lib-series-show");
+          const showKey = showEl?.dataset.seriesShow || "";
+          const seasonKey =
+            el.dataset.seasonKey ||
+            el.querySelector(".lib-series-season-summary")?.textContent?.trim() ||
+            "";
+          const composite = showKey + "\u0001" + seasonKey;
+          if (state.openSeasons.includes(composite)) el.setAttribute("open", "");
+        });
       }
 
       function syncLibBulkBar() {
+        syncLibSelectedIdsFromDom();
         const bar = document.getElementById("lib-bulk-bar");
         const countEl = document.getElementById("lib-bulk-count");
         const n = libSelectedIds.size;
@@ -6281,9 +6343,15 @@
       }
 
       async function deleteLibraryItems(ids) {
+        syncLibSelectedIdsFromDom();
+        const fromDom = collectSelectedLibraryIds();
+        const merged = [
+          ...(Array.isArray(ids) ? ids : []),
+          ...fromDom,
+        ];
         const unique = [
           ...new Set(
-            ids
+            merged
               .map((x) => parseInt(String(x), 10))
               .filter((n) => Number.isFinite(n) && n > 0),
           ),
@@ -6297,7 +6365,6 @@
           { confirmText: "Supprimer", cancelText: "Annuler" },
         );
         if (!ok) return;
-        closeLibraryCollapses();
         closeFilmModal();
         const r = await api("/api/admin/films/bulk-delete", {
           method: "POST",
@@ -6314,9 +6381,10 @@
         const j = await r.json();
         const deleted = (j && j.deleted) || [];
         const errors = (j && j.errors) || [];
+        const collapseState = captureLibraryCollapseState();
         clearLibSelection();
         await loadLibrary(false);
-        closeLibraryCollapses();
+        restoreLibraryCollapseState(collapseState);
         if (errors.length) {
           await showAlertModal(
             "Suppression partielle",
@@ -6383,6 +6451,7 @@
       }
 
       async function loadLibrary(resetPages = true) {
+        const collapseState = resetPages ? null : captureLibraryCollapseState();
         if (resetPages) {
           libFilmsPage = 1;
           libEpsPage = 1;
@@ -6499,6 +6568,7 @@
             const seasonMap = byShow.get(showName);
             const block = document.createElement("details");
             block.className = "lib-series-show";
+            block.dataset.seriesShow = showName;
             const showSum = document.createElement("summary");
             showSum.className = "lib-series-show-summary";
             const showSelWrap = document.createElement("span");
@@ -6576,6 +6646,8 @@
               });
               const seasonDetails = document.createElement("details");
               seasonDetails.className = "lib-series-season";
+              seasonDetails.dataset.seasonKey =
+                sn === LIB_SEASON_UNASSIGNED ? "unassigned" : String(sn);
               const seasonSum = document.createElement("summary");
               seasonSum.className = "lib-series-season-summary";
               seasonSum.textContent =
@@ -6651,6 +6723,7 @@
         document.querySelectorAll("details.lib-series-show").forEach((block) => {
           syncLibShowSelectCheckbox(block);
         });
+        restoreLibraryCollapseState(collapseState);
       }
 
       function smGetSeriesKey() {
@@ -6939,12 +7012,13 @@
 
       function libToggleRowCheckboxes(checkboxes, checked) {
         checkboxes.forEach((cb) => {
-          const id = parseInt(cb.dataset.filmId, 10);
+          const id = libFilmIdFromCheckbox(cb);
           if (!Number.isFinite(id)) return;
           cb.checked = checked;
           if (checked) libSelectedIds.add(id);
           else libSelectedIds.delete(id);
         });
+        syncLibBulkBar();
       }
 
       function bindLibrarySelectionHandlers() {
@@ -6989,7 +7063,7 @@
               return;
             }
             if (t.classList.contains("lib-row-sel")) {
-              const id = parseInt(t.dataset.filmId, 10);
+              const id = libFilmIdFromCheckbox(t);
               if (!Number.isFinite(id)) return;
               if (t.checked) libSelectedIds.add(id);
               else libSelectedIds.delete(id);
@@ -7004,7 +7078,7 @@
         if (libBulkDel && !libBulkDel.dataset.bound) {
           libBulkDel.dataset.bound = "1";
           libBulkDel.addEventListener("click", () => {
-            const ids = [...libSelectedIds];
+            const ids = collectSelectedLibraryIds();
             if (!ids.length) return;
             void deleteLibraryItems(ids);
           });
