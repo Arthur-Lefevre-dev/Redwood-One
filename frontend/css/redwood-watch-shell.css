@@ -1,0 +1,142 @@
+/* Shared watch shell — tokens, reset, nav, brand, footer */
+:root {
+  --bg: #0a0a0a;
+  --accent: #8b2500;
+  --text: #f5f5f5;
+  --muted: #a3a3a3;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  border-bottom: 1px solid #222;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+a.brand,
+.brand {
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  font-size: clamp(1.35rem, 2.5vw, 1.85rem);
+  transition: color 0.2s ease;
+}
+
+@keyframes brand-neon-flicker {
+  0%,
+  100% {
+    color: #fecaca;
+    text-shadow:
+      0 0 6px rgba(252, 165, 165, 0.9),
+      0 0 14px rgba(139, 37, 0, 0.75),
+      0 0 26px rgba(139, 37, 0, 0.38);
+  }
+  6% {
+    color: #fca5a5;
+    text-shadow:
+      0 0 2px rgba(252, 165, 165, 0.35),
+      0 0 6px rgba(139, 37, 0, 0.22);
+  }
+  8% {
+    color: #fff7ed;
+    text-shadow:
+      0 0 10px rgba(254, 243, 199, 0.55),
+      0 0 22px rgba(252, 165, 165, 0.88),
+      0 0 34px rgba(139, 37, 0, 0.5);
+  }
+  11% {
+    color: #fecaca;
+    text-shadow:
+      0 0 5px rgba(252, 165, 165, 0.55),
+      0 0 12px rgba(139, 37, 0, 0.4);
+  }
+  51% {
+    color: #fecaca;
+    text-shadow:
+      0 0 8px rgba(252, 165, 165, 0.85),
+      0 0 18px rgba(139, 37, 0, 0.62);
+  }
+  53% {
+    color: var(--accent);
+    text-shadow: none;
+  }
+  55% {
+    color: #fecaca;
+    text-shadow:
+      0 0 12px rgba(252, 165, 165, 0.92),
+      0 0 24px rgba(139, 37, 0, 0.58);
+  }
+}
+
+a.brand:hover {
+  color: #fecaca;
+  animation: brand-neon-flicker 2.4s ease-in-out infinite;
+}
+
+.nav-mid {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+.nav-search {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid #333;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+}
+
+.nav-mid .nav-search {
+  width: 100%;
+}
+
+nav > .nav-search {
+  flex: 1;
+  max-width: 360px;
+}
+
+.nav-search::placeholder {
+  color: #666;
+}
+
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  margin-left: 18px;
+  font-size: 14px;
+}
+
+nav a:hover {
+  color: #fff;
+}
+
+footer {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  border-top: 1px solid #222;
+}

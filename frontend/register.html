@@ -4,48 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Inscription — Redwood Plus</title>
-  <style>
-    :root { --bg:#0a0a0a; --card:#141414; --border:#2a2a2a; --text:#f5f5f5; --muted:#a3a3a3; --accent:#8B2500; }
-    * { box-sizing:border-box; margin:0; padding:0; }
-    body { font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); margin:0; min-height:100vh; }
-    .auth-page-wrap {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 24px 16px;
-    }
-    .auth-announcements-host[hidden] { display: none !important; }
-    .auth-announcements-host {
-      width: min(420px, 100%);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .auth-announcement {
-      border: 1px solid #854d0e;
-      background: rgba(180, 83, 9, 0.14);
-      border-radius: 10px;
-      padding: 12px 14px;
-      font-size: 0.88rem;
-      line-height: 1.45;
-      color: #fef3c7;
-    }
-    .auth-announcement-title { font-weight: 600; margin-bottom: 6px; color: #fde68a; }
-    .auth-announcement-body { white-space: pre-wrap; word-break: break-word; }
-    .card { width:min(420px,100%); background:var(--card); border:1px solid var(--border); border-radius:12px; padding:28px; }
-    h1 { font-size:1.25rem; margin-bottom:4px; }
-    .sub { color:var(--muted); font-size:.85rem; margin-bottom:22px; line-height:1.5; }
-    label { display:block; font-size:.8rem; color:var(--muted); margin-bottom:6px; }
-    input { width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:#0f0f0f; color:var(--text); margin-bottom:14px; }
-    button { width:100%; padding:10px; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; margin-top:6px; }
-    .err { color:#f87171; font-size:.85rem; margin-top:10px; display:none; }
-    .ok { color:#86efac; font-size:.85rem; margin-top:10px; display:none; }
-    .links { margin-top:18px; font-size:.85rem; color:var(--muted); text-align:center; }
-    a { color:#fca5a5; }
-  </style>
+  <link rel="stylesheet" href="/css/redwood-auth.css" />
 </head>
 <body>
   <div class="auth-page-wrap">

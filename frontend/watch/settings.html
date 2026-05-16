@@ -5,46 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
   <title>Paramètres — Redwood Plus</title>
-  <style>
-    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; --card:#111; --border:#2a2a2a; }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
-    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem);transition:color .2s ease}
-    @keyframes brand-neon-flicker{
-      0%,100%{color:#fecaca;text-shadow:0 0 6px rgba(252,165,165,.9),0 0 14px rgba(139,37,0,.75),0 0 26px rgba(139,37,0,.38)}
-      6%{color:#fca5a5;text-shadow:0 0 2px rgba(252,165,165,.35),0 0 6px rgba(139,37,0,.22)}
-      8%{color:#fff7ed;text-shadow:0 0 10px rgba(254,243,199,.55),0 0 22px rgba(252,165,165,.88),0 0 34px rgba(139,37,0,.5)}
-      11%{color:#fecaca;text-shadow:0 0 5px rgba(252,165,165,.55),0 0 12px rgba(139,37,0,.4)}
-      51%{color:#fecaca;text-shadow:0 0 8px rgba(252,165,165,.85),0 0 18px rgba(139,37,0,.62)}
-      53%{color:var(--accent);text-shadow:none}
-      55%{color:#fecaca;text-shadow:0 0 12px rgba(252,165,165,.92),0 0 24px rgba(139,37,0,.58)}
-    }
-    a.brand:hover{color:#fecaca;animation:brand-neon-flicker 2.4s ease-in-out infinite}
-    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
-    nav a:hover{color:#fff}
-    main{max-width:720px;margin:0 auto;padding:28px 24px 48px}
-    h1{font-size:1.35rem;margin-bottom:8px}
-    .lead{color:var(--muted);font-size:14px;margin-bottom:28px;line-height:1.5}
-    section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px}
-    section h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:var(--text);font-size:14px;margin-bottom:12px}
-    input:focus{outline:2px solid rgba(139,37,0,.45);outline-offset:1px}
-    .btn{
-      display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:8px;
-      border:1px solid var(--accent);background:rgba(139,37,0,.25);color:#fecaca;font-size:14px;font-weight:600;
-      cursor:pointer;font-family:inherit;margin-top:4px;
-    }
-    .btn:hover{background:rgba(139,37,0,.4);color:#fff}
-    .msg{font-size:13px;margin-top:10px;line-height:1.45;display:none}
-    .msg.err{color:#f87171}
-    .msg.ok{color:#86efac}
-    .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45}
-    .identity{font-size:14px;color:#ccc;margin-bottom:6px}
-    .identity strong{color:#fff}
-    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
-  </style>
+    <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-account.css" />
 </head>
 <body>
   <nav>

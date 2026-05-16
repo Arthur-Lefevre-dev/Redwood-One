@@ -5,45 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="/watch/favicon.svg" type="image/svg+xml" />
   <title>Support — Redwood Plus</title>
-  <style>
-    :root { --bg:#0a0a0a; --accent:#8B2500; --text:#f5f5f5; --muted:#a3a3a3; --card:#111; --border:#2a2a2a; }
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    nav{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;border-bottom:1px solid #222;flex-wrap:wrap;gap:12px}
-    a.brand,.brand{font-weight:800;color:var(--accent);text-decoration:none;font-size:clamp(1.35rem,2.5vw,1.85rem)}
-    nav a{color:var(--muted);text-decoration:none;margin-left:18px;font-size:14px}
-    nav a:hover{color:#fff}
-    main{max-width:800px;margin:0 auto;padding:28px 24px 48px}
-    h1{font-size:1.35rem;margin-bottom:8px}
-    .lead{color:var(--muted);font-size:14px;margin-bottom:24px;line-height:1.5}
-    section{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px}
-    section h2{font-size:15px;font-weight:600;color:#e5e5e5;margin-bottom:14px}
-    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-    input,select,textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;color:var(--text);font-size:14px;margin-bottom:12px;font-family:inherit}
-    textarea{min-height:120px;resize:vertical}
-    .btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:8px;border:1px solid var(--accent);background:rgba(139,37,0,.25);color:#fecaca;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
-    .btn:hover{background:rgba(139,37,0,.4);color:#fff}
-    .msg{font-size:13px;margin-top:10px;line-height:1.45;display:none}
-    .msg.err{color:#f87171}
-    .msg.ok{color:#86efac}
-    .ticket{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px}
-    .ticket h3{font-size:14px;font-weight:600;margin-bottom:6px}
-    .meta{font-size:12px;color:var(--muted);margin-bottom:8px}
-    .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;background:#262626;color:#d4d4d4;margin-right:6px}
-    .body-preview{font-size:13px;color:#ccc;white-space:pre-wrap;word-break:break-word}
-    .admin-hint{font-size:12px;color:#a3a3a3;margin-top:8px}
-    .admin-hint strong{color:#86efac;font-weight:600}
-    .tk-thread{display:none;margin-top:12px;padding-top:12px;border-top:1px dashed #333;text-align:left}
-    .ticket.open .tk-thread{display:block}
-    .tk-msg{margin-bottom:10px;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#0f0f0f;font-size:13px}
-    .tk-msg.tk-adm{background:rgba(139,37,0,.2);border-color:#4a2a22}
-    .tk-msg .who{font-size:11px;color:#a3a3a3;margin-bottom:6px}
-    .tk-msg .who em{color:#fca5a5;font-style:normal}
-    .tk-reply-box{margin-top:14px}
-    .tk-reply-box textarea{min-height:88px;margin-bottom:8px}
-    .tk-closed-notice{font-size:13px;color:#fbbf24;margin-top:14px;padding:12px;border-radius:8px;border:1px solid #854d0e;background:rgba(133,77,14,.2)}
-    footer{padding:24px;text-align:center;color:var(--muted);font-size:12px;border-top:1px solid #222;margin-top:32px}
-  </style>
+    <link rel="stylesheet" href="/css/redwood-watch-shell.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-ui.css" />
+  <link rel="stylesheet" href="/css/redwood-watch-support.css" />
 </head>
 <body>
   <nav>

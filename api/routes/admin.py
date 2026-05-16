@@ -425,6 +425,7 @@ def admin_bulk_delete_films(
         db.delete(f)
         deleted.append(film_id)
     if deleted:
+        db.flush()
         db.commit()
     return {"deleted": deleted, "errors": errors}
 

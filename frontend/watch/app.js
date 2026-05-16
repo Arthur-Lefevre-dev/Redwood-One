@@ -124,8 +124,12 @@ function watchNavUserInitials(display) {
   return s.slice(0, 2).toUpperCase();
 }
 
+function watchUiStylesExternal() {
+  return !!document.querySelector('link[href*="redwood-watch-ui.css"]');
+}
+
 function injectWatchMobileNavStyles() {
-  if (document.getElementById('watch-mobile-nav-styles')) return;
+  if (document.getElementById('watch-mobile-nav-styles') || watchUiStylesExternal()) return;
   const style = document.createElement('style');
   style.id = 'watch-mobile-nav-styles';
   style.textContent = `
@@ -424,7 +428,7 @@ function initWatchMobileNav() {
 }
 
 function injectWatchNavUserStyles() {
-  if (document.getElementById('watch-nav-user-styles')) return;
+  if (document.getElementById('watch-nav-user-styles') || watchUiStylesExternal()) return;
   const style = document.createElement('style');
   style.id = 'watch-nav-user-styles';
   style.textContent = `
@@ -607,7 +611,7 @@ function watchEscapeHtml(s) {
 const WATCH_ANNOUNCE_DISMISS_KEY = 'redwood_announce_dismiss';
 
 function injectWatchAnnouncementStyles() {
-  if (document.getElementById('watch-announcement-styles')) return;
+  if (document.getElementById('watch-announcement-styles') || watchUiStylesExternal()) return;
   const style = document.createElement('style');
   style.id = 'watch-announcement-styles';
   style.textContent = `
@@ -698,7 +702,7 @@ let _watchLoadingStylesInjected = false;
 let _watchPageLoadingDepth = 0;
 
 function injectWatchLoadingStyles() {
-  if (_watchLoadingStylesInjected) return;
+  if (_watchLoadingStylesInjected || watchUiStylesExternal()) return;
   _watchLoadingStylesInjected = true;
   const s = document.createElement('style');
   s.id = 'watch-loading-style-tag';
