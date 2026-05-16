@@ -1,4 +1,4 @@
-"""Public read-only config for third-party ad tags on watch pages (no secrets)."""
+"""Public read-only config for third-party ad tags (watch film + auth pages; no secrets)."""
 
 from __future__ import annotations
 
@@ -13,38 +13,44 @@ from config import get_settings
 router = APIRouter(prefix="/api/public", tags=["public"])
 
 
-def _safe_https_script_src(raw: str) -> Optional[str]:
-    """Reject obvious junk; publisher pastes URL from Coinzilla dashboard."""
-    u = (raw or "").strip()
-    if not u or len(u) > 2048 or not u.startswith("https://"):
-        return None
-    if any(c in u for c in "\n\r\t\x00<>'\""):
-        return None
-    return u
-
-
-def _safe_zone_id(raw: str) -> Optional[str]:
+def _safe_aads_unit_id(raw: str) -> Optional[str]:
+    """A-ADS unit id is numeric (publisher dashboard)."""
     z = (raw or "").strip()
-    if not z or len(z) > 120:
+    if not z or len(z) > 20:
         return None
-    if not re.fullmatch(r"[\w\-]+", z):
+    if not re.fullmatch(r"\d+", z):
         return None
     return z
 
 
 @router.get("/watch-ads")
 def watch_ads_public_config() -> JSONResponse:
-    """Film / episode page loads this and injects Coinzilla tag when enabled."""
+    """Watch film + auth pages load this; inject A-ADS iframes when enabled."""
     s = get_settings()
-    src = _safe_https_script_src(getattr(s, "WATCH_ADS_COINZILLA_SCRIPT_SRC", "") or "")
-    enabled = bool(getattr(s, "WATCH_ADS_COINZILLA_ENABLED", False)) and bool(src)
-    zone = _safe_zone_id(getattr(s, "WATCH_ADS_COINZILLA_ZONE_ID", "") or "")
+    unit = _safe_aads_unit_id(getattr(s, "WATCH_ADS_AADS_UNIT_ID", "") or "")
+    enabled = bool(getattr(s, "WATCH_ADS_AADS_ENABLED", False)) and bool(unit)
+    unit_mobile = _safe_aads_unit_id(getattr(s, "WATCH_ADS_AADS_MOBILE_UNIT_ID", "") or "")
+    if unit_mobile == unit:
+        unit_mobile = None
+    unit_auth = _safe_aads_unit_id(getattr(s, "WATCH_ADS_AADS_AUTH_UNIT_ID", "") or "")
+    auth_enabled = bool(getattr(s, "WATCH_ADS_AADS_AUTH_ENABLED", False)) and bool(unit_auth)
+    unit_auth_top = _safe_aads_unit_id(getattr(s, "WATCH_ADS_AADS_AUTH_TOP_UNIT_ID", "") or "")
+    auth_top_enabled = bool(getattr(s, "WATCH_ADS_AADS_AUTH_TOP_ENABLED", False)) and bool(unit_auth_top)
+    if unit_auth_top == unit_auth:
+        unit_auth_top = None
+        auth_top_enabled = False
     body: Dict[str, Any] = {
-        "coinzilla": {
+        "aads": {
             "enabled": enabled,
-            "script_src": src if enabled else None,
-            "zone_id": zone if enabled else None,
-        }
+            "unit_id": unit if enabled else None,
+            "mobile_unit_id": (unit_mobile if enabled and unit_mobile else None),
+        },
+        "aads_auth": {
+            "enabled": auth_enabled,
+            "unit_id": unit_auth if auth_enabled else None,
+            "top_enabled": auth_top_enabled,
+            "top_unit_id": unit_auth_top if auth_top_enabled else None,
+        },
     }
     return JSONResponse(
         content=body,

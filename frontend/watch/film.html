@@ -118,6 +118,32 @@
     }
     .trailer-modal-close:hover{border-color:var(--accent);color:#fff}
     .trailer-modal-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    .film-ad-modal[hidden]{display:none!important}
+    .film-ad-modal:not([hidden]){
+      position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:16px;
+    }
+    .film-ad-modal-backdrop{
+      position:absolute;inset:0;border:0;padding:0;margin:0;width:100%;height:100%;
+      background:rgba(0,0,0,.85);cursor:pointer;
+    }
+    .film-ad-modal-panel{
+      position:relative;z-index:1;width:min(560px,96vw);max-height:min(90vh,100%);
+      background:#111;border:1px solid #333;border-radius:14px;box-shadow:0 24px 48px rgba(0,0,0,.55);
+      padding:16px;display:flex;flex-direction:column;gap:14px;align-items:stretch;
+    }
+    .film-ad-modal-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .film-ad-modal-title{font-size:1rem;font-weight:600;color:#eee;margin:0}
+    .film-ad-modal-close{
+      flex-shrink:0;width:40px;height:40px;border-radius:10px;border:1px solid #333;
+      background:#1a1a1a;color:#e5e5e5;font-size:22px;line-height:1;cursor:pointer;font-family:inherit;
+    }
+    .film-ad-modal-close:hover{border-color:var(--accent);color:#fff}
+    .film-ad-modal-body{min-height:100px;display:flex;align-items:center;justify-content:center}
+    .film-ad-modal-continue{
+      width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent);color:#fff;
+      font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;
+    }
+    .film-ad-modal-continue:hover{filter:brightness(1.08)}
     .trailer-modal-frame-wrap{
       position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;
       flex-shrink:0;isolation:isolate;
@@ -210,7 +236,6 @@
   </style>
 </head>
 <body>
-  <script src="/watch/js/watch-ads-loader.js"></script>
   <nav>
     <a class="brand" href="/watch/">Redwood Plus</a>
     <div class="nav-end">
@@ -294,6 +319,17 @@
       <!-- No crossorigin: presigned S3 URLs rarely send CORS headers; without it, cross-origin video still plays. -->
       <video id="player" playsinline controls></video>
     </div>
+    <div class="film-ad-modal" id="film-ad-modal" hidden role="dialog" aria-modal="true" aria-labelledby="film-ad-modal-title">
+      <button type="button" class="film-ad-modal-backdrop" id="film-ad-modal-backdrop" aria-label="Fermer la publicité"></button>
+      <div class="film-ad-modal-panel">
+        <div class="film-ad-modal-header">
+          <h2 class="film-ad-modal-title" id="film-ad-modal-title">Publicité</h2>
+          <button type="button" class="film-ad-modal-close" id="film-ad-modal-close" aria-label="Fermer">&times;</button>
+        </div>
+        <div class="film-ad-modal-body" id="film-ad-modal-host"></div>
+        <button type="button" class="film-ad-modal-continue" id="film-ad-modal-continue">Continuer la lecture</button>
+      </div>
+    </div>
     <div class="row" id="actors"></div>
     <section class="similar">
       <h2>Autres films</h2>
@@ -301,6 +337,8 @@
     </section>
   </main>
   <footer>© Redwood Plus — This product uses the TMDB API but is not endorsed or certified by TMDB.</footer>
+  <script src="/watch/js/watch-ads-loader.js"></script>
+  <script src="/watch/js/watch-adblock-notice.js"></script>
   <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
   <script src="/watch/app.js"></script>
   <script>
@@ -533,6 +571,27 @@
         btn.style.removeProperty('display');
       }
       player.on('ready', revealPlyrCaptionsButton);
+      if (!video.dataset.redwoodSpaceToggleBound) {
+        video.dataset.redwoodSpaceToggleBound = '1';
+        document.addEventListener(
+          'keydown',
+          (ev) => {
+            if (ev.code !== 'Space' && ev.key !== ' ') return;
+            if (ev.target === video) return;
+            const tgt = ev.target;
+            if (tgt && typeof tgt.closest === 'function') {
+              if (tgt.closest('input, textarea, select, [contenteditable="true"], button, a, summary')) return;
+            }
+            const trailerEl = document.getElementById('trailer-modal');
+            if (trailerEl && !trailerEl.hidden) return;
+            const adModalEl = document.getElementById('film-ad-modal');
+            if (adModalEl && !adModalEl.hidden) return;
+            ev.preventDefault();
+            player.togglePlay();
+          },
+          true,
+        );
+      }
       video.addEventListener('loadedmetadata', revealPlyrCaptionsButton);
       setTimeout(revealPlyrCaptionsButton, 400);
       const playerWrap = document.querySelector('.player-wrap');
@@ -556,6 +615,67 @@
         }
       });
       setTimeout(() => { if (video.readyState >= 2) hideLoader(); }, 8000);
+
+      function attachFilmAdPlayGate(vid) {
+        if (vid._redwoodFilmAdGate) return;
+        var storageKey = 'redwood_aads_ok_' + String(id);
+        function hostHasIframe() {
+          var h = document.getElementById('film-ad-modal-host');
+          return !!(h && h.querySelector('iframe'));
+        }
+        function bindGate() {
+          if (vid._redwoodFilmAdGate) return;
+          if (!window.__REDWOOD_FILM_AADS__ || !window.__REDWOOD_FILM_AADS__.unitId) return;
+          if (!hostHasIframe()) return;
+          vid._redwoodFilmAdGate = true;
+          var memSkip = false;
+          var modal = document.getElementById('film-ad-modal');
+          var btnClose = document.getElementById('film-ad-modal-close');
+          var btnBack = document.getElementById('film-ad-modal-backdrop');
+          var btnCont = document.getElementById('film-ad-modal-continue');
+          function dismissThenPlay() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            memSkip = true;
+            try {
+              sessionStorage.setItem(storageKey, '1');
+            } catch (_) {}
+            vid.play().catch(function () {});
+          }
+          function openAdModal() {
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+          }
+          btnClose.onclick = dismissThenPlay;
+          btnBack.onclick = dismissThenPlay;
+          btnCont.onclick = dismissThenPlay;
+          document.addEventListener('keydown', function filmAdEsc(ev) {
+            if (ev.key !== 'Escape' || modal.hidden) return;
+            dismissThenPlay();
+          });
+          vid.addEventListener(
+            'play',
+            function filmAdGate() {
+              if (memSkip) return;
+              var done = false;
+              try {
+                done = sessionStorage.getItem(storageKey) === '1';
+              } catch (_) {}
+              if (done) return;
+              if (!hostHasIframe()) return;
+              vid.pause();
+              openAdModal();
+            },
+            true,
+          );
+        }
+        if (window.__REDWOOD_FILM_AADS__ && window.__REDWOOD_FILM_AADS__.unitId && hostHasIframe()) {
+          bindGate();
+        } else {
+          window.addEventListener('redwood-film-aads-ready', bindGate, { once: true });
+        }
+      }
+      attachFilmAdPlayGate(video);
 
       const sim = document.getElementById('sim');
       const SIM_PAGE = 24;
